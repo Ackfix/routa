@@ -328,3 +328,16 @@ body:not(.searching) .topbar { display: none; }
 body.navigating .fab-search, body.navigating .fab-menu { display: none; }
 body.searching .fab-search, body.searching .fab-menu, body.searching .fab-report, body.searching .fabs-right, body.searching .speedbox, body.searching .limitsign { display: none; }
 body.searching .chips { opacity: 1 !important; transform: none !important; pointer-events: auto !important; }
+/* 0.9.9 : boutons collés aux bords de l'écran */
+:root { --eL: max(10px, calc(var(--sal) - 24px)); --eR: max(10px, calc(var(--sar) - 24px)); --eB: max(12px, calc(var(--sab) - 10px)); --eT: max(10px, calc(var(--sat) + 2px)); }
+.fab-menu { top: var(--eT); left: var(--eL); }
+.fab-report { right: var(--eR); bottom: var(--eB); }
+.fab-search { right: calc(var(--eR) + 3px); bottom: calc(var(--eB) + 72px); }
+.fabs-right { right: calc(var(--eR) + 8px); bottom: calc(var(--eB) + 140px); }
+body:not(.navigating) .speedbox { left: var(--eL); bottom: var(--eB); }
+body:not(.navigating) .limitsign { left: var(--eL); bottom: calc(var(--eB) + 86px); }
+.limitnext { left: calc(var(--eL) + 72px); }
+body.navigating .fab-report { right: var(--eR); }
+body.navigating .fabs-right { right: calc(var(--eR) + 8px); }
+body.navigating .speedbox, body.navigating .limitsign { left: var(--eL); }
+.maplibregl-ctrl-bottom-right { bottom: auto; top: var(--eT); right: var(--eR); }
