@@ -3,7 +3,7 @@
 'use strict';
 
 const CFG = window.ROUTA_CONFIG || {};
-const VERSION = '0.9.3';
+const VERSION = '0.9.4';
 const I18N = window.ROUTA_I18N || { lang: 'fr', t: (s) => s, speech: 'fr-FR', valhalla: 'fr-FR', langs: { fr: 'Français' }, setLang() {} };
 const $ = (id) => document.getElementById(id);
 
@@ -363,11 +363,21 @@ map.on('load', () => {
   map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#4DA3FF', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3.5, 16, 10] } });
   map.addSource('done', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({ id: 'done-line', type: 'line', source: 'done', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#8A94A6', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3.5, 16, 10] } });
+  map.on('click', (e) => {
+    if (e._routaDone || S.placing) return;
+    const t = e.originalEvent && e.originalEvent.target;
+    if (t && t.closest && t.closest('.maplibregl-marker')) return;
+    const open = !$('sheetWrap').hidden || (S.preview && !S.nav) || S.markers.pois.length || S.markers.pin;
+    if (!open) return;
+    e._routaDone = true;
+    if (!$('sheetWrap').hidden) userClose();
+    if (S.preview && !S.nav) cancelPreview();
+    clearPois(); setPin(null);
+  });
   setupPlaces();
   setupMapLayers();
   map.on('click', (e) => {
     if (e._routaDone || S.placing || S.nav) return;
-    if (!$('sheetWrap').hidden && S.sheetView !== 'point') { userClose(); return; }
     const t = e.originalEvent && e.originalEvent.target;
     if (t && t.closest && t.closest('.maplibregl-marker')) return;
     openPoint({ lat: e.lngLat.lat, lon: e.lngLat.lng });
@@ -1382,7 +1392,7 @@ function setupPlaces() {
   try { map.setLayerZoomRange('poi_r1', 15, 24); map.setLayerZoomRange('poi_r7', 16, 24); map.setLayerZoomRange('poi_r20', 17, 24); } catch (e) { /* style différent */ }
   applyPlaces();
   map.on('click', (e) => {
-    if (S.placing || !S.settings.showPlaces) return;
+    if (e._routaDone || S.placing || S.nav || !S.settings.showPlaces) return;
     const layers = POI_LAYERS.filter((id) => map.getLayer(id));
     if (!layers.length) return;
     const pad = 16;
