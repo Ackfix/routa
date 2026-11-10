@@ -135,7 +135,7 @@ const DIM_LABELS = [['height', 'Hauteur', 'm'], ['width', 'Largeur', 'm'], ['len
 /* ======================= État ======================= */
 const S = {
   me: store.get('routa.me', null),
-  settings: Object.assign({ voice: false, readMsgs: true, night: 'auto', traffic: true, mapType: 'plan', relief3d: false, navNorth: false, showPlaces: true, googleLinks: true, showLimit: true, speedAlert: true }, store.get('routa.settings', {})),
+  settings: Object.assign({ voice: false, readMsgs: true, night: 'auto', traffic: true, mapType: 'plan', relief3d: false, navNorth: false, showPlaces: true, googleLinks: true, showLimit: true, speedAlert: true, showTransit: false }, store.get('routa.settings', {})),
   vehicle: Object.assign({ type: 'voiture', dims: {}, hazmat: false }, store.get('routa.vehicle', {})),
   recents: store.get('routa.recents', []),
   lastRead: store.get('routa.lastRead', 0),
@@ -449,6 +449,7 @@ function openMapView() {
     '<h3>Type de carte</h3>' + seg('mvType', [['plan', 'Plan'], ['sat', 'Satellite']], S.settings.mapType) +
     '<label class="switch" for="mvTraffic"><span><b>Trafic en direct</b><br><span class="muted small">Vert fluide, orange ralenti, rouge bouchon. Accidents et travaux en zoomant.</span></span><input id="mvTraffic" type="checkbox"' + (S.settings.traffic && CFG.tomtomKey ? ' checked' : '') + (CFG.tomtomKey ? '' : ' disabled') + '></label>' +
     (CFG.tomtomKey ? '' : '<p class="muted small">Trafic en direct bientôt disponible.</p>') +
+    '<label class="switch" for="mvTransit"><span><b>Arrêts de bus et de tram</b><br><span class="muted small">Touche un arrêt pour voir les lignes et les prochains départs.</span></span><input id="mvTransit" type="checkbox"' + (S.settings.showTransit ? ' checked' : '') + '></label>' +
     '<label class="switch" for="mvPlaces"><span>Afficher les établissements (restos, magasins…) en zoomant</span><input id="mvPlaces" type="checkbox"' + (S.settings.showPlaces ? ' checked' : '') + '></label>' +
     '<h3>Couleurs</h3>' + seg('mvNight', [['auto', 'Auto'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
     '<h3>Pendant la navigation</h3>' + seg('mvNav', [['route', 'Dans le sens de la route'], ['north', 'Nord en haut']], S.settings.navNorth ? 'north' : 'route') +
@@ -456,6 +457,7 @@ function openMapView() {
     '<p class="muted small">Images satellite : Esri.</p>', 'mapview');
   body.querySelectorAll('#mvType button').forEach((b) => { b.onclick = () => { S.settings.mapType = b.dataset.v; saveSettings(); body.querySelectorAll('#mvType button').forEach((x) => x.classList.toggle('on', x === b)); applyMapView(true); }; });
   body.querySelector('#mvTraffic').onchange = (e) => { S.settings.traffic = e.target.checked; saveSettings(); applyMapView(false); };
+  body.querySelector('#mvTransit').onchange = (e) => { S.settings.showTransit = e.target.checked; saveSettings(); applyTransit(); if (S.settings.showTransit && map.getZoom() < 15) map.easeTo({ zoom: 15.5, duration: 600 }); };
   body.querySelector('#mvPlaces').onchange = (e) => { S.settings.showPlaces = e.target.checked; saveSettings(); applyPlaces(); if (S.settings.showPlaces && map.getZoom() < 15) map.easeTo({ zoom: 15.5, duration: 600 }); };
   body.querySelectorAll('#mvNight button').forEach((b) => { b.onclick = () => { S.settings.night = b.dataset.v; saveSettings(); applyNight(); body.querySelectorAll('#mvNight button').forEach((x) => x.classList.toggle('on', x === b)); }; });
   body.querySelectorAll('#mvNav button').forEach((b) => { b.onclick = () => { S.settings.navNorth = b.dataset.v === 'north'; saveSettings(); body.querySelectorAll('#mvNav button').forEach((x) => x.classList.toggle('on', x === b)); if (S.nav) { S.follow = true; $('btnLocate').classList.add('active'); followCam(); } updateCompass(); }; });
@@ -1409,7 +1411,78 @@ const POI_LAYERS = ['poi_r1', 'poi_r7', 'poi_r20'];
 const SUB_FR = { restaurant: 'Restaurant', fast_food: 'Fast-food', cafe: 'Café', bar: 'Bar', pub: 'Pub', beer: 'Bar', ice_cream: 'Glacier', bakery: 'Boulangerie', supermarket: 'Supermarché', grocery: 'Épicerie', convenience: 'Épicerie', butcher: 'Boucherie', pharmacy: 'Pharmacie', bank: 'Banque', atm: 'Bancomat', fuel: 'Station-service', parking: 'Parking', hotel: 'Hôtel', motel: 'Motel', clothes: 'Vêtements', clothing_store: 'Vêtements', shoes: 'Chaussures', hairdresser: 'Coiffeur', beauty: 'Institut de beauté', car_repair: 'Garage', car: 'Concession auto', car_wash: 'Lavage auto', car_parts: 'Pièces auto', tyres: 'Pneus', doctors: 'Médecin', dentist: 'Dentiste', hospital: 'Hôpital', clinic: 'Clinique', post_office: 'Poste', school: 'École', kindergarten: 'Crèche', college: 'Haute école', university: 'Université', place_of_worship: 'Lieu de culte', museum: 'Musée', cinema: 'Cinéma', theatre: 'Théâtre', library: 'Bibliothèque', florist: 'Fleuriste', kiosk: 'Kiosque', mobile_phone: 'Téléphonie', electronics: 'Électronique', computer: 'Informatique', hardware: 'Quincaillerie', doityourself: 'Bricolage', optician: 'Opticien', laundry: 'Laverie', dry_cleaning: 'Pressing', bicycle: 'Vélos', books: 'Librairie', jewelry: 'Bijouterie', alcohol: 'Boissons', alcohol_shop: 'Boissons', beverages: 'Boissons', department_store: 'Grand magasin', mall: 'Centre commercial', furniture: 'Meubles', garden_centre: 'Jardinerie', toys: 'Jouets', sports: 'Sport', pet: 'Animalerie', veterinary: 'Vétérinaire', police: 'Police', townhall: 'Administration', fire_station: 'Pompiers', attraction: 'Attraction', viewpoint: 'Point de vue', gym: 'Salle de sport', fitness_centre: 'Salle de sport', swimming_pool: 'Piscine', stadium: 'Stade', park: 'Parc', playground: 'Place de jeux', charging_station: 'Borne de recharge', tobacco: 'Tabac', deli: 'Traiteur', chemist: 'Droguerie', variety_store: 'Bazar', gift: 'Cadeaux', travel_agency: 'Agence de voyage', estate_agent: 'Immobilier', insurance: 'Assurance', lawyer: 'Avocat', dentist_office: 'Dentiste', parcel_locker: 'Casier à colis', post_box: 'Boîte aux lettres', vending_machine: 'Distributeur', toilets: 'Toilettes', drinking_water: 'Fontaine', recycling: 'Recyclage', bicycle_parking: 'Parking vélos', bicycle_rental: 'Location de vélos', information: 'Information', fountain: 'Fontaine', marketplace: 'Marché', nightclub: 'Discothèque', casino: 'Casino', bus: 'Arrêt de bus', rail: 'Gare', taxi: 'Taxi', car_rental: 'Location de voitures', hostel: 'Auberge', guest_house: 'Maison d\'hôtes', camp_site: 'Camping', caravan_site: 'Aire de camping-cars', motorcycle: 'Motos', music: 'Musique', photo: 'Photo', stationery: 'Papeterie', newsagent: 'Kiosque', pastry: 'Pâtisserie', confectionery: 'Confiserie', cheese: 'Fromagerie', wine: 'Vins', seafood: 'Poissonnerie', greengrocer: 'Primeur', tailor: 'Retouches', massage: 'Massage', tattoo: 'Tatouage', nails: 'Onglerie' };
 const FOOD_CLS = /^(restaurant|fast_food|cafe|bar|beer|pub|ice_cream|food_court|biergarten)$/;
 const SHOP_CLS = /^(shop|grocery|bakery|butcher|alcohol_shop|clothing_store|jewelry|furniture|hardware|car|bicycle|books|florist|supermarket|convenience|electronics|mobile_phone|shoes|toys|sports|pet|garden_centre|department_store|mall|doityourself|optician|deli|kiosk|gift|variety_store|computer|chemist|beauty|hairdresser|laundry|tobacco)$/;
+/* Arrêts de bus et de tram : masqués par défaut, prochains départs au toucher */
+const TRANSIT_STOP = ['any', ['==', ['get', 'class'], 'bus'], ['==', ['get', 'subclass'], 'bus_stop'], ['==', ['get', 'subclass'], 'bus_station'], ['==', ['get', 'subclass'], 'tram_stop']];
+function setupTransit() {
+  try {
+    POI_LAYERS.forEach((id) => { if (!map.getLayer(id)) return; const f = map.getFilter(id); map.setFilter(id, f ? ['all', f, ['!', TRANSIT_STOP]] : ['!', TRANSIT_STOP]); });
+    const def = (map.getStyle().layers || []).find((l) => l.id === 'poi_transit');
+    if (def) {
+      const f = def.filter;
+      map.setFilter('poi_transit', f ? ['all', f, ['!', TRANSIT_STOP]] : ['!', TRANSIT_STOP]);
+      const c = JSON.parse(JSON.stringify(def));
+      c.id = 'transit-stops'; c.minzoom = 14.5; c.filter = ['all', ['match', ['geometry-type'], ['MultiPoint', 'Point'], true, false], TRANSIT_STOP];
+      c.layout = Object.assign({}, c.layout, { visibility: 'none' });
+      map.addLayer(c);
+    }
+  } catch (e) { console.warn('transports', e); }
+  applyTransit();
+  map.on('click', (e) => {
+    if (e._routaDone || S.placing || S.nav) return;
+    const layers = ['transit-stops', 'poi_transit'].filter((id) => map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== 'none');
+    if (!layers.length) return;
+    const pad = 14;
+    const fs = map.queryRenderedFeatures([[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]], { layers }).filter((f) => (f.properties || {}).class !== 'airport');
+    if (!fs.length) return;
+    e._routaDone = true;
+    openStop(fs[0]);
+  });
+}
+function applyTransit() {
+  try { if (map.getLayer('transit-stops')) map.setLayoutProperty('transit-stops', 'visibility', S.settings.showTransit ? 'visible' : 'none'); } catch (e) { /* */ }
+}
+const LINE_ONLY = /^(B|BUS|T|TRAM|M|NFB|NFT|NFO|KB|EXB|BAT|BP|FUN|PB|GB)$/i;
+async function openStop(f) {
+  const pr = f.properties || {}; const g = f.geometry.coordinates;
+  const name = pr['name:fr'] || pr.name || pr['name:latin'] || 'Arrêt';
+  const link = '<a class="btn soft block" target="_blank" rel="noopener" href="https://search.ch/fahrplan/?from=' + encodeURIComponent(name) + '">' + ic('clock') + 'Horaires complets</a>';
+  openSheet(name, '<p class="muted">Chargement des prochains départs…</p>', 'poistop');
+  const token = (S.stopTok = (S.stopTok || 0) + 1);
+  const load = async () => {
+    let html = '';
+    try {
+      const loc = await fetch('https://transport.opendata.ch/v1/locations?x=' + g[1] + '&y=' + g[0] + '&type=station').then((r) => r.json());
+      const st = (loc.stations || []).filter((x) => x.id).sort((a, b) => (a.distance || 0) - (b.distance || 0))[0];
+      if (!st || (st.distance || 0) > 400) throw new Error('loin');
+      const sb = await fetch('https://transport.opendata.ch/v1/stationboard?id=' + st.id + '&limit=10').then((r) => r.json());
+      const now = Date.now();
+      const rows = (sb.stationboard || []).map((d) => {
+        const t = d.stop && d.stop.departure ? new Date(d.stop.departure.replace(/([+-]\d\d)(\d\d)$/, '$1:$2')) : null;
+        if (!t || isNaN(t)) return '';
+        const delay = +(d.stop.delay || 0);
+        const m = Math.round((t.getTime() + delay * 60000 - now) / 60000);
+        if (m < -1) return '';
+        const cat = String(d.category || '').trim(); const num = String(d.number || '').trim();
+        const train = !LINE_ONLY.test(cat);
+        const line = train ? cat + (num && num.length < 4 ? num : '') : (num || cat);
+        const hm = ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2);
+        const when = m <= 0 ? '<b>maintenant</b>' : m < 60 ? '<b>' + m + ' min</b>' : '<b>' + hm + '</b>';
+        return '<li class="dep"><span class="ln' + (train ? ' train' : '') + '">' + esc(line) + '</span><span class="to">' + esc(d.to || '') + (d.stop.platform ? '<small class="muted"> · <span>voie</span> ' + esc(d.stop.platform) + '</small>' : '') + '</span><span class="tm">' + when + (delay > 0 ? '<small class="late">+' + delay + '</small>' : '') + '</span></li>';
+      }).filter(Boolean);
+      html = (rows.length ? '<h3>Prochains départs</h3><ul class="deps">' + rows.join('') + '</ul>' : '<p class="muted">Aucun départ prévu pour le moment.</p>') + link + '<p class="muted small">Horaires en temps réel : opendata.ch</p>';
+    } catch (e) {
+      html = '<p class="muted">Horaires en direct indisponibles pour cet arrêt.</p>' + link;
+    }
+    if (token !== S.stopTok || S.sheetView !== 'poistop') return false;
+    $('sheetBody').innerHTML = html;
+    return true;
+  };
+  if (await load()) {
+    const iv = setInterval(async () => { if (token !== S.stopTok || S.sheetView !== 'poistop' || $('sheetWrap').hidden || !(await load())) clearInterval(iv); }, 30000);
+  }
+}
 function setupPlaces() {
+  setupTransit();
   try { map.setLayerZoomRange('poi_r1', 15, 24); map.setLayerZoomRange('poi_r7', 16, 24); map.setLayerZoomRange('poi_r20', 17, 24); } catch (e) { /* style différent */ }
   applyPlaces();
   map.on('click', (e) => {
