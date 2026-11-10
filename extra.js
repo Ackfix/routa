@@ -401,7 +401,11 @@ const MAN = {
   WAYPOINT_REACHED: ['continue', 'straight'], WAYPOINT_LEFT: ['continue', 'straight'], WAYPOINT_RIGHT: ['continue', 'straight'], DEPART: ['depart', ''], ARRIVE: ['arrive', ''], ARRIVE_LEFT: ['arrive', 'left'], ARRIVE_RIGHT: ['arrive', 'right']
 };
 function convertTT(rt) {
-  const coords = []; rt.legs.forEach((l) => l.points.forEach((p) => { const c = { lat: p.latitude, lon: p.longitude }; const last = coords[coords.length - 1]; if (!last || last.lat !== c.lat || last.lon !== c.lon) coords.push(c); }));
+  const raw = []; rt.legs.forEach((l) => l.points.forEach((p) => raw.push(p)));
+  const rawLim = new Array(raw.length).fill(null);
+  (rt.sections || []).filter((x) => x.sectionType === 'SPEED_LIMIT' && x.maxSpeedLimitInKmh).forEach((x) => { for (let i = x.startPointIndex; i < x.endPointIndex && i < raw.length; i++) rawLim[i] = x.maxSpeedLimitInKmh; });
+  const coords = [], limits = [];
+  raw.forEach((p, i) => { const c = { lat: p.latitude, lon: p.longitude }; const last = coords[coords.length - 1]; if (!last || last.lat !== c.lat || last.lon !== c.lon) { coords.push(c); limits.push(rawLim[i]); } });
   const cum = [0]; for (let i = 1; i < coords.length; i++) cum.push(cum[i - 1] + dist(coords[i - 1], coords[i]));
   const total = cum[cum.length - 1] || rt.summary.lengthInMeters;
   const k = total / Math.max(1, rt.summary.lengthInMeters);
@@ -418,7 +422,7 @@ function convertTT(rt) {
     stepEnds.push(endD);
   });
   if (!steps.length) { steps.push({ maneuver: { type: 'depart' }, name: '', distance: total }); stepEnds.push(total); }
-  return { coords, cum, total, duration: rt.summary.travelTimeInSeconds, steps, stepEnds, tomtom: true, trafficDelay: rt.summary.trafficDelayInSeconds || 0, noTraffic: rt.summary.noTrafficTravelTimeInSeconds };
+  return { coords, cum, total, duration: rt.summary.travelTimeInSeconds, steps, stepEnds, limits: limits.some(Boolean) ? limits : null, tomtom: true, trafficDelay: rt.summary.trafficDelayInSeconds || 0, noTraffic: rt.summary.noTrafficTravelTimeInSeconds };
 }
 X.route = async (from, to) => {
   if (!TT) return null;
@@ -435,6 +439,7 @@ X.route = async (from, to) => {
     if (X.opts.motorways) avoid.push('motorways');
     let url = tt('/routing/1/calculateRoute/' + locs + '/json', { traffic: 'true', travelMode: 'car', routeType: 'fastest', instructionsType: 'coded', language: LANG, computeTravelTimeFor: 'all', maxAlternatives: vias.length ? '0' : '2', routeRepresentation: 'polyline' });
     avoid.forEach((a) => { url += '&avoid=' + a; });
+    url += '&sectionType=speedLimit';
     if (X.opts.vignette) url += '&avoidVignette=CHE,AUT,SVN,HUN,CZE,SVK,BGR,ROU,MDA';
     const j = await getJson(url, 9000);
     if (!j.routes || !j.routes.length) throw new Error('no route');
@@ -489,6 +494,30 @@ setInterval(() => {
   const v = X.via.find((x) => !x.done);
   if (v && dist(S.pos, v) < 80) { v.done = true; toast('Étape atteinte : <b>' + esc(v.name) + '</b>'); say('Étape atteinte'); }
 }, 3000);
+
+/* ======================= Limites de vitesse sur tout le trajet ======================= */
+let limNextEl = null, limSaidFor = -1, limShownCur = null;
+function limNextBox() {
+  if (limNextEl) return limNextEl;
+  limNextEl = el('<div id="limitNext" class="limitnext" hidden><span class="ln-sign"></span><span class="ln-dist"></span></div>');
+  document.body.appendChild(limNextEl); return limNextEl;
+}
+setInterval(() => {
+  const N = S.nav, box = limNextBox();
+  if (!N || !N.R || !N.R.limits || !S.settings.showLimit) { box.hidden = true; limShownCur = null; return; }
+  const L = N.R.limits, i = Math.max(0, Math.min(N.seg || 0, L.length - 1));
+  let cur = L[i];
+  if (cur == null) { for (let k = i; k >= 0 && k > i - 20; k--) if (L[k]) { cur = L[k]; break; } }
+  if (cur !== S.limit) { S.limit = cur; if (A.updateSpeed) A.updateSpeed(); }
+  if (cur && limShownCur && cur !== limShownCur && cur < limShownCur) vibrate(40);
+  limShownCur = cur;
+  let j = i; while (j < L.length && (L[j] === cur || L[j] == null)) j++;
+  const d = j < L.length ? N.R.cum[j] - (N.along || 0) : Infinity;
+  if (j < L.length && L[j] && d > 0 && d < 800) {
+    box.hidden = false; box.querySelector('.ln-sign').textContent = L[j]; box.querySelector('.ln-dist').textContent = 'dans ' + fmtDist(Math.round(d / 10) * 10);
+    if (cur && L[j] < cur && d < 350 && limSaidFor !== j && S.settings.speedAlert) { limSaidFor = j; say('Limitation à ' + L[j] + ' dans ' + (d < 100 ? 'quelques mètres' : Math.round(d / 50) * 50 + ' mètres')); }
+  } else box.hidden = true;
+}, 1000);
 
 /* ======================= Météo sur le trajet et cols ======================= */
 const WMO = (c) => c === 0 ? 'Ciel clair' : c <= 2 ? 'Peu nuageux' : c === 3 ? 'Couvert' : c <= 48 ? 'Brouillard' : c <= 57 ? 'Bruine' : c <= 67 ? 'Pluie' : c <= 77 ? 'Neige' : c <= 82 ? 'Averses' : c <= 86 ? 'Averses de neige' : 'Orage';
