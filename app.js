@@ -1981,7 +1981,6 @@ function profileForm(isNew) {
     html:
       '<label class="field" for="pfName">Pseudo<input id="pfName" type="text" maxlength="20" value="' + esc(S.me.pseudo || '') + '" placeholder="Ex. : Pilote_GT"></label>' +
       '<label class="field" for="pfCar">Ta voiture<input id="pfCar" type="text" maxlength="30" value="' + esc(S.me.car || '') + '" placeholder="Ex. : Golf 8 GTI"></label>' +
-      '<div class="field">Ta couleur<div class="swatches" id="pfColors">' + COLORS.map((c) => '<button class="swatch' + (c === color ? ' sel' : '') + '" data-c="' + c + '" style="background:' + c + '" aria-label="Couleur ' + c + '"></button>').join('') + '</div></div>' +
       '<h3>Qui peut me voir sur la carte ?</h3>' + visSeg('pfVis') +
       '<p class="muted small">Tes amis voient ta position exacte. Les autres voient seulement une zone d\'environ 1 km.</p>',
     bind(root) {
