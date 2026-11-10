@@ -316,3 +316,15 @@ body.night.sat #map .maplibregl-canvas { filter: brightness(.78) saturate(.9); }
 /* 0.9.5 : limite suivante */
 .limitnext{position:fixed;z-index:15;left:calc(max(12px, var(--sal)) + 72px);bottom:calc(var(--sab) + 244px);display:flex;align-items:center;gap:6px;padding:6px 10px 6px 6px;border-radius:24px;background:var(--surface);box-shadow:0 6px 18px rgba(0,0,0,.35);font-size:13px;font-weight:600}
 .limitnext .ln-sign{width:34px;height:34px;border-radius:17px;background:#fff;border:4px solid #E5484D;color:#0E1116;font:700 13px var(--display);display:flex;align-items:center;justify-content:center;box-sizing:border-box}
+/* 0.9.6 : carte épurée façon Waze */
+body:not(.searching) .topbar { display: none; }
+.topbar { background: linear-gradient(var(--bg) 70%, transparent); padding-bottom: 10px; }
+.qback { width: 52px; height: 52px; border-radius: 16px; flex-shrink: 0; background: var(--surface); }
+.fab-menu { position: fixed; z-index: 16; top: calc(var(--sat) + 12px); left: max(12px, var(--sal)); width: 48px; height: 48px; border-radius: 24px; border: 3px solid var(--bg); background: var(--accent); color: var(--accent-ink); font: 700 16px var(--display); box-shadow: 0 6px 18px rgba(0,0,0,.4); }
+.fab-search { position: fixed; z-index: 16; right: max(12px, var(--sar)); bottom: calc(var(--sab) + 148px); width: 56px; height: 56px; border-radius: 28px; border: 0; background: var(--surface); color: var(--fg); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 22px rgba(0,0,0,.45); }
+.fab-search svg { width: 26px; height: 26px; stroke-width: 2.4; }
+.fabs-right { bottom: calc(var(--sab) + 214px); }
+#btnLocate.active { display: none; }
+body.navigating .fab-search, body.navigating .fab-menu { display: none; }
+body.searching .fab-search, body.searching .fab-menu, body.searching .fab-report, body.searching .fabs-right, body.searching .speedbox, body.searching .limitsign { display: none; }
+body.searching .chips { opacity: 1 !important; transform: none !important; pointer-events: auto !important; }
