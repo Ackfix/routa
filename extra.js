@@ -479,11 +479,6 @@ X.preview = (R, dest, body) => {
     box.appendChild(el('<h3>Étapes</h3>'));
     X.via.forEach((v, i) => { const c = el('<div class="card"><div class="ico" style="background:#4DA3FF">' + (i + 1) + '</div><div class="grow"><b>' + esc(v.name) + '</b></div><button class="iconbtn small" aria-label="Retirer">' + ic('trash') + '</button></div>'); c.querySelector('button').onclick = () => { X.via.splice(i, 1); chooseDestination(dest); }; box.appendChild(c); });
   }
-  if (TT) {
-    const add = el('<button class="btn ghost block">' + ic('spot') + 'Ajouter une étape</button>');
-    add.onclick = () => { X.addingVia = dest; closeSheet(); toast('Cherche l\'étape ou touche-la sur la carte, puis « Itinéraire ». Elle sera ajoutée avant <b>' + esc(dest.name) + '</b>.', { ms: 9000 }); setTimeout(() => { const q = $('q'); if (q) q.focus(); }, 300); };
-    box.appendChild(add);
-  }
   go.parentNode.insertBefore(box, go.nextSibling);
   routeWeather(R, box);
 };
