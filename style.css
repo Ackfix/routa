@@ -356,3 +356,7 @@ html, body { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .sheet-head { padding-left: 20px; padding-right: 16px; }
   .sheet-body { padding-left: 20px; padding-right: 20px; padding-bottom: 20px; }
 }
+
+/* 0.9.11 fluidité : marqueurs sur calques GPU */
+.maplibregl-marker{will-change:transform;contain:layout style;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+#map canvas{touch-action:none}
