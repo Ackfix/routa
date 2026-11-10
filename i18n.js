@@ -341,7 +341,7 @@ window.ROUTA_I18N_SUB = ["Suisse", "France", "Italie", "Allemagne", "Autriche", 
 /* ROUTA – langues (français, anglais, turc). Le français est la langue d'origine :
    en anglais ou en turc, les textes affichés et la voix sont traduits à la volée. */
 (function () {
-  const DATA = { en: {}, tr: {}, sub: window.ROUTA_I18N_SUB || [] };
+  const DATA = { en: {}, tr: {}, sub: (window.ROUTA_I18N_SUB || []).concat(window.ROUTA_I18N_SUB_EXTRA || []) };
   (window.ROUTA_I18N_ROWS || []).forEach((r) => { DATA.en[r[0]] = r[1]; DATA.tr[r[0]] = r[2]; });
   const LANGS = { fr: 'Français', en: 'English', tr: 'Türkçe' };
   let lang = null;
@@ -370,7 +370,7 @@ window.ROUTA_I18N_SUB = ["Suisse", "France", "Italie", "Allemagne", "Autriche", 
     return null;
   }
   const num = (g) => g.replace(' virgule ', lang === 'tr' ? ',' : '.');
-  const P = {
+  const P = ((window.ROUTA_I18N_PX || {})[lang] || []).concat({
     en: [
       [/^Dans (.+?), (.+)$/, (a, b) => 'In ' + num(a) + ', ' + b, [2]],
       [/^C'est parti\. (.+)\. Puis, (.+)$/, (a, b) => "Let's go. " + a + '. Then, ' + b, [1, 2]],
@@ -401,7 +401,7 @@ window.ROUTA_I18N_SUB = ["Suisse", "France", "Italie", "Allemagne", "Autriche", 
       [/^(\d+) étoiles?$/, (a) => a + ' yıldız'],
       [/^(.+) \(changer\)$/, (a) => a + ' (değiştir)', [1]]
     ]
-  }[lang] || [];
+  }[lang] || []);
   const SKIP = /^[\s\d.,:;/%°'"+×–—·•()|\-–]*(?:km\/h|km|m|h|min|CHF|€|‰|t|kW)?[\s\d.,:;/%°()–\-]*$/;
   function t(s) {
     if (s == null) return s;
