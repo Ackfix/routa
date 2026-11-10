@@ -3,7 +3,7 @@
 'use strict';
 
 const CFG = window.ROUTA_CONFIG || {};
-const VERSION = '0.9.0';
+const VERSION = '0.9.1';
 const I18N = window.ROUTA_I18N || { lang: 'fr', t: (s) => s, speech: 'fr-FR', valhalla: 'fr-FR', langs: { fr: 'Français' }, setLang() {} };
 const $ = (id) => document.getElementById(id);
 
@@ -113,7 +113,8 @@ const QUICK_MSGS = ['On se retrouve au spot ?', "J'arrive dans 10 min", 'Tu es o
 /* ======================= Véhicule ======================= */
 const VEHICLES = {
   voiture: { label: 'Voiture', icon: 'car' },
-  electrique: { label: 'Électrique', icon: 'ev' },
+  electrique: { label: 'Électrique', icon: 'ev', ev: true },
+  hybride: { label: 'Hybride', icon: 'ev', ev: true },
   camping: { label: 'Camping-car', icon: 'camper', heavy: true, costing: 'truck', dims: { height: 3.2, width: 2.3, length: 7.5, weight: 3.5 } },
   minibus: { label: 'Minibus', icon: 'minibus', heavy: true, costing: 'bus', dims: { height: 2.9, width: 2.1, length: 7, weight: 5 } },
   bus: { label: 'Car / bus', icon: 'bus', heavy: true, costing: 'bus', dims: { height: 3.8, width: 2.55, length: 13.5, weight: 19 } },
@@ -904,13 +905,13 @@ async function chooseDestination(dest) {
       (veh().heavy ? (R.fallback ? '<div class="banner warnb">' + ic('info') + '<span><b>Calcul poids lourd indisponible pour le moment.</b> Trajet voiture affiché : attention aux restrictions de hauteur, de poids et d\'accès.</span></div>'
         : '<div class="banner">' + ic(veh().icon) + '<span>Trajet adapté : <b>' + esc(vehSummary()) + '</b>. Les limites connues de hauteur, poids et accès sont évitées. Respecte toujours la signalisation.</span></div>') : '') +
       '<button class="btn block" id="goNav">' + ic('nav') + 'Démarrer</button>' +
-      '<div class="row"><button class="btn soft grow" id="alongFuel">' + ic('fuel') + (veh().isHgv ? 'Carburant PL' : 'Essence') + ' sur le trajet</button>' + (veh().heavy ? '<button class="btn soft grow" id="alongTruck">' + ic('truckstop') + 'Aires sur le trajet</button>' : '<button class="btn soft grow" id="alongCharge">' + ic('charge') + 'Bornes sur le trajet</button>') + '</div>' +
+      '<div class="row">' + (veh().type !== 'electrique' ? '<button class="btn soft grow" id="alongFuel">' + ic('fuel') + (veh().isHgv ? 'Carburant PL' : 'Essence') + ' sur le trajet</button>' : '') + (veh().heavy ? '<button class="btn soft grow" id="alongTruck">' + ic('truckstop') + 'Aires sur le trajet</button>' : veh().ev ? '<button class="btn soft grow" id="alongCharge">' + ic('charge') + 'Bornes sur le trajet</button>' : '') + '</div>' +
       '<button class="btn ghost" id="chgVeh">' + ic(veh().icon) + 'Véhicule : ' + esc(vehSummary()) + ' (changer)</button>' +
       '<p class="muted small">Durée calculée sans le trafic en direct.</p>', 'preview');
     body.querySelector('#goNav').onclick = () => { closeSheet(); startNav(R, dest); };
     const ac = body.querySelector('#alongCharge'); if (ac) ac.onclick = () => alongRoute(R, 'charge');
     const at = body.querySelector('#alongTruck'); if (at) at.onclick = () => alongRoute(R, 'truckstop');
-    body.querySelector('#alongFuel').onclick = () => alongRoute(R, 'fuel');
+    const af = body.querySelector('#alongFuel'); if (af) af.onclick = () => alongRoute(R, 'fuel');
     body.querySelector('#chgVeh').onclick = () => openVehicle(() => chooseDestination(dest));
     routeCountries(R, dest);
     if (window.ROUTA_X && ROUTA_X.preview) ROUTA_X.preview(R, dest, body);
@@ -1593,13 +1594,14 @@ let spotFilter = 'all';
 function openSpots() {
   const c = S.pos || (() => { const m = map.getCenter(); return { lat: m.lat, lon: m.lng }; })();
   const list = [...S.spots.values()].filter((s) => spotFilter === 'all' || s.category === spotFilter).map((s) => Object.assign({}, s, { d: dist(c, s) })).sort((a, b) => a.d - b.d);
-  const body = openSheet('Spots et routes',
+  const body = openSheet('Spots, routes et cols',
     '<div class="seg" style="grid-auto-flow:row;grid-template-columns:repeat(3,minmax(0,1fr))">' + [['all', 'Tous']].concat(Object.entries(SPOT_CATS).filter(([k]) => k !== 'autre')).map(([k, v]) => '<button data-c="' + k + '" class="' + (spotFilter === k ? 'on' : '') + '">' + esc(v) + '</button>').join('') + '</div>' +
-    '<button class="btn soft block" id="spotAdd">' + ic('spot') + 'Ajouter un spot</button>' +
+    '<div class="row"><button class="btn soft grow" id="spotAdd">' + ic('spot') + 'Ajouter un spot</button>' + (window.ROUTA_X ? '<button class="btn soft grow" id="spotCols"><svg viewBox="0 0 24 24"><path d="M3 20l6-11 4 6 3-4 5 9z"/></svg>Cols et météo</button>' : '') + '</div>' +
     (list.length ? list.slice(0, 60).map((s, i) => '<button class="card tap" data-i="' + i + '"><div class="ico" style="background:#fff">' + ic('spot') + '</div><div class="grow"><b>' + esc(s.name) + '</b><div class="sub">' + esc(SPOT_CATS[s.category] || 'Spot') + (s.description ? ' · ' + esc(s.description) : '') + '</div></div><div class="val">' + fmtDist(s.d) + '</div></button>').join('') : '<div class="empty">Aucun spot ici pour le moment. Ajoute le premier avec le bouton au-dessus.</div>'), 'spots');
   body.querySelectorAll('.seg button').forEach((b) => { b.onclick = () => { spotFilter = b.dataset.c; openSpots(); }; });
   body.querySelectorAll('.card').forEach((b) => { b.onclick = () => openSpot(list[+b.dataset.i].id); });
   body.querySelector('#spotAdd').onclick = () => openAddSpot(null);
+  const sc = body.querySelector('#spotCols'); if (sc) sc.onclick = () => openK('cols');
 }
 function openSpot(id) {
   const s = S.spots.get(id); if (!s) return;
@@ -1760,6 +1762,7 @@ function updateVehChip() {
   $('vehLabel').textContent = v.label;
   $('vehIco').innerHTML = ic(v.icon);
   document.querySelectorAll('.chip.heavy-only').forEach((c) => { c.hidden = !v.heavy; });
+  document.querySelectorAll('.chip.ev-only').forEach((c) => { c.hidden = !v.ev; });
 }
 function openVehicle(after) {
   let type = S.vehicle.type;
@@ -2091,23 +2094,35 @@ function bindLangSeg(root) {
 }
 function openMenu() {
   const n = +($('msgBadge').hidden ? 0 : $('msgBadge').textContent) || 0;
-  const tiles = [
-    ['country', '<span class="sosdot big">SOS</span>', 'Urgences · ' + $('ctryLabel').textContent, 'sos'],
-    ['favs', ic('star'), 'Favoris'],
-    ['vehicle', ic(veh().icon), 'Véhicule · ' + veh().label],
-    ['drivers', '<span class="dot ' + (S.me.vis === 'tous' ? 'on' : S.me.vis === 'amis' ? 'friends' : '') + '"></span>', 'Conducteurs · ' + visLabel(S.me.vis)],
-    ['messages', ic('msg'), 'Messages' + (n ? ' <span class="badge">' + n + '</span>' : '')],
-    ['spots', ic('spot'), 'Spots et routes'],
-    ['mapview', '<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>', 'Affichage carte'],
-    ['feedback', ic('info'), 'Mon avis'],
-    ['share', '<svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>', 'Partager ROUTA'],
-    ['help', ic('info'), 'Aide']
+  const X = window.ROUTA_X || {}; const XI = X.icons || {};
+  const fr = X.pendingCount ? X.pendingCount() : 0;
+  const v = veh();
+  const groups = [
+    ['Communauté', [
+      ['messages', ic('msg'), 'Messages' + (n ? ' <span class="badge">' + n + '</span>' : '')],
+      X.open && ['friends', XI.users || ic('msg'), 'Amis et conducteurs' + (fr ? ' <span class="badge">' + fr + '</span>' : '')],
+      X.open && ['convoy', XI.convoy || ic('car'), X.convoy ? 'Convoi · ' + esc(X.convoy.name) : 'Convoi'],
+      X.open && ['events', XI.event || ic('spot'), 'Rassemblements']
+    ]],
+    ['Carte et routes', [
+      ['favs', ic('star'), 'Favoris'],
+      ['spots', ic('spot'), 'Spots, routes et cols'],
+      v.ev && X.open && ['chargers', XI.plug || ic('charge'), 'Bornes libres'],
+      ['mapview', '<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>', 'Affichage carte']
+    ]],
+    ['Ma voiture', [
+      ['vehicle', ic(v.icon), 'Véhicule · ' + v.label],
+      X.open && ['carnet', XI.book || ic('info'), 'Carnet d\'entretien'],
+      X.open && ['parked', XI.park || ic('parking'), 'Stationnement']
+    ]]
   ];
-  if (window.ROUTA_X && ROUTA_X.tiles) tiles.splice(6, 0, ...ROUTA_X.tiles());
+  const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + t[1] + '<span>' + t[2] + '</span></button>';
   const body = openSheet('Menu',
-    '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(S.me.car || 'Pseudo, voiture, visibilité, réglages') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
-    langSeg() +
-    '<div class="tiles">' + tiles.map(([k, i, l, c]) => '<button class="tile ' + (c || '') + '" data-k="' + k + '">' + i + '<span>' + l + '</span></button>').join('') + '</div>', 'menu');
+    '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
+    '<button class="card tap menusos" data-k="country"><span class="sosdot big">SOS</span><span class="grow"><b>Urgences et infos pays</b><span class="sub">' + esc($('ctryLabel').textContent) + '</span></span></button>' +
+    groups.map(([g, ts]) => { const list = ts.filter(Boolean); return '<h3 class="menuh">' + g + '</h3><div class="tiles">' + list.map(tile).join('') + '</div>'; }).join('') +
+    '<div class="menulinks"><button data-k="share">Partager ROUTA</button><button data-k="feedback">Mon avis</button><button data-k="help">Aide</button></div>' +
+    langSeg(), 'menu');
   body.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => openK(b.dataset.k); });
   bindLangSeg(body);
 }
