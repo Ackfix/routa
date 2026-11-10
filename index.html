@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>ROUTA</title>
+<meta name="description" content="ROUTA – navigation, alertes, conducteurs en direct et spots pour automobilistes.">
+<meta name="theme-color" content="#0E1116">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ROUTA">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<link href="style.css" rel="stylesheet">
+</head>
+<body>
+
+<div id="map" aria-label="Carte"></div>
+
+<!-- Barre du haut (mode carte) -->
+<header id="topbar" class="topbar">
+  <div class="searchrow">
+    <label class="search" for="q">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <span class="sr">Rechercher une destination</span>
+      <input id="q" type="search" placeholder="Où va-t-on ?" autocomplete="off" enterkeyhint="search">
+      <button id="qclear" class="iconbtn small" aria-label="Effacer" hidden><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </label>
+    <button id="btnProfile" class="avatarbtn" aria-label="Menu et profil">?<span class="menuhint" aria-hidden="true"><i></i><i></i><i></i></span><span id="menuBadge" class="badge menubadge" hidden></span></button>
+  </div>
+  <div id="results" class="results" hidden></div>
+  <nav class="chips" aria-label="Raccourcis">
+    <button class="chip" data-open="favs"><svg class="chipstar" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>Favoris</button>
+    <button class="chip heavy-only" data-open="restrictions" hidden>Restrictions</button>
+    <button class="chip heavy-only" data-open="truckstop" hidden>Aires PL</button>
+    <button class="chip" data-open="fuel">Essence</button>
+    <button class="chip" data-open="food">Restos</button>
+    <button class="chip" data-open="shops">Magasins</button>
+    <button class="chip" data-open="charge">Recharge</button>
+    <button class="chip" data-open="parking">Parking</button>
+    <button class="chip" data-open="spots">Spots</button>
+  </nav>
+  <div id="moreChips" hidden>
+    <button class="chip chip-veh" data-open="vehicle"><span id="vehIco" class="chipico"></span><span id="vehLabel">Voiture</span></button>
+    <button class="chip chip-ctry" data-open="country"><span class="sosdot" aria-hidden="true">SOS</span><span id="ctryLabel">Infos pays</span></button>
+    <button class="chip" data-open="drivers"><span class="dot" id="visDot"></span><span id="visLabel">Conducteurs</span></button>
+    <button class="chip" data-open="messages">Messages <span id="msgBadge" class="badge" hidden>0</span></button>
+    <button id="btnPlaces" class="iconbtn" aria-label="Afficher les établissements"></button>
+    <button id="btnNight" class="iconbtn" aria-label="Mode nuit"></button>
+  </div>
+</header>
+
+<!-- Bandeau de navigation -->
+<section id="navBanner" class="navbanner" hidden aria-live="polite">
+  <div class="navmain">
+    <div id="navArrow" class="navarrow" aria-hidden="true"></div>
+    <div class="navtext">
+      <div id="navDist" class="navdist">–</div>
+      <div id="navInstr" class="navinstr">–</div>
+    </div>
+  </div>
+  <div id="navThen" class="navthen" hidden></div>
+</section>
+
+<!-- Alerte à proximité -->
+<section id="alertNear" class="alertnear" hidden aria-live="assertive">
+  <div class="alertnear-txt">
+    <strong id="alertNearTitle">Alerte</strong>
+    <span id="alertNearSub"></span>
+  </div>
+  <div class="alertnear-act">
+    <button id="alertYes" class="btn small">Toujours là</button>
+    <button id="alertNo" class="btn small ghost">Plus là</button>
+  </div>
+</section>
+
+<!-- Boutons flottants droite -->
+<div class="fabs-right">
+  <button id="btnLayers" class="iconbtn" aria-label="Plan, satellite et 3D"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></button>
+  <button id="btnNorth" class="iconbtn compass" aria-label="Boussole : remettre le nord en haut"><svg aria-hidden="true" viewBox="0 0 24 24"><path class="cn" d="M12 2l4 10h-8z"/><path class="cs" d="M8 12h8l-4 10z"/></svg></button>
+  <button id="btnLocate" class="iconbtn" aria-label="Me recentrer"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+</div>
+
+<!-- Vitesse -->
+<div id="limitSign" class="limitsign" hidden aria-label="Limite de vitesse">50</div>
+<div id="speedBox" class="speedbox" hidden>
+  <div id="speedVal" class="speedval">0</div>
+  <div class="speedunit">km/h</div>
+</div>
+
+<!-- Signaler -->
+<button id="btnReport" class="fab-report" aria-label="Signaler quelque chose sur la route">
+  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+</button>
+
+<!-- Barre de navigation (bas) -->
+<section id="navBar" class="navbar" hidden>
+  <div class="navbar-info">
+    <div><span id="etaMin" class="eta">–</span> <span id="etaRest" class="etarest"></span></div>
+    <div id="etaDest" class="etadest"></div>
+  </div>
+  <div class="navbar-act">
+    <button id="btnMute" class="iconbtn" aria-label="Couper la voix"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9a4 4 0 010 6"/></svg></button>
+    <button id="btnOverview" class="iconbtn" aria-label="Voir tout le trajet"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg></button>
+    <button id="btnStop" class="btn danger">Arrêter</button>
+  </div>
+</section>
+
+<!-- Viseur pour placer un point -->
+<div id="crosshair" class="crosshair" hidden aria-hidden="true"><span></span></div>
+
+<!-- Feuille du bas (contenu variable) -->
+<div id="sheetWrap" class="sheetwrap" hidden>
+  <div id="sheetBackdrop" class="sheetbackdrop"></div>
+  <section id="sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-head">
+      <div class="grab" aria-hidden="true"></div>
+      <h2 id="sheetTitle">–</h2>
+      <button id="sheetClose" class="iconbtn small" aria-label="Fermer"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div id="sheetBody" class="sheet-body"></div>
+  </section>
+</div>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="i18n-a.js"></script>
+<script src="i18n-c.js"></script>
+<script src="i18n.js"></script>
+<script src="config.js"></script>
+<script src="countries.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

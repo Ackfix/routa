@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aide ROUTA</title>
+<meta name="theme-color" content="#0E1116">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0E1116; --card:#171B22; --card2:#1F2530; --line:#2B3241; --fg:#F2F4F7; --muted:#A3ACB9; --accent:#FF8A3D; --alert:#FFC24D; --ok:#3DDC97; --info:#8EC5FF; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 Inter, system-ui, -apple-system, sans-serif; }
+main { max-width: 720px; margin: 0 auto; padding: calc(env(safe-area-inset-top, 0px) + 20px) max(18px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 60px) max(18px, env(safe-area-inset-left, 0px)); }
+.back { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 22px; background: var(--card); color: var(--fg); text-decoration: none; font-weight: 600; }
+h1 { font: 700 32px/1.15 "Space Grotesk", Inter, sans-serif; margin: 22px 0 6px; text-wrap: balance; }
+h2 { font: 700 22px "Space Grotesk", Inter, sans-serif; margin: 36px 0 10px; text-wrap: balance; }
+h3 { font-size: 17px; margin: 18px 0 4px; }
+.lead { color: var(--muted); margin: 0; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
+nav.toc a { height: 40px; padding: 0 14px; border-radius: 20px; background: var(--card); color: var(--fg); text-decoration: none; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; }
+section.card { background: var(--card); border-radius: 18px; padding: 6px 18px 16px; margin: 12px 0; }
+ol, ul { padding-left: 22px; margin: 8px 0; }
+li { margin: 7px 0; }
+b { font-weight: 600; }
+.tip { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--card2); font-size: 15px; }
+.warn { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: #2A2312; border-left: 4px solid var(--alert); font-size: 15px; }
+.key { display: inline-block; padding: 0 8px; border-radius: 6px; background: var(--card2); border: 1px solid var(--line); font-size: 14px; white-space: nowrap; }
+details { background: var(--card); border-radius: 14px; margin: 10px 0; padding: 0 16px; }
+summary { cursor: pointer; padding: 14px 0; font-weight: 600; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; float: right; color: var(--muted); font-weight: 700; }
+details[open] summary::after { content: "–"; }
+details p { margin: 0 0 14px; color: #D9DEE5; }
+a { color: var(--info); }
+a:focus-visible, summary:focus-visible { outline: 3px solid var(--info); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="./">‹ Retour à la carte</a>
+<h1>Utiliser ROUTA</h1>
+<p class="lead">Prototype 0.8. Installation sur iPhone, Android et ordinateur, puis toutes les fonctions expliquées.</p>
+<nav class="toc" aria-label="Sommaire">
+  <a href="#prototype">Prototype</a><a href="#iphone">iPhone</a><a href="#android">Android</a><a href="#ordinateur">Ordinateur</a><a href="#debut">Premier lancement</a><a href="#vehicule">Mon véhicule</a><a href="#fonctions">Fonctions</a><a href="#voiture">En voiture</a><a href="#problemes">Problèmes</a>
+</nav>
+
+<h2 id="prototype">Un prototype qui a besoin de toi</h2>
+<section class="card">
+<p>ROUTA est en <b>phase de test</b>. Certaines choses peuvent bugger, être lentes ou pas encore claires : c'est normal à ce stade.</p>
+<ul>
+<li><b>Signale tout ce qui ne va pas</b> : un bug, un bouton qui ne réagit pas, une indication fausse, un texte pas clair.</li>
+<li><b>Propose tes idées</b> : ce qui te manque, ce que tu changerais, ce que tu adorerais avoir.</li>
+<li>Pour ça, touche le bouton <span class="key">Mon avis</span> en haut de la carte (ou dans ton profil). Ça prend 30 secondes.</li>
+<li>L'app est <b>en développement</b> et s'améliore au fur et à mesure avec vos retours. N'hésite pas à la partager avec tes potes : le bouton <span class="key">Partager</span> est dans « Mon avis ».</li>
+</ul>
+<p class="tip">Plus ton retour est précis (ce que tu faisais, ce qui s'est passé, ce que tu attendais), plus il est facile à corriger. Ta position n'est jamais envoyée avec un retour.</p>
+</section>
+
+<h2 id="iphone">Sur iPhone</h2>
+<section class="card">
+<h3>Installer l'app</h3>
+<ol>
+<li>Ouvre le lien de ROUTA dans <b>Safari</b> (pas Chrome ni Instagram : l'installation ne marche que depuis Safari).</li>
+<li>Touche le bouton <span class="key">Partager</span> (le carré avec une flèche vers le haut).</li>
+<li>Descends et choisis <span class="key">Sur l'écran d'accueil</span>, puis <span class="key">Ajouter</span>.</li>
+<li>Ouvre ROUTA depuis la nouvelle icône : elle s'affiche en plein écran, comme une vraie app.</li>
+</ol>
+<h3>Autoriser la position</h3>
+<ol>
+<li>Au premier lancement, touche <span class="key">Autoriser</span> quand l'iPhone demande la position.</li>
+<li>Si tu as refusé : <span class="key">Réglages</span> › <span class="key">Confidentialité et sécurité</span> › <span class="key">Service de localisation</span> › <span class="key">Sites Safari</span> (ou Safari) › <span class="key">Lorsque l'app est active</span>, et active <span class="key">Position exacte</span>.</li>
+<li>Ferme complètement ROUTA (balaye-la vers le haut dans le sélecteur d'apps) et rouvre-la.</li>
+</ol>
+<h3>Entendre le guidage</h3>
+<ul>
+<li>Touche l'écran une fois après l'ouverture : l'iPhone n'autorise la voix qu'après un premier geste.</li>
+<li>Monte le volume avec les boutons du côté. Si tu n'entends rien, vérifie que le mode silencieux n'est pas activé.</li>
+<li>En Bluetooth ou CarPlay, la voix passe par les haut-parleurs de la voiture comme un son du téléphone. ROUTA ne s'affiche pas encore sur l'écran CarPlay.</li>
+</ul>
+<p class="tip">Pour mettre à jour l'app quand une nouvelle version est en ligne : ferme-la complètement et rouvre-la.</p>
+</section>
+
+<h2 id="android">Sur Android</h2>
+<section class="card">
+<h3>Installer l'app</h3>
+<ol>
+<li>Ouvre le lien de ROUTA dans <b>Chrome</b>.</li>
+<li>Touche le menu <span class="key">⋮</span> en haut à droite, puis <span class="key">Installer l'application</span> ou <span class="key">Ajouter à l'écran d'accueil</span>.</li>
+<li>Confirme. L'icône ROUTA apparaît avec tes autres apps.</li>
+</ol>
+<h3>Autoriser la position</h3>
+<ol>
+<li>Accepte la demande de position au premier lancement, en choisissant <span class="key">Lorsque vous utilisez l'appli</span> et <span class="key">Position exacte</span>.</li>
+<li>Si tu as refusé : <span class="key">Paramètres</span> › <span class="key">Applications</span> › <span class="key">Chrome</span> (ou ROUTA) › <span class="key">Autorisations</span> › <span class="key">Position</span>.</li>
+<li>Vérifie aussi que la localisation du téléphone est activée (menu des réglages rapides, en glissant du haut de l'écran).</li>
+</ol>
+<p class="tip">Si l'économiseur de batterie est très strict, le GPS peut ralentir. Pendant un trajet, laisse ROUTA ouverte à l'écran.</p>
+</section>
+
+<h2 id="ordinateur">Sur ordinateur</h2>
+<section class="card">
+<ul>
+<li>Ouvre le lien dans Chrome, Edge ou Safari. Pratique pour <b>préparer un trajet</b>, voir les bornes le long d'une route, ajouter des spots ou écrire à tes potes.</li>
+<li>Pour faire pivoter la carte : clic droit maintenu et glisser. Clic droit simple sur la carte : y aller, signaler ou ajouter un spot à cet endroit.</li>
+<li>Dans Chrome, l'icône d'installation dans la barre d'adresse transforme ROUTA en fenêtre d'application.</li>
+</ul>
+</section>
+
+<h2 id="debut">Premier lancement</h2>
+<section class="card">
+<ol>
+<li>Choisis un <b>pseudo</b>, ta <b>voiture</b> et ta <b>couleur</b> : c'est ce que les autres verront sur la carte.</li>
+<li>Choisis <b>qui peut te voir</b> : Invisible, Mes amis (par défaut) ou Tout le monde.</li>
+<li>Touche <span class="key">C'est parti</span> et autorise la position.</li>
+<li>Ouvre ton profil (la pastille en haut à droite) pour trouver ton <b>code ami</b> à 6 caractères, et envoie-le à tes potes.</li>
+</ol>
+</section>
+
+<h2 id="vehicule">Mon véhicule (voiture, camion, bus…)</h2>
+<section class="card">
+<ul>
+<li>Touche le premier bouton en haut de la carte (il affiche ton véhicule, « Voiture » par défaut) et choisis : <b>Voiture, Électrique, Camping-car, Minibus, Car / bus</b> ou <b>Poids lourd</b>.</li>
+<li>Pour les grands véhicules, indique la <b>hauteur, la largeur, la longueur et le poids</b> (et les matières dangereuses ADR pour un poids lourd).</li>
+<li>Les trajets évitent alors les ponts trop bas, les routes limitées en poids et les routes interdites aux poids lourds connues.</li>
+<li>Deux boutons apparaissent : <span class="key">Restrictions</span> (les limites autour de toi qui concernent ton véhicule) et <span class="key">Aires PL</span> (parkings, aires de repos et stations poids lourds).</li>
+</ul>
+<p class="warn">Les données viennent d'OpenStreetMap et peuvent être incomplètes : la signalisation sur place reste toujours prioritaire.</p>
+</section>
+
+<h2 id="fonctions">Les fonctions</h2>
+<section class="card">
+<h3>Aller quelque part</h3>
+<ol>
+<li>Tape une adresse, une ville, un commerce ou un spot dans « Où va-t-on ? ».</li>
+<li>Choisis le bon résultat : le trajet s'affiche avec la durée, la distance et l'heure d'arrivée.</li>
+<li>Touche <span class="key">Démarrer</span>. Le guidage parle, affiche la prochaine manœuvre en vert en haut et recalcule tout seul si tu changes de route.</li>
+<li>En bas : <span class="key">son</span> pour couper ou remettre la voix, <span class="key">carte</span> pour voir tout le trajet, <span class="key">Arrêter</span> pour finir.</li>
+</ol>
+<p class="tip">Tu as déplacé la carte avec le doigt ? Touche le bouton viseur à droite pour revenir sur ta voiture.</p>
+
+<h3>Signaler sur la route</h3>
+<ul>
+<li>Gros bouton jaune <span class="key">+</span> : choisis Trou, Objet, Accident, Travaux, Bouchon, Véhicule arrêté, Route glissante ou Animal, puis <span class="key">Signaler</span>.</li>
+<li><span class="key">Dire à voix haute</span> : dis par exemple « pneu sur la route » ou « bouchon », l'alerte part toute seule. Disponible seulement si ton téléphone permet la dictée dans le navigateur.</li>
+<li>Quand tu approches d'une alerte, ROUTA te prévient à voix haute. Réponds <span class="key">Toujours là</span> ou <span class="key">Plus là</span> pour aider les autres.</li>
+<li>Les alertes disparaissent seules après 2 heures (24 heures pour les travaux), ou plus tôt si plusieurs personnes disent « Plus là ».</li>
+</ul>
+
+<h3>Voir et contacter les autres</h3>
+<ul>
+<li>Bouton <span class="key">Conducteurs</span> en haut : liste des gens visibles autour de toi, avec leur voiture et leur distance.</li>
+<li><span class="key">Bump</span> : un petit « coucou » qui fait vibrer son téléphone. <span class="key">Message</span> : messages rapides tout prêts ou texte libre.</li>
+<li><span class="key">Le rejoindre</span> : lance le guidage jusqu'à sa position.</li>
+<li>Une pastille avec un contour en pointillés veut dire que tu ne vois qu'une zone approximative (environ 1 km), car vous n'êtes pas amis.</li>
+</ul>
+
+<h3>Qui me voit ?</h3>
+<ul>
+<li><b>Invisible</b> : personne ne te voit, mais tu vois les alertes et tu peux naviguer.</li>
+<li><b>Mes amis</b> : seuls les gens que tu as ajoutés avec leur code te voient, à ta position exacte.</li>
+<li><b>Tout le monde</b> : tes amis te voient précisément, les autres seulement dans une zone d'environ 1 km.</li>
+<li>Ajouter un ami : profil › « Ajouter un ami » › son code. Ça lui donne le droit de te voir. Pour vous voir tous les deux, chacun ajoute le code de l'autre.</li>
+</ul>
+
+<h3>Essence, recharge et parking</h3>
+<ul>
+<li>Boutons en haut : stations, bornes ou parkings autour de toi, avec leurs infos (24 h/24, type de prise, puissance, payant ou gratuit…).</li>
+<li>Essence : chacun peut <span class="key">Signaler un prix</span>. Trie avec <span class="key">Moins cher</span> pour trouver la meilleure station.</li>
+<li>Avant de partir sur un trajet : <span class="key">Bornes sur le trajet</span> ou <span class="key">Essence sur le trajet</span> affiche tout ce qui se trouve le long de la route.</li>
+</ul>
+
+<h3>Tous les établissements</h3>
+<ul>
+<li>Restaurants, magasins, pharmacies, banques, garages, hôtels… s'affichent directement sur la carte quand tu zoomes. Le bouton en forme de sac, à droite, les affiche ou les masque.</li>
+<li>Touche un établissement pour voir son adresse, les avis des testeurs, <span class="key">Voir les avis Google</span> (ouvre sa fiche Google Maps avec les notes, photos et horaires) et <span class="key">Y aller</span>.</li>
+<li>Dans ton profil, tu peux désactiver l'affichage des établissements ou le bouton Google.</li>
+</ul>
+
+<h3>Restos et magasins</h3>
+<ul>
+<li>Boutons <span class="key">Restos</span> et <span class="key">Magasins</span> : restaurants, fast-foods, cafés, supermarchés, boulangeries, garages, pièces auto…</li>
+<li>Chaque lieu peut être <b>noté de 1 à 5 étoiles</b> avec un petit avis, et tu peux trier par <span class="key">Mieux notés</span>. Les notes viennent des testeurs de ROUTA.</li>
+</ul>
+
+<h3>Spots et belles routes</h3>
+<ul>
+<li>Bouton <span class="key">Spots</span> : belles routes, points de vue, rassemblements, parkings de nuit, triés par distance.</li>
+<li><span class="key">Ajouter un spot</span> : à ta position ou en visant sur la carte. Tout le monde le verra (en mode en ligne).</li>
+<li>Appui long sur la carte (clic droit sur ordinateur) : y aller, signaler ou ajouter un spot à cet endroit précis.</li>
+</ul>
+
+<h3>Limite de vitesse</h3>
+<ul>
+<li>Quand tu roules, un panneau rond affiche la limite de vitesse de la route, au-dessus de ta vitesse réelle. Ta vitesse passe en rouge si tu la dépasses, et une voix te prévient (désactivable dans ton profil).</li>
+<li>La limite est <b>indicative</b> : elle vient d'OpenStreetMap et peut manquer ou être fausse (travaux, zones temporaires, routes mal renseignées). Seuls les panneaux sur place font foi.</li>
+</ul>
+
+<h3>Horaires, téléphone et site web</h3>
+<ul>
+<li>Sur la fiche d'un établissement : horaires de la semaine avec « Ouvert · ferme à… » ou « Fermé · ouvre à… », bouton pour appeler et lien vers le site web, quand ces infos existent.</li>
+</ul>
+
+<h3>Toucher la carte et favoris</h3>
+<ul>
+<li><b>Touche n'importe quel endroit de la carte :</b> un repère rouge s'y pose avec l'adresse. Tu peux alors voir l'<b>itinéraire jusqu'ici</b> et démarrer, l'<b>enregistrer en favori</b>, signaler quelque chose ou ajouter un spot.</li>
+<li>Tes <b>favoris</b> (étoiles jaunes sur la carte) se retrouvent avec le bouton <span class="key">Favoris</span> et en haut de la recherche. Tu peux les renommer ou les supprimer.</li>
+<li>Un établissement (resto, station…) peut aussi être enregistré en favori depuis sa fiche.</li>
+<li>Les favoris restent sur ton téléphone : personne d'autre ne les voit.</li>
+</ul>
+
+<h3>Tourner la carte, satellite et 3D</h3>
+<ul>
+<li><b>Tourner la carte :</b> pose deux doigts sur l'écran et tourne-les (sur ordinateur : clic droit et glisser). Tu peux mettre le nord où tu veux.</li>
+<li><b>Incliner la carte :</b> glisse deux doigts ensemble vers le haut ou le bas.</li>
+<li>La <b>boussole</b> à droite montre toujours où est le nord. Touche-la pour remettre le nord en haut. Pendant un trajet, elle passe de « carte dans le sens de la route » à « nord en haut ».</li>
+<li>Le bouton <span class="key">couches</span> au-dessus de la boussole ouvre l'affichage : <b>Plan</b> ou <b>Satellite</b>, et le <b>Relief 3D</b> (montagnes en relief, carte inclinée), aussi pendant la navigation.</li>
+</ul>
+
+<h3>Infos pays et urgences</h3>
+<ul>
+<li>Le bouton avec <span class="key">SOS</span>, en haut de la carte, affiche le pays où tu te trouves. Il ouvre trois onglets : <b>Urgences</b> (numéros à appeler d'un appui), <b>Règles</b> (vitesses, alcool, équipement obligatoire) et <b>Vignette / péage</b> (ce qu'il faut, où l'acheter, liens officiels).</li>
+<li>Quand tu passes une frontière, ROUTA te souhaite la bienvenue et te rappelle le numéro d'urgence et la vignette ou le péage du pays.</li>
+<li>Sur un long trajet, la liste des pays traversés s'affiche avant le départ avec leur vignette ou péage.</li>
+<li>Prix et règles changent souvent : vérifie toujours sur le site officiel.</li>
+</ul>
+
+<h3>Réglages</h3>
+<ul>
+<li>Dans ton profil : guidage vocal, lecture des messages reçus, mode nuit (automatique de 19 h à 7 h, toujours ou jamais).</li>
+<li>Bouton lune à droite de la carte : passe en mode nuit ou jour tout de suite.</li>
+</ul>
+</section>
+
+<h2 id="voiture">En voiture</h2>
+<section class="card">
+<ul>
+<li>Fixe le téléphone sur un <b>support</b> avant de démarrer.</li>
+<li>Lance le trajet <b>avant de partir</b> et laisse ROUTA ouverte à l'écran : dans cette version, le GPS s'arrête si l'écran s'éteint ou si tu ouvres une autre app. ROUTA empêche l'écran de se mettre en veille pendant le guidage.</li>
+<li>Branche le téléphone pour les longs trajets : le GPS et l'écran allumé consomment de la batterie.</li>
+<li>Pour signaler en roulant, préfère <span class="key">Dire à voix haute</span>.</li>
+</ul>
+<p class="warn">Le téléphone tenu en main au volant est interdit en Suisse et dangereux. Support obligatoire, et les messages attendent un arrêt ou ton passager.</p>
+</section>
+
+<h2 id="problemes">Si ça ne marche pas</h2>
+<details><summary>La carte reste grise ou vide</summary><p>Vérifie la connexion internet (4G/5G ou Wi-Fi), puis ferme et rouvre ROUTA. La carte a besoin d'internet pour se charger.</p></details>
+<details><summary>Ma position n'apparaît pas</summary><p>Vérifie l'autorisation de position (voir iPhone ou Android plus haut) et que « Position exacte » est activée. À l'intérieur d'un bâtiment, le GPS peut mettre une minute à te trouver.</p></details>
+<details><summary>Je n'entends pas le guidage</summary><p>Touche l'écran une fois, monte le volume, vérifie le mode silencieux et que le bouton son du guidage n'est pas barré en rouge. Dans ton profil, « Guidage vocal » doit être activé.</p></details>
+<details><summary>Je ne vois pas mon pote sur la carte</summary><p>Il doit avoir ROUTA ouverte, être en « Mes amis » ou « Tout le monde », et t'avoir ajouté avec ton code s'il est en « Mes amis ». Les conducteurs qui n'ont pas bougé depuis 3 minutes disparaissent de la carte.</p></details>
+<details><summary>« Mode solo » s'affiche</summary><p>La base partagée n'est pas encore branchée, ou ne répond pas. Les alertes et spots restent alors sur ton téléphone. Préviens la personne qui t'a envoyé le lien.</p></details>
+<details><summary>Le trajet ne se calcule pas</summary><p>Le service d'itinéraire gratuit du prototype est parfois saturé. Attends quelques secondes et touche « Réessayer ».</p></details>
+<details><summary>Ça ne s'installe pas sur l'iPhone</summary><p>L'option « Sur l'écran d'accueil » n'existe que dans Safari. Si tu as ouvert le lien depuis WhatsApp ou Instagram, utilise « Ouvrir dans Safari » d'abord.</p></details>
+</main>
+</body>
+</html>
