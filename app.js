@@ -3,7 +3,7 @@
 'use strict';
 
 const CFG = window.ROUTA_CONFIG || {};
-const VERSION = '0.9.8';
+const VERSION = '0.9.9';
 const I18N = window.ROUTA_I18N || { lang: 'fr', t: (s) => s, speech: 'fr-FR', valhalla: 'fr-FR', langs: { fr: 'Français' }, setLang() {} };
 const $ = (id) => document.getElementById(id);
 
@@ -731,6 +731,7 @@ $('alertNo').onclick = () => { $('alertNear').hidden = true; if (S.alertNearId) 
 function openSheet(title, html, view) {
   $('sheetTitle').textContent = title;
   $('sheetBody').innerHTML = html;
+  $('sheetBody').scrollTop = 0;
   $('sheetWrap').hidden = false;
   S.sheetView = view || null;
   $('sheetWrap').classList.toggle('nomodal', /^(point|preview|place|fav|spot|poi)/.test(S.sheetView || ''));
@@ -2177,8 +2178,8 @@ function openMenu() {
   const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + t[1] + '<span>' + t[2] + '</span></button>';
   const body = openSheet('Menu',
     '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
-    '<button class="card tap menusos" data-k="country"><span class="sosdot big">SOS</span><span class="grow"><b>Urgences et infos pays</b><span class="sub">' + esc($('ctryLabel').textContent) + '</span></span></button>' +
-    groups.map(([g, ts]) => { const list = ts.filter(Boolean); return '<h3 class="menuh">' + g + '</h3><div class="tiles">' + list.map(tile).join('') + '</div>'; }).join('') +
+    '<button class="card tap menusos" data-k="country"><span class="sosdot big">SOS</span><span class="grow"><b>Urgences et infos pays</b><span class="sub">' + ($('ctryLabel').textContent === 'Infos pays' ? 'Numéros d\'urgence, règles, vignettes' : esc($('ctryLabel').textContent)) + '</span></span></button>' +
+    groups.map(([g, ts]) => { const list = ts.filter(Boolean); return '<h3 class="menuh">' + g + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
     '<div class="menulinks">' + (X.canInstall && X.canInstall() ? '<button data-k="install">Installer l\'app</button>' : '') + '<button data-k="share">Partager ROUTA</button><button data-k="feedback">Mon avis</button><button data-k="help">Aide</button></div>' +
     langSeg(), 'menu');
   body.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => openK(b.dataset.k); });
