@@ -130,7 +130,7 @@ function openFriends() {
     '<div class="row wrap hubrow"><button class="btn soft grow" id="hubDrivers">Conducteurs autour</button><button class="btn soft grow" id="hubRank">' + IC.trophy + 'Classement · ' + (S.me.points || 0) + ' pts</button><button class="btn soft grow" id="hubShare">' + IC.share + ((X.share && X.share.until > Date.now()) ? 'Position partagée' : 'Partager ma position') + '</button></div>' +
     (pendingReq.length ? '<h3>Demandes reçues</h3>' + pendingReq.map((r, i) => '<div class="card"><div class="ico" style="background:#FF8A3D;border-radius:22px">' + esc(initials(r.pseudo)) + '</div><div class="grow"><b>' + esc(r.pseudo) + '</b><div class="sub">' + esc(r.car || '') + '</div></div><button class="btn small" data-ok="' + i + '">Accepter</button><button class="iconbtn small" data-no="' + i + '" aria-label="Refuser">' + ic('trash') + '</button></div>').join('') : '') +
     '<h3>Mes amis</h3>' +
-    (fr.length ? fr.map((f, i) => { const d = S.drivers.get(f.id); const on = d && Date.now() - Date.parse(d.updated_at) < 3 * 60000; return '<div class="card"><div class="ico" style="background:' + esc((d && d.color) || '#4DA3FF') + ';border-radius:22px">' + esc(initials(f.pseudo)) + '</div><div class="grow"><b>' + esc(f.pseudo) + '</b><div class="sub">' + (on ? 'En ligne' + (S.pos && d.lat != null ? ' · ' + fmtDist(dist(S.pos, d)) : '') : 'Hors ligne') + '</div></div><button class="iconbtn small" data-msg="' + i + '" aria-label="Message">' + ic('msg') + '</button></div>'; }).join('') : '<div class="empty">Pas encore d\'amis. Touche un conducteur sur la carte puis « Demander en ami », ou entre le code d\'un pote ci-dessous.</div>') +
+    (fr.length ? fr.map((f, i) => { const d = S.drivers.get(f.id); const on = d && Date.now() - Date.parse(d.updated_at) < 3 * 60000; return '<div class="card"><div class="ico" style="background:' + esc((d && d.color) || '#4DA3FF') + ';border-radius:22px">' + esc(initials(f.pseudo)) + '</div><div class="grow"><b>' + esc(f.pseudo) + '</b><div class="sub">' + (on ? 'En ligne' + (S.pos && d.lat != null ? ' · ' + fmtDist(dist(S.pos, d)) : '') : 'Hors ligne') + '</div></div><button class="btn small" data-msg="' + i + '">Bump</button></div>'; }).join('') : '<div class="empty">Pas encore d\'amis. Touche un conducteur sur la carte puis « Demander en ami », ou entre le code d\'un pote ci-dessous.</div>') +
     '<form id="frCodeF" class="row"><label class="field grow" for="frCode">Code ami<input id="frCode" maxlength="6" autocapitalize="characters" placeholder="Ex. : K7P2QX"></label><button class="btn" type="submit">Ajouter</button></form>' +
     '<p class="muted small">Ton code : <b class="code">' + esc(S.me.code || '') + '</b></p>', 'friends');
   body.querySelector('#hubDrivers').onclick = () => A.openK('drivers');
@@ -138,7 +138,7 @@ function openFriends() {
   body.querySelector('#hubShare').onclick = openShareSheet;
   body.querySelectorAll('[data-ok]').forEach((b) => { b.onclick = async () => { await acceptFriend(pendingReq[+b.dataset.ok]); openFriends(); }; });
   body.querySelectorAll('[data-no]').forEach((b) => { b.onclick = () => { refuseFriend(pendingReq[+b.dataset.no]); openFriends(); }; });
-  body.querySelectorAll('[data-msg]').forEach((b) => { b.onclick = () => openThread(fr[+b.dataset.msg].id); });
+  body.querySelectorAll('[data-msg]').forEach((b) => { b.onclick = () => A.bump(fr[+b.dataset.msg]); });
   body.querySelector('#frCodeF').onsubmit = async (e) => {
     e.preventDefault();
     const c = $('frCode').value.trim().toUpperCase();
@@ -214,7 +214,7 @@ function subscribeConvoy() {
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'to_id=eq.' + to }, (p) => {
       const m = p.new; if (convoyMsgs.some((x) => x.id === m.id)) return;
       convoyMsgs.push(m);
-      if (m.from_id !== S.me.id) { vibrate(50); toast('<b>' + esc(X.convoy.name) + '</b> · ' + esc(m.from_name || '') + ' : ' + esc(m.body || ''), { action: 'Ouvrir', onAction: openConvoy, ms: 7000 }); if (S.settings.readMsgs) say('Convoi, ' + (m.from_name || '') + ' : ' + (m.body || '')); }
+      if (m.from_id !== S.me.id) { vibrate(50); toast('<b>' + esc(X.convoy.name) + '</b> · ' + esc(m.from_name || '') + ' : ' + esc(m.body || ''), { action: 'Ouvrir', onAction: openConvoy, ms: 7000 }); }
       if (S.sheetView === 'convoy') openConvoy();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'convoys', filter: 'id=eq.' + X.convoy.id }, (p) => {
@@ -276,7 +276,6 @@ async function openConvoy() {
     '<h3>Membres</h3>' + mem.map((d) => { const on = Date.now() - Date.parse(d.updated_at) < 3 * 60000; return '<div class="card"><div class="ico" style="background:' + esc(d.color || '#FF8A3D') + ';border-radius:22px">' + esc(initials(d.pseudo)) + '</div><div class="grow"><b>' + esc(d.pseudo) + (d.id === c.owner ? ' · chef' : '') + '</b><div class="sub">' + (on && d.lat != null && S.pos && d.id !== S.me.id ? fmtDist(dist(S.pos, d)) : on ? 'En ligne' : 'Hors ligne') + '</div></div></div>'; }).join('') +
     '<h3>Chat du convoi</h3><div class="cvchat">' + (convoyMsgs.length ? convoyMsgs.slice(-30).map((m) => '<div class="msg' + (m.from_id === S.me.id ? ' mine' : '') + '"><b>' + esc(m.from_name || '') + '</b> ' + esc(m.body || '') + '<div class="meta">' + ago(m.created_at) + '</div></div>').join('') : '<div class="empty">Pas encore de message.</div>') + '</div>' +
     '<div class="quick">' + ['On part !', 'Pause dans 10 min', 'Je suis derrière', 'Attention devant', 'On se retrouve à l\'arrivée'].map((t) => '<button data-q="' + esc(t) + '">' + esc(t) + '</button>').join('') + '</div>' +
-    '<form id="cvMsgF" class="row"><label class="field grow" for="cvMsg"><span class="sr">Message</span><input id="cvMsg" maxlength="300" placeholder="Message au groupe…" autocomplete="off"></label><button class="btn" type="submit">Envoyer</button></form>' +
     '<div class="row"><button class="btn soft grow" id="cvInvite">' + IC.share + 'Inviter</button><button class="btn danger grow" id="cvLeave">Quitter</button></div>';
   const send = async (t) => {
     t = (t || '').trim(); if (!t) return;
@@ -293,7 +292,6 @@ async function openConvoy() {
     await send('Destination : ' + myDest.name); toast('Destination partagée avec le convoi.');
   };
   body.querySelectorAll('[data-q]').forEach((b) => { b.onclick = () => send(b.dataset.q); });
-  body.querySelector('#cvMsgF').onsubmit = (e) => { e.preventDefault(); send($('cvMsg').value); };
   body.querySelector('#cvInvite').onclick = () => shareLink('ROUTA', 'Rejoins mon convoi « ' + c.name + ' » sur ROUTA :', appUrl() + '?convoi=' + c.id);
   body.querySelector('#cvLeave').onclick = leaveConvoy;
   const chat = body.querySelector('.cvchat'); if (chat) chat.scrollTop = chat.scrollHeight;
@@ -708,6 +706,37 @@ X.arrived = (dest) => {
   X.via = []; X.viaFor = null;
 };
 
+/* ======================= Installer l'app sur l'écran d'accueil ======================= */
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; });
+const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+X.canInstall = () => !isStandalone();
+function openInstall() {
+  const ios = isIOS();
+  const shareIco = '<svg viewBox="0 0 24 24" style="width:18px;height:18px;vertical-align:-3px"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 11v9h14v-9"/></svg>';
+  const steps = ios ? [
+    ['Ouvre ce site dans <b>Safari</b>', 'Si tu es dans une autre app (Instagram, WhatsApp…), touche « Ouvrir dans Safari ».'],
+    ['Touche le bouton <b>Partager</b> ' + shareIco, 'En bas de l\'écran (ou en haut sur iPad).'],
+    ['Choisis <b>« Sur l\'écran d\'accueil »</b> puis <b>Ajouter</b>', 'Fais défiler la liste si tu ne le vois pas.']
+  ] : [
+    ['Ouvre ce site dans <b>Chrome</b>', 'Si tu es dans une autre app, touche « Ouvrir dans Chrome ».'],
+    ['Touche le menu <b>⋮</b>', 'En haut à droite de Chrome.'],
+    ['Choisis <b>« Installer l\'application »</b> ou <b>« Ajouter à l\'écran d\'accueil »</b>', 'Puis confirme.']
+  ];
+  const body = openSheet('Installer ROUTA',
+    '<p>Ajoute ROUTA sur ton écran d\'accueil : elle s\'ouvre en plein écran, comme une vraie app, en un seul appui.</p>' +
+    (installEvt ? '<button class="btn block" id="instNow">Installer maintenant</button><p class="muted small">Ou à la main :</p>' : '') +
+    steps.map((st, i) => '<div class="card"><div class="ico" style="background:#FF8A3D;border-radius:22px;color:#0E1116;font-weight:800">' + (i + 1) + '</div><div class="grow"><b>' + st[0] + '</b><div class="sub">' + st[1] + '</div></div></div>').join('') +
+    '<button class="btn soft block" id="instLater">Plus tard</button>', 'install');
+  const n = body.querySelector('#instNow'); if (n) n.onclick = async () => { installEvt.prompt(); try { await installEvt.userChoice; } catch (e) { /* */ } installEvt = null; closeSheet(); };
+  body.querySelector('#instLater').onclick = closeSheet;
+}
+setTimeout(() => {
+  if (isStandalone() || store.get('routa.installSeen', false) || !S.me || !S.me.pseudo || S.nav || !$('sheetWrap').hidden) return;
+  store.set('routa.installSeen', true); openInstall();
+}, 25000);
+
 /* ======================= Menu ======================= */
 function updateTileBadge() { const b = $('menuBadge'); if (b && pendingReq.length && b.hidden) { b.hidden = false; b.textContent = pendingReq.length; } }
 X.tiles = () => [
@@ -725,7 +754,7 @@ X.tiles = () => [
 X.icons = IC;
 X.pendingCount = () => pendingReq.length;
 X.open = (k) => {
-  const f = { friends: openFriends, convoy: openConvoy, events: openEvents, ranking: () => openRanking('all'), shareme: openShareSheet, chargers: openChargers, parkfree: openFreeParking, cols: openCols, carnet: openCarnet, parked: openParked }[k];
+  const f = { install: openInstall, friends: openFriends, convoy: openConvoy, events: openEvents, ranking: () => openRanking('all'), shareme: openShareSheet, chargers: openChargers, parkfree: openFreeParking, cols: openCols, carnet: openCarnet, parked: openParked }[k];
   if (f) { f(); return true; }
   return false;
 };
