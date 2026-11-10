@@ -1,5 +1,16 @@
 /* ROUTA – traductions (3/3) : nouveautés 0.9 (amis, convoi, rassemblements, carnet, parking, cols, menu…) */
 window.ROUTA_I18N_ROWS = (window.ROUTA_I18N_ROWS || []).concat([
+["Arrêts de bus et de tram", "Bus and tram stops", "Otobüs ve tramvay durakları"],
+["Touche un arrêt pour voir les lignes et les prochains départs.", "Tap a stop to see its lines and next departures.", "Hatları ve sonraki kalkışları görmek için bir durağa dokun."],
+["Chargement des prochains départs…", "Loading next departures…", "Sonraki kalkışlar yükleniyor…"],
+["Prochains départs", "Next departures", "Sonraki kalkışlar"],
+["Horaires complets", "Full timetable", "Tüm sefer saatleri"],
+["Aucun départ prévu pour le moment.", "No departures scheduled right now.", "Şu anda planlanmış kalkış yok."],
+["Horaires en direct indisponibles pour cet arrêt.", "Live times aren't available for this stop.", "Bu durak için canlı saatler mevcut değil."],
+["Horaires en temps réel : opendata.ch", "Real-time timetable: opendata.ch", "Gerçek zamanlı saatler: opendata.ch"],
+["maintenant", "now", "şimdi"],
+["voie", "platform", "peron"],
+["Arrêt", "Stop", "Durak"],
 ["Feu hors service", "Traffic light out", "Trafik ışığı arızalı"],
 ["feu tricolore hors service", "traffic light out of order", "trafik ışığı arızalı"],
 ["véhicule à contresens", "wrong-way driver", "ters yönde araç"],
