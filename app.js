@@ -3,7 +3,7 @@
 'use strict';
 
 const CFG = window.ROUTA_CONFIG || {};
-const VERSION = '0.9.4';
+const VERSION = '0.9.5';
 const I18N = window.ROUTA_I18N || { lang: 'fr', t: (s) => s, speech: 'fr-FR', valhalla: 'fr-FR', langs: { fr: 'Français' }, setLang() {} };
 const $ = (id) => document.getElementById(id);
 
@@ -633,6 +633,7 @@ S.trail = []; S.limit = null;
 let limitBusy = false, lastLimitAt = 0, lastLimitPos = null;
 async function speedLimitTick() {
   if (!S.pos || !S.settings.showLimit) return;
+  if (S.nav && S.nav.R && S.nav.R.limits) return;
   const last = S.trail[S.trail.length - 1];
   if (!last || dist(last, S.pos) > 8) { S.trail.push({ lat: S.pos.lat, lon: S.pos.lon }); if (S.trail.length > 6) S.trail.shift(); }
   if (limitBusy || (S.speed || 0) < 2 || S.trail.length < 2) return;
@@ -2229,7 +2230,7 @@ applyNight();
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => { /* hors ligne non disponible */ });
 }
-window.ROUTA = { S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials, veh, nameOf, openDriver, startNav, openSpot, openK };
+window.ROUTA = { updateSpeed, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials, veh, nameOf, openDriver, startNav, openSpot, openK };
 if (!S.me || !S.me.pseudo) onboarding(); else boot();
 
 })();
