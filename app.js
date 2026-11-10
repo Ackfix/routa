@@ -3,7 +3,7 @@
 'use strict';
 
 const CFG = window.ROUTA_CONFIG || {};
-const VERSION = '0.9.6';
+const VERSION = '0.9.7';
 const I18N = window.ROUTA_I18N || { lang: 'fr', t: (s) => s, speech: 'fr-FR', valhalla: 'fr-FR', langs: { fr: 'Français' }, setLang() {} };
 const $ = (id) => document.getElementById(id);
 
@@ -135,7 +135,7 @@ const DIM_LABELS = [['height', 'Hauteur', 'm'], ['width', 'Largeur', 'm'], ['len
 /* ======================= État ======================= */
 const S = {
   me: store.get('routa.me', null),
-  settings: Object.assign({ voice: true, readMsgs: true, night: 'auto', traffic: true, mapType: 'plan', relief3d: false, navNorth: false, showPlaces: true, googleLinks: true, showLimit: true, speedAlert: true }, store.get('routa.settings', {})),
+  settings: Object.assign({ voice: false, readMsgs: true, night: 'auto', traffic: true, mapType: 'plan', relief3d: false, navNorth: false, showPlaces: true, googleLinks: true, showLimit: true, speedAlert: true }, store.get('routa.settings', {})),
   vehicle: Object.assign({ type: 'voiture', dims: {}, hazmat: false }, store.get('routa.vehicle', {})),
   recents: store.get('routa.recents', []),
   lastRead: store.get('routa.lastRead', 0),
@@ -442,19 +442,17 @@ function openMapView() {
   const seg = (id, opts, cur) => '<div class="seg" id="' + id + '">' + opts.map(([k, v]) => '<button data-v="' + k + '" class="' + (k === cur ? 'on' : '') + '">' + v + '</button>').join('') + '</div>';
   const body = openSheet('Affichage de la carte',
     '<h3>Type de carte</h3>' + seg('mvType', [['plan', 'Plan'], ['sat', 'Satellite']], S.settings.mapType) +
-    '<label class="switch" for="mv3d"><span>Relief 3D (montagnes et vallées en relief, carte inclinée)</span><input id="mv3d" type="checkbox"' + (S.settings.relief3d ? ' checked' : '') + '></label>' +
     '<label class="switch" for="mvTraffic"><span><b>Trafic en direct</b><br><span class="muted small">Vert fluide, orange ralenti, rouge bouchon. Accidents et travaux en zoomant.</span></span><input id="mvTraffic" type="checkbox"' + (S.settings.traffic && CFG.tomtomKey ? ' checked' : '') + (CFG.tomtomKey ? '' : ' disabled') + '></label>' +
     (CFG.tomtomKey ? '' : '<p class="muted small">Trafic en direct bientôt disponible.</p>') +
     '<label class="switch" for="mvPlaces"><span>Afficher les établissements (restos, magasins…) en zoomant</span><input id="mvPlaces" type="checkbox"' + (S.settings.showPlaces ? ' checked' : '') + '></label>' +
     '<h3>Couleurs</h3>' + seg('mvNight', [['auto', 'Auto'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
     '<h3>Pendant la navigation</h3>' + seg('mvNav', [['route', 'Dans le sens de la route'], ['north', 'Nord en haut']], S.settings.navNorth ? 'north' : 'route') +
     '<div class="banner">' + ic('info') + '<span><b>Tourner la carte :</b> pose deux doigts et tourne-les (sur ordinateur : clic droit et glisser). <b>Incliner :</b> glisse deux doigts vers le haut ou le bas. La boussole montre le nord : touche-la pour remettre le nord en haut.</span></div>' +
-    '<p class="muted small">Images satellite : Esri. Le relief 3D consomme un peu plus de données et de batterie.</p>', 'mapview');
+    '<p class="muted small">Images satellite : Esri.</p>', 'mapview');
   body.querySelectorAll('#mvType button').forEach((b) => { b.onclick = () => { S.settings.mapType = b.dataset.v; saveSettings(); body.querySelectorAll('#mvType button').forEach((x) => x.classList.toggle('on', x === b)); applyMapView(true); }; });
   body.querySelector('#mvTraffic').onchange = (e) => { S.settings.traffic = e.target.checked; saveSettings(); applyMapView(false); };
   body.querySelector('#mvPlaces').onchange = (e) => { S.settings.showPlaces = e.target.checked; saveSettings(); applyPlaces(); if (S.settings.showPlaces && map.getZoom() < 15) map.easeTo({ zoom: 15.5, duration: 600 }); };
   body.querySelectorAll('#mvNight button').forEach((b) => { b.onclick = () => { S.settings.night = b.dataset.v; saveSettings(); applyNight(); body.querySelectorAll('#mvNight button').forEach((x) => x.classList.toggle('on', x === b)); }; });
-  body.querySelector('#mv3d').onchange = (e) => { S.settings.relief3d = e.target.checked; saveSettings(); applyMapView(true); };
   body.querySelectorAll('#mvNav button').forEach((b) => { b.onclick = () => { S.settings.navNorth = b.dataset.v === 'north'; saveSettings(); body.querySelectorAll('#mvNav button').forEach((x) => x.classList.toggle('on', x === b)); if (S.nav) { S.follow = true; $('btnLocate').classList.add('active'); followCam(); } updateCompass(); }; });
 }
 
@@ -659,15 +657,17 @@ function followCam() {
   const nowT = Date.now(); if (nowT - (S.camAt || 0) < 900) return; S.camAt = nowT;
   $('btnLocate').classList.add('active');
   const kmh = (S.speed || 0) * 3.6;
-  if (kmh < 10) { if (!S.slowSince) S.slowSince = nowT; } else S.slowSince = 0;
-  const still = !!S.slowSince && nowT - S.slowSince > 5000;
+  if (kmh >= 12) { S.moving = true; S.slowSince = 0; }
+  else if (kmh < 10) { if (!S.slowSince) S.slowSince = nowT; if (nowT - S.slowSince > 4000) S.moving = false; }
+  const moving = !!S.moving;
   const zoom = kmh < 30 ? 17.3 : kmh < 55 ? 16.5 : kmh < 90 ? 15.7 : 15;
   const north = S.settings.navNorth;
-  const pitch = still ? 0 : (S.settings.relief3d ? 60 : north ? 25 : 50);
-  const bearing = north ? 0 : (!still && S.heading != null ? S.heading : map.getBearing());
-  const off = still ? 0 : Math.round(window.innerHeight * (S.nav ? 0.2 : 0.15));
+  const pitch = moving ? (north ? 30 : 58) : 0;
+  const bearing = north ? 0 : (moving && S.heading != null ? S.heading : map.getBearing());
+  const off = moving ? Math.round(window.innerHeight * 0.28) : 0;
   map.easeTo({ center: [S.pos.lon, S.pos.lat], bearing, pitch, zoom, duration: 1000, easing: (t) => t, offset: [0, off], essential: true });
 }
+setInterval(() => { if (S.follow && S.pos && !document.hidden) followCam(); }, 1500);
 
 /* Envoi de ma position */
 let lastPush = 0, lastPushPos = null;
@@ -1034,7 +1034,7 @@ function stopNav(silent) {
   $('navBanner').hidden = true; $('navBar').hidden = true;
   drawRoute(null); setDestMarker(null);
   releaseWake();
-  map.easeTo({ pitch: S.settings.relief3d ? 60 : 0, bearing: 0, duration: 600 });
+  map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
   updateCompass();
   if (!silent) toast('Navigation arrêtée.');
 }
@@ -2234,6 +2234,8 @@ applyNight();
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => { /* hors ligne non disponible */ });
 }
+if (!store.get('routa.mig096', false)) { S.settings.voice = false; S.settings.relief3d = false; saveSettings(); store.set('routa.mig096', true); }
+S.settings.relief3d = false;
 window.ROUTA = { updateSpeed, bump, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials, veh, nameOf, openDriver, startNav, openSpot, openK };
 if (!S.me || !S.me.pseudo) onboarding(); else boot();
 
