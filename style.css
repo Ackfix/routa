@@ -360,3 +360,11 @@ html, body { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* 0.9.11 fluidité : marqueurs sur calques GPU */
 .maplibregl-marker{will-change:transform;contain:layout style;backface-visibility:hidden;-webkit-backface-visibility:hidden}
 #map canvas{touch-action:none}
+.deps{list-style:none;margin:0 0 14px;padding:0}
+.dep{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.dep:last-child{border-bottom:0}
+.dep .ln{flex:none;min-width:40px;padding:4px 8px;border-radius:8px;background:#4DA3FF;color:#06121f;font:800 14px var(--display);text-align:center}
+.dep .ln.train{background:#E5484D;color:#fff}
+.dep .to{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dep .tm{flex:none;text-align:right;display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
+.dep .late{color:#FF8F94;font-weight:700}
