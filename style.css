@@ -297,3 +297,12 @@ body.night.sat #map .maplibregl-canvas { filter: brightness(.78) saturate(.9); }
 .pill.warn{background:rgba(255,92,92,.2);color:#ff8a8a}
 .pill.tap{cursor:pointer;border:0;font:inherit;color:inherit}
 #btnShareTrip.active{background:#3DDC97;color:#06210f}
+/* 0.9.1 : menu simplifié */
+.menuh{margin:14px 2px 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tiles{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tile{min-height:76px;padding:12px 10px;gap:8px;font-size:13px}
+.menusos{width:100%;display:flex;align-items:center;gap:12px;text-align:left;border:0;color:inherit;background:#3A1D22;margin-top:8px}
+.menusos .sub{display:block}
+.menulinks{display:flex;justify-content:center;gap:4px;flex-wrap:wrap;margin:16px 0 10px}
+.menulinks button{background:none;border:0;color:var(--muted);font:inherit;font-size:13px;padding:8px 10px;text-decoration:underline}
+.hubrow .btn{font-size:13px}
