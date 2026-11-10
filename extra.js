@@ -704,7 +704,7 @@ X.arrived = (dest) => {
 /* ======================= Installer l'app sur l'écran d'accueil ======================= */
 let installEvt = null;
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; });
-const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+const isStandalone = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) || (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 X.canInstall = () => !isStandalone();
 function openInstall() {
