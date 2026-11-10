@@ -3,7 +3,7 @@
 'use strict';
 
 const CFG = window.ROUTA_CONFIG || {};
-const VERSION = '0.8.1';
+const VERSION = '0.9.0';
 const I18N = window.ROUTA_I18N || { lang: 'fr', t: (s) => s, speech: 'fr-FR', valhalla: 'fr-FR', langs: { fr: 'Français' }, setLang() {} };
 const $ = (id) => document.getElementById(id);
 
@@ -474,7 +474,7 @@ function renderMe() {
 function visibleDriver(d) {
   if (!d || d.id === S.me.id || d.lat == null || d.lon == null) return null;
   if (Date.now() - Date.parse(d.updated_at) > 3 * 60000) return null;
-  const isFriend = Array.isArray(d.friends) && d.friends.includes(S.me.id);
+  const isFriend = (Array.isArray(d.friends) && d.friends.includes(S.me.id)) || !!(window.ROUTA_X && ROUTA_X.isMate && ROUTA_X.isMate(d));
   if (d.visibility === 'amis' && !isFriend) return null;
   if (d.visibility === 'invisible') return null;
   if (isFriend) return { lat: d.lat, lon: d.lon, fuzzy: false };
@@ -841,6 +841,7 @@ async function fetchRoute(from, to) {
     try { const R = await fetchValhalla(from, to, v.costing, o); R.vehicle = vehSummary(); return R; }
     catch (e) { console.warn('valhalla', e); const R = await fetchOsrm(from, to); R.fallback = true; return R; }
   }
+  if (window.ROUTA_X && ROUTA_X.route) { try { const R = await ROUTA_X.route(from, to); if (R) return R; } catch (e) { console.warn('tomtom', e); } }
   try { return await fetchOsrm(from, to); }
   catch (e) { return await fetchValhalla(from, to, 'auto'); }
 }
@@ -912,6 +913,7 @@ async function chooseDestination(dest) {
     body.querySelector('#alongFuel').onclick = () => alongRoute(R, 'fuel');
     body.querySelector('#chgVeh').onclick = () => openVehicle(() => chooseDestination(dest));
     routeCountries(R, dest);
+    if (window.ROUTA_X && ROUTA_X.preview) ROUTA_X.preview(R, dest, body);
   } catch (e) {
     openSheet(dest.name, '<p>Impossible de calculer le trajet pour le moment. Vérifie ta connexion et réessaie.</p><button class="btn block" id="retryRoute">Réessayer</button>', 'preview')
       .querySelector('#retryRoute').onclick = () => chooseDestination(dest);
@@ -1057,8 +1059,10 @@ async function reroute() {
 }
 function arrive() {
   const name = S.nav.dest.name;
+  const arrDest = S.nav.dest;
   say('Vous êtes arrivé.');
   stopNav(true);
+  if (window.ROUTA_X && ROUTA_X.arrived) ROUTA_X.arrived(arrDest);
   openSheet('Tu es arrivé', '<p>' + esc(name) + '</p><div class="row"><button class="btn soft grow" id="arrSpot">' + ic('spot') + 'Ajouter en spot</button><button class="btn soft grow" id="arrPark">' + ic('parking') + 'Parkings autour</button></div><button class="btn ghost" id="arrFb">Un souci pendant ce trajet ? Dis-le-nous</button>', 'arrive');
   $('arrFb').onclick = () => openFeedback({ kind: 'bug', page: 'navigation' });
   $('arrSpot').onclick = () => openAddSpot(S.pos);
@@ -1232,7 +1236,7 @@ function renderPoiList(kind, list, c) {
     if (kind === 'fuel') val = '<div class="val">' + (p.mainPrice != null ? p.mainPrice.toFixed(2) + '<small>' + esc(p.mainFuel) + ' · ' + ago(p.priceAt) + '</small>' : '<small>prix ?</small>') + '<small>' + fmtDist(p.dist) + '</small></div>';
     return '<button class="card tap" data-i="' + i + '"><div class="ico" style="background:' + KIND_COLOR[kind] + '">' + ic(kind) + '</div><div class="grow"><b>' + esc(p.name) + '</b><div class="sub">' + esc(p.details || (p.hours ? 'Horaires : ' + p.hours : '')) + '</div></div>' + val + '</button>';
   }).join('');
-  html += '<p class="muted small">Lieux : OpenStreetMap. Notes et avis : laissés par les testeurs de ROUTA.' + (kind === 'charge' ? ' Disponibilité des bornes en direct : pas encore dans ce prototype.' : '') + '</p>';
+  html += '<p class="muted small">Lieux : OpenStreetMap. Notes et avis : laissés par les testeurs de ROUTA.' + (kind === 'charge' ? ' Disponibilité en direct : menu › Bornes libres.' : '') + '</p>';
   body.innerHTML = html;
   body.querySelectorAll('.card').forEach((b) => { b.onclick = () => openPoi(sorted[+b.dataset.i], kind); });
   body.querySelectorAll('.seg button').forEach((b) => { b.onclick = () => { poiSort = b.dataset.s; renderPoiList(kind, list, c); }; });
@@ -1334,6 +1338,7 @@ function openPoi(p, kind) {
   const rb = body.querySelector('#poiRate'); if (rb) rb.onclick = () => openRateForm(p, kind);
   body.querySelector('#poiGo').onclick = () => { closeSheet(); chooseDestination({ name: p.name, sub: KIND_LABEL[kind], lat: p.lat, lon: p.lon }); };
   body.querySelector('#poiFav').onclick = () => addFav({ name: p.name, addr: p.addr || '', lat: p.lat, lon: p.lon });
+  if (window.ROUTA_X && ROUTA_X.poiExtra) ROUTA_X.poiExtra(p, kind, body);
   const pb = body.querySelector('#poiPrice'); if (pb) pb.onclick = () => openPriceForm(p);
 }
 /* ======================= Tous les établissements ======================= */
@@ -1608,6 +1613,7 @@ function openSpot(id) {
   body.querySelector('#spGo').onclick = () => { closeSheet(); chooseDestination({ name: s.name, sub: SPOT_CATS[s.category] || 'Spot', lat: s.lat, lon: s.lon }); };
   body.querySelector('#spShow').onclick = () => { closeSheet(); stopFollow(); map.flyTo({ center: [s.lon, s.lat], zoom: 14 }); };
   const del = body.querySelector('#spDel'); if (del) del.onclick = () => { closeSheet(); DB.deleteSpot(id); toast('Spot supprimé.'); };
+  if (window.ROUTA_X && ROUTA_X.spotExtra) ROUTA_X.spotExtra(s, body);
 }
 function openAddSpot(at) {
   let cat = 'route';
@@ -1674,11 +1680,11 @@ function openDriver(id) {
     '<div class="row"><div class="ico" style="background:' + esc(d.color || '#FF8A3D') + ';border-radius:22px">' + esc(initials(d.pseudo)) + '</div><div class="grow"><b>' + esc(d.car || 'Voiture inconnue') + '</b><div class="sub">' + (d.fuzzy ? 'Zone approximative · ' : '') + (d.dist != null ? fmtDist(d.dist) : '') + ' · vu ' + ago(d.updated_at) + '</div></div></div>' +
     '<div class="row"><button class="btn grow" id="dBump">Bump</button><button class="btn soft grow" id="dMsg">' + ic('msg') + 'Message</button></div>' +
     '<button class="btn soft block" id="dJoin">' + ic('nav') + 'Le rejoindre</button>' +
-    (isFriend ? '' : '<button class="btn ghost" id="dFriend">Ajouter en ami (il pourra me voir)</button>'), 'driver');
+    (isFriend ? '' : '<button class="btn ghost" id="dFriend">Demander en ami</button>'), 'driver');
   body.querySelector('#dBump').onclick = () => bump(d);
   body.querySelector('#dMsg').onclick = () => openThread(d.id);
   body.querySelector('#dJoin').onclick = () => { closeSheet(); chooseDestination({ name: d.pseudo, sub: d.car || '', lat: d.vlat, lon: d.vlon }); };
-  const fr = body.querySelector('#dFriend'); if (fr) fr.onclick = () => { addFriend({ id: d.id, pseudo: d.pseudo }); openDriver(id); };
+  const fr = body.querySelector('#dFriend'); if (fr) fr.onclick = async () => { if (window.ROUTA_X && ROUTA_X.requestFriend) await ROUTA_X.requestFriend(d); else addFriend({ id: d.id, pseudo: d.pseudo }); openDriver(id); };
 }
 async function bump(d) {
   const ok = await DB.sendMsg({ id: uuid(), from_id: S.me.id, from_name: S.me.pseudo, to_id: d.id, kind: 'bump', body: null, created_at: new Date().toISOString() });
@@ -1691,6 +1697,7 @@ function nameOf(id) {
 }
 function onIncoming(m) {
   if (S.messages.some((x) => x.id === m.id)) return;
+  if (window.ROUTA_X && ROUTA_X.onMsg && ROUTA_X.onMsg(m)) return;
   S.messages.push(m);
   updateBadge();
   const who = m.from_name || nameOf(m.from_id);
@@ -2073,6 +2080,7 @@ function openK(k) {
     else if (k === 'profile') openProfile();
     else if (k === 'share') shareApp();
     else if (k === 'help') location.href = 'aide.html';
+    else if (window.ROUTA_X && ROUTA_X.open && ROUTA_X.open(k)) { /* nouveautés */ }
     else openPoiList(k);
 }
 document.querySelectorAll('.chip[data-open]').forEach((b) => { b.onclick = () => openK(b.dataset.open); });
@@ -2096,6 +2104,7 @@ function openMenu() {
     ['share', '<svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>', 'Partager ROUTA'],
     ['help', ic('info'), 'Aide']
   ];
+  if (window.ROUTA_X && ROUTA_X.tiles) tiles.splice(6, 0, ...ROUTA_X.tiles());
   const body = openSheet('Menu',
     '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(S.me.car || 'Pseudo, voiture, visibilité, réglages') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     langSeg() +
@@ -2159,6 +2168,7 @@ applyNight();
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => { /* hors ligne non disponible */ });
 }
+window.ROUTA = { S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials, veh, nameOf, openDriver, startNav, openSpot, openK };
 if (!S.me || !S.me.pseudo) onboarding(); else boot();
 
 })();
