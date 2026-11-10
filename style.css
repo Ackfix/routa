@@ -306,3 +306,10 @@ body.night.sat #map .maplibregl-canvas { filter: brightness(.78) saturate(.9); }
 .menulinks{display:flex;justify-content:center;gap:4px;flex-wrap:wrap;margin:16px 0 10px}
 .menulinks button{background:none;border:0;color:var(--muted);font:inherit;font-size:13px;padding:8px 10px;text-decoration:underline}
 .hubrow .btn{font-size:13px}
+/* 0.9.2 : domicile / travail */
+.chip > svg:not(.chipstar){width:16px;height:16px;color:var(--info)}
+.quickplaces{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px}
+.quickplaces button{display:flex;align-items:center;gap:10px;padding:10px;border:0;border-radius:12px;background:var(--surface-2);color:inherit;text-align:left;font:inherit;min-width:0}
+.quickplaces button svg{color:var(--info);flex-shrink:0}
+.quickplaces span{display:flex;flex-direction:column;min-width:0}
+.quickplaces small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
