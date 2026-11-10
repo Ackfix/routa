@@ -126,12 +126,16 @@ function sweepMessages() {
 function openFriends() {
   sweepMessages();
   const fr = S.me.friends || [];
-  const body = openSheet('Amis',
+  const body = openSheet('Amis et conducteurs',
+    '<div class="row wrap hubrow"><button class="btn soft grow" id="hubDrivers">Conducteurs autour</button><button class="btn soft grow" id="hubRank">' + IC.trophy + 'Classement · ' + (S.me.points || 0) + ' pts</button><button class="btn soft grow" id="hubShare">' + IC.share + ((X.share && X.share.until > Date.now()) ? 'Position partagée' : 'Partager ma position') + '</button></div>' +
     (pendingReq.length ? '<h3>Demandes reçues</h3>' + pendingReq.map((r, i) => '<div class="card"><div class="ico" style="background:#FF8A3D;border-radius:22px">' + esc(initials(r.pseudo)) + '</div><div class="grow"><b>' + esc(r.pseudo) + '</b><div class="sub">' + esc(r.car || '') + '</div></div><button class="btn small" data-ok="' + i + '">Accepter</button><button class="iconbtn small" data-no="' + i + '" aria-label="Refuser">' + ic('trash') + '</button></div>').join('') : '') +
     '<h3>Mes amis</h3>' +
     (fr.length ? fr.map((f, i) => { const d = S.drivers.get(f.id); const on = d && Date.now() - Date.parse(d.updated_at) < 3 * 60000; return '<div class="card"><div class="ico" style="background:' + esc((d && d.color) || '#4DA3FF') + ';border-radius:22px">' + esc(initials(f.pseudo)) + '</div><div class="grow"><b>' + esc(f.pseudo) + '</b><div class="sub">' + (on ? 'En ligne' + (S.pos && d.lat != null ? ' · ' + fmtDist(dist(S.pos, d)) : '') : 'Hors ligne') + '</div></div><button class="iconbtn small" data-msg="' + i + '" aria-label="Message">' + ic('msg') + '</button></div>'; }).join('') : '<div class="empty">Pas encore d\'amis. Touche un conducteur sur la carte puis « Demander en ami », ou entre le code d\'un pote ci-dessous.</div>') +
     '<form id="frCodeF" class="row"><label class="field grow" for="frCode">Code ami<input id="frCode" maxlength="6" autocapitalize="characters" placeholder="Ex. : K7P2QX"></label><button class="btn" type="submit">Ajouter</button></form>' +
     '<p class="muted small">Ton code : <b class="code">' + esc(S.me.code || '') + '</b></p>', 'friends');
+  body.querySelector('#hubDrivers').onclick = () => A.openK('drivers');
+  body.querySelector('#hubRank').onclick = () => openRanking('all');
+  body.querySelector('#hubShare').onclick = openShareSheet;
   body.querySelectorAll('[data-ok]').forEach((b) => { b.onclick = async () => { await acceptFriend(pendingReq[+b.dataset.ok]); openFriends(); }; });
   body.querySelectorAll('[data-no]').forEach((b) => { b.onclick = () => { refuseFriend(pendingReq[+b.dataset.no]); openFriends(); }; });
   body.querySelectorAll('[data-msg]').forEach((b) => { b.onclick = () => openThread(fr[+b.dataset.msg].id); });
@@ -646,14 +650,16 @@ function drawParked() {
 function saveParked(p, until) { parked = { lat: p.lat, lon: p.lon, at: Date.now(), until: until || null, warned: false }; store.set('routa.parked', parked); drawParked(); }
 function openParked() {
   const left = parked && parked.until ? Math.round((parked.until - Date.now()) / 60000) : null;
-  const body = openSheet('Ma voiture garée',
+  const body = openSheet('Stationnement',
     (parked ? '<div class="card"><div class="ico" style="background:#FFC24D">' + IC.car + '</div><div class="grow"><b>Garée ' + ago(new Date(parked.at).toISOString()) + '</b><div class="sub">' + (S.pos ? 'à ' + fmtDist(dist(S.pos, parked)) : '') + (left != null ? ' · ' + (left > 0 ? 'parking payé encore ' + left + ' min' : 'temps de parking dépassé') : '') + '</div></div></div>' +
       '<div class="row"><button class="btn grow" id="pkGo">' + ic('nav') + 'Y retourner</button><button class="btn soft grow" id="pkShow">Voir</button></div>' : '<p>Aucune position enregistrée. Elle s\'enregistre toute seule à la fin d\'une navigation, ou avec le bouton ci-dessous.</p>') +
     '<button class="btn soft block" id="pkHere">' + IC.car + 'Ma voiture est garée ici</button>' +
+    '<button class="btn soft block" id="pkFree">' + IC.park + 'Parkings libres autour (en direct)</button>' +
     '<h3>Rappel de fin de parking</h3><div class="row wrap" id="pkTimer">' + [30, 60, 90, 120, 180].map((m) => '<button class="pill tap" data-m="' + m + '">' + (m < 60 ? m + ' min' : (m / 60) + ' h') + '</button>').join('') + '</div>' +
     (parked ? '<button class="btn danger" id="pkClear">Effacer</button>' : ''), 'parked');
   const g = body.querySelector('#pkGo'); if (g) g.onclick = () => { closeSheet(); chooseDestination({ name: 'Ma voiture', sub: 'Voiture garée', lat: parked.lat, lon: parked.lon }); };
   const sh = body.querySelector('#pkShow'); if (sh) sh.onclick = () => { closeSheet(); map.flyTo({ center: [parked.lon, parked.lat], zoom: 17 }); };
+  body.querySelector('#pkFree').onclick = openFreeParking;
   body.querySelector('#pkHere').onclick = () => { if (!S.pos) { toast('Recherche de ta position…'); return; } saveParked(S.pos); toast('Position de ta voiture enregistrée.'); openParked(); };
   body.querySelectorAll('[data-m]').forEach((b) => { b.onclick = () => { if (!parked) { if (!S.pos) return; saveParked(S.pos); } parked.until = Date.now() + (+b.dataset.m) * 60000; parked.warned = false; store.set('routa.parked', parked); toast('Rappel 10 min avant la fin du parking.'); try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) { /* */ } openParked(); }; });
   const cl = body.querySelector('#pkClear'); if (cl) cl.onclick = () => { parked = null; store.set('routa.parked', null); drawParked(); closeSheet(); };
@@ -687,6 +693,8 @@ X.tiles = () => [
   ['carnet', IC.book, 'Carnet de la voiture'],
   ['parked', IC.car, 'Ma voiture garée']
 ];
+X.icons = IC;
+X.pendingCount = () => pendingReq.length;
 X.open = (k) => {
   const f = { friends: openFriends, convoy: openConvoy, events: openEvents, ranking: () => openRanking('all'), shareme: openShareSheet, chargers: openChargers, parkfree: openFreeParking, cols: openCols, carnet: openCarnet, parked: openParked }[k];
   if (f) { f(); return true; }
