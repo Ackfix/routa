@@ -3,7 +3,7 @@
 'use strict';
 
 const CFG = window.ROUTA_CONFIG || {};
-const VERSION = '0.9.2';
+const VERSION = '0.9.3';
 const I18N = window.ROUTA_I18N || { lang: 'fr', t: (s) => s, speech: 'fr-FR', valhalla: 'fr-FR', langs: { fr: 'Français' }, setLang() {} };
 const $ = (id) => document.getElementById(id);
 
@@ -1484,7 +1484,6 @@ function openReport(at) {
   let type = null;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const body = openSheet('Que se passe-t-il ?',
-    (SR ? '<button class="btn block" id="repVoice">' + ic('mic') + 'Dire à voix haute</button>' : '') +
     '<div class="grid4">' + Object.keys(ALERT_TYPES).map((k) => '<button class="typebtn" data-t="' + k + '">' + ic(k) + esc(ALERT_TYPES[k].label) + '</button>').join('') + '</div>' +
     '<label class="field" for="repComment">Précision (facultatif)<input id="repComment" type="text" maxlength="120" placeholder="Ex. : pneu sur la voie de droite"></label>' +
     '<button class="btn block" id="repSend" disabled>Choisis un type</button>' +
