@@ -3,7 +3,7 @@
 'use strict';
 
 const CFG = window.ROUTA_CONFIG || {};
-const VERSION = '0.9.1';
+const VERSION = '0.9.2';
 const I18N = window.ROUTA_I18N || { lang: 'fr', t: (s) => s, speech: 'fr-FR', valhalla: 'fr-FR', langs: { fr: 'Français' }, setLang() {} };
 const $ = (id) => document.getElementById(id);
 
@@ -92,7 +92,13 @@ const P = {
   sign: '<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>',
   phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/>',
   web: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/>',
-  star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>'
+  star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+  home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>',
+  work: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M3 13h18"/>',
+  feu: '<rect x="8" y="2" width="8" height="20" rx="3"/><circle cx="12" cy="7" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="17" r="1.6"/><path d="M4 4l16 16"/>',
+  contresens: '<path d="M12 21V4"/><path d="M7 9l5-5 5 5"/><path d="M4 4l16 16"/>',
+  brouillard: '<path d="M4 8h16M2 12h20M4 16h16M7 20h10"/>',
+  fermee: '<circle cx="12" cy="12" r="9"/><path d="M6 12h12"/>'
 };
 const ic = (n) => '<svg aria-hidden="true" viewBox="0 0 24 24">' + (P[n] || P.pin) + '</svg>';
 
@@ -104,7 +110,11 @@ const ALERT_TYPES = {
   bouchon: { label: 'Bouchon', say: 'bouchon', cls: 'red' },
   arret: { label: 'Véhicule arrêté', say: 'véhicule arrêté' },
   glissant: { label: 'Route glissante', say: 'route glissante', cls: 'blue' },
-  animal: { label: 'Animal', say: 'animal sur la route' }
+  animal: { label: 'Animal', say: 'animal sur la route' },
+  feu: { label: 'Feu hors service', say: 'feu tricolore hors service' },
+  contresens: { label: 'Contresens', say: 'véhicule à contresens', cls: 'red' },
+  brouillard: { label: 'Brouillard', say: 'brouillard, visibilité réduite', cls: 'blue' },
+  fermee: { label: 'Route fermée', say: 'route fermée', cls: 'red' }
 };
 const SPOT_CATS = { route: 'Belle route', vue: 'Point de vue', rdv: 'Rassemblement', nuit: 'Parking de nuit', autre: 'Autre' };
 const COLORS = ['#FF8A3D', '#4DA3FF', '#3DDC97', '#C9A2FF', '#FF6B9A', '#FFD34D', '#7FE0C2', '#F2F4F7'];
@@ -785,18 +795,39 @@ function showResults(items, msg) {
   if (!items.length) { box.innerHTML = '<div class="result"><span class="muted">' + esc(msg || 'Aucun résultat.') + '</span></div>'; box.hidden = false; return; }
   box.innerHTML = items.map((it, i) => '<button class="result" data-i="' + i + '">' + ic(it.fav ? 'star' : it.spot ? 'spot' : it.recent ? 'clock' : 'pin') + '<span class="grow"><b>' + esc(it.name) + '</b><small>' + esc(it.sub || '') + (S.pos ? ' · ' + fmtDist(dist(S.pos, it)) : '') + '</small></span></button>').join('');
   box.hidden = false;
-  box.querySelectorAll('.result').forEach((b) => { b.onclick = () => { const it = items[+b.dataset.i]; hideResults(); q.blur(); chooseDestination(it); }; });
+  box.querySelectorAll('.result').forEach((b) => { b.onclick = () => { const it = items[+b.dataset.i]; hideResults(); q.blur(); if (S.pickSlot) { const k = S.pickSlot; q.value = ''; saveSlot(k, it); return; } chooseDestination(it); }; });
 }
 function hideResults() { $('results').hidden = true; }
 function showRecents() {
-  const favs = S.favs.slice(0, 5).map((f) => ({ name: f.name, sub: f.addr || 'Favori', lat: f.lat, lon: f.lon, fav: true }));
+  const favs = S.favs.filter((f) => !f.slot).slice(0, 5).map((f) => ({ name: f.name, sub: f.addr || 'Favori', lat: f.lat, lon: f.lon, fav: true }));
   const rec = S.recents.filter((r) => !r.fav).map((r) => Object.assign({}, r, { recent: true }));
-  if (!favs.length && !rec.length) { hideResults(); return; }
+  if (S.pickSlot) { hideResults(); return; }
   showResults(favs.concat(rec).slice(0, 10));
+  const box = $('results');
+  if (!favs.length && !rec.length) box.innerHTML = '';
+  box.insertAdjacentHTML('afterbegin', '<div class="quickplaces">' + Object.keys(SLOTS).map((k) => { const f = slotFav(k); return '<button data-slot="' + k + '">' + ic(k) + '<span><b>' + SLOTS[k] + '</b><small>' + (f ? esc(f.addr || 'Enregistré') : 'Définir') + '</small></span></button>'; }).join('') + '</div>');
+  box.querySelectorAll('[data-slot]').forEach((b) => { b.onmousedown = (e) => e.preventDefault(); b.onclick = () => { hideResults(); q.blur(); goSlot(b.dataset.slot); }; });
+  box.hidden = false;
+}
+const SLOTS = { home: 'Domicile', work: 'Travail' };
+const slotFav = (k) => S.favs.find((f) => f.slot === k);
+function goSlot(k, edit) {
+  const f = slotFav(k);
+  if (f && !edit) { chooseDestination({ name: f.name, sub: f.addr || SLOTS[k], lat: f.lat, lon: f.lon, fav: true }); return; }
+  S.pickSlot = k; q.value = ''; $('qclear').hidden = true; q.placeholder = 'Adresse : ' + SLOTS[k].toLowerCase();
+  setTimeout(() => q.focus(), 50);
+  toast('Tape l\'adresse de ton <b>' + SLOTS[k].toLowerCase() + '</b> puis choisis-la : elle sera enregistrée.', { ms: 7000 });
+}
+function saveSlot(k, p) {
+  S.pickSlot = null; q.placeholder = 'Où va-t-on ?';
+  S.favs = S.favs.filter((f) => f.slot !== k);
+  S.favs.unshift({ id: uuid(), slot: k, name: SLOTS[k], addr: p.addr || p.sub || p.name || '', lat: p.lat, lon: p.lon, created_at: new Date().toISOString() });
+  saveFavs(); drawFavs(); vibrate(15);
+  toast('<b>' + SLOTS[k] + '</b> enregistré. Touche « ' + SLOTS[k] + ' » pour y aller en un clic.');
 }
 q.addEventListener('input', () => { $('qclear').hidden = !q.value; runSearch(q.value.trim()); });
 q.addEventListener('focus', () => { if (!q.value) showRecents(); });
-q.addEventListener('keydown', (e) => { if (e.key === 'Escape') { q.value = ''; hideResults(); q.blur(); } });
+q.addEventListener('keydown', (e) => { if (e.key === 'Escape') { q.value = ''; S.pickSlot = null; q.placeholder = 'Où va-t-on ?'; hideResults(); q.blur(); } });
 $('qclear').onclick = () => { q.value = ''; $('qclear').hidden = true; hideResults(); q.focus(); };
 map.on('click', (e) => { if (!$('results').hidden || document.activeElement === q) e._routaDone = true; hideResults(); q.blur(); });
 
@@ -1487,7 +1518,7 @@ function voiceReport(SR, at) {
   $('repVoice').textContent = 'Je t’écoute…';
   rec.onresult = (e) => {
     const text = [...e.results[0]].map((r) => r.transcript.toLowerCase()).join(' ');
-    const rules = [['accident', /accident|carambolage|collision/], ['bouchon', /bouchon|embouteillage|trafic|ralenti/], ['travaux', /travaux|chantier/], ['trou', /trou|nid/], ['arret', /arr[êe]t|panne|stationn/], ['glissant', /glissant|verglas|neige|pluie|huile|gravier/], ['animal', /animal|chevreuil|cerf|vache|chien|renard|sanglier/], ['objet', /objet|pneu|d[ée]bris|carton|pierre|caillou|chute/]];
+    const rules = [['contresens', /contresens|contre-sens|sens interdit/], ['feu', /feu|signalisation|tricolore/], ['brouillard', /brouillard|visibilit/], ['fermee', /ferm[ée]|barr[ée]|bloqu[ée]/], ['accident', /accident|carambolage|collision/], ['bouchon', /bouchon|embouteillage|trafic|ralenti/], ['travaux', /travaux|chantier/], ['trou', /trou|nid/], ['arret', /arr[êe]t|panne|stationn/], ['glissant', /glissant|verglas|neige|pluie|huile|gravier/], ['animal', /animal|chevreuil|cerf|vache|chien|renard|sanglier/], ['objet', /objet|pneu|d[ée]bris|carton|pierre|caillou|chute/]];
     const hit = rules.find(([, re]) => re.test(text));
     if (hit) { closeSheet(); sendAlert(hit[0], at || S.pos, text); say('Alerte ' + ALERT_TYPES[hit[0]].say + ' envoyée'); }
     else { toast('Je n’ai pas compris « ' + esc(text) + ' ». Choisis le type dans la liste.'); $('repVoice').innerHTML = ic('mic') + 'Dire à voix haute'; }
@@ -1552,12 +1583,14 @@ function addFav(p) {
   const body = openSheet('Enregistrer en favori',
     (p.addr ? '<p class="muted">' + esc(p.addr) + '</p>' : '') +
     '<label class="field" for="fvName">Nom du repère<input id="fvName" type="text" maxlength="40" value="' + esc(def) + '" placeholder="Ex. : Maison, Travail, Garage, Point de vue…"></label>' +
-    '<div class="row wrap" id="fvQuick">' + ['Maison', 'Travail', 'Garage', 'Point de vue'].map((n) => '<button class="pill tap" data-n="' + n + '">' + n + '</button>').join('') + '</div>' +
+    '<div class="row wrap" id="fvQuick">' + ['Domicile', 'Travail', 'Garage', 'Point de vue'].map((n) => '<button class="pill tap" data-n="' + n + '">' + n + '</button>').join('') + '</div>' +
     '<button class="btn block" id="fvSave">' + ic('star') + 'Enregistrer</button>' +
     '<p class="muted small">Tes favoris restent sur ce téléphone, personne d\'autre ne les voit.</p>', 'favadd');
   body.querySelectorAll('#fvQuick button').forEach((b) => { b.onclick = () => { $('fvName').value = b.dataset.n; }; });
   body.querySelector('#fvSave').onclick = () => {
     const name = $('fvName').value.trim() || p.addr || 'Mon repère';
+    const slot = Object.keys(SLOTS).find((k) => SLOTS[k].toLowerCase() === name.toLowerCase());
+    if (slot) { closeSheet(); saveSlot(slot, p); return; }
     S.favs.unshift({ id: uuid(), name, addr: p.addr || '', lat: p.lat, lon: p.lon, created_at: new Date().toISOString() });
     saveFavs(); drawFavs(); closeSheet(); vibrate(15);
     toast('<b>' + esc(name) + '</b> ajouté à tes favoris.', { action: 'Voir', onAction: openFavs });
@@ -1580,13 +1613,17 @@ function openFav(id) {
 }
 function openFavs() {
   const c = S.pos || (() => { const m = map.getCenter(); return { lat: m.lat, lon: m.lng }; })();
-  const list = S.favs.map((f) => Object.assign({ d: dist(c, f) }, f));
+  const list = S.favs.filter((f) => !f.slot).map((f) => Object.assign({ d: dist(c, f) }, f));
   const body = openSheet('Mes favoris',
+    Object.keys(SLOTS).map((k) => { const f = slotFav(k); return '<div class="card"><div class="ico" style="background:#4DA3FF">' + ic(k) + '</div><div class="grow"><b>' + SLOTS[k] + '</b><div class="sub">' + (f ? esc(f.addr || 'Enregistré') : 'Pas encore défini') + '</div></div>' + (f ? '<button class="btn small" data-sgo="' + k + '">' + ic('nav') + 'Y aller</button>' : '') + '<button class="btn soft small" data-sedit="' + k + '">' + (f ? 'Modifier' : 'Définir') + '</button></div>'; }).join('') +
+    '<h3>Autres favoris</h3>' +
     (list.length ? list.map((f, i) => '<div class="card"><button class="grow tap plain" data-i="' + i + '"><b>' + esc(f.name) + '</b><div class="sub">' + esc(f.addr || 'Repère') + ' · ' + fmtDist(f.d) + '</div></button><button class="btn small" data-go="' + i + '">' + ic('nav') + 'Y aller</button></div>').join('') :
       '<div class="empty">Pas encore de favori. Touche un endroit sur la carte (ou un établissement), puis « Enregistrer en favori ».</div>') +
     '<p class="muted small">Tes favoris apparaissent aussi en haut de la recherche.</p>', 'favs');
   body.querySelectorAll('[data-i]').forEach((b) => { b.onclick = () => { const f = list[+b.dataset.i]; map.easeTo({ center: [f.lon, f.lat], zoom: Math.max(map.getZoom(), 15), duration: 600 }); openFav(f.id); }; });
   body.querySelectorAll('[data-go]').forEach((b) => { b.onclick = () => { const f = list[+b.dataset.go]; closeSheet(); chooseDestination({ name: f.name, sub: f.addr || 'Favori', lat: f.lat, lon: f.lon, fav: true }); }; });
+  body.querySelectorAll('[data-sgo]').forEach((b) => { b.onclick = () => { closeSheet(); goSlot(b.dataset.sgo); }; });
+  body.querySelectorAll('[data-sedit]').forEach((b) => { b.onclick = () => { closeSheet(); goSlot(b.dataset.sedit, true); }; });
 }
 
 /* ======================= Spots ======================= */
@@ -2078,6 +2115,7 @@ function openK(k) {
     else if (k === 'restrictions') openRestrictions();
     else if (k === 'country') openCountry(S.country, 'sos');
     else if (k === 'favs') openFavs();
+    else if (SLOTS[k]) goSlot(k);
     else if (k === 'mapview') openMapView();
     else if (k === 'profile') openProfile();
     else if (k === 'share') shareApp();
