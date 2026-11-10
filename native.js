@@ -328,7 +328,17 @@
     const vis = cs.visibility !== 'hidden';
     const r = e.getBoundingClientRect();
     const tag = e.tagName.toLowerCase();
-    if (tag === 'svg') { if (vis && r.width > 0) items.push({ t: 'svg', e, r, a, pad: 0 }); return; }
+    if (tag === 'svg') {
+      if (vis && r.width > 0) {
+        const sh = parseShadow(cs.boxShadow);
+        items.push({ t: 'box', cs, r, a, sh, pad: sh ? sh.blur + Math.max(Math.abs(sh.x), Math.abs(sh.y)) + 2 : 0 });
+        const bl = (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.paddingLeft) || 0), bt = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.paddingTop) || 0);
+        const br = (parseFloat(cs.borderRightWidth) || 0) + (parseFloat(cs.paddingRight) || 0), bb = (parseFloat(cs.borderBottomWidth) || 0) + (parseFloat(cs.paddingBottom) || 0);
+        const ir = { left: r.left + bl, top: r.top + bt, right: r.right - br, bottom: r.bottom - bb, width: r.width - bl - br, height: r.height - bt - bb };
+        if (ir.width > 0 && ir.height > 0) items.push({ t: 'svg', e, r: ir, a, pad: 0 });
+      }
+      return;
+    }
     if (tag === 'img') return;
     if (vis && r.width > 0 && r.height > 0) {
       const sh = parseShadow(cs.boxShadow);
