@@ -339,6 +339,8 @@ window.ROUTA_I18N_SUB_EXTRA = ["ici", "Classement", "Convoi", "Garée", "libres"
 /* Phrases avec des nombres ou des noms */
 window.ROUTA_I18N_PX = {
   en: [
+    [/^(.+) autour de toi$/, (a) => a + ' around you', [1]],
+    [/^(-?\d+)°, ([^,]+)(.*)$/, (a, b, c) => a + '°, ' + b + c, [2, 3]],
     [/^(.+ · )?(\d+) m, entre (.+?) et (.+?)\. (.+)$/, (p, n, a, b, r) => (p || '') + n + ' m, between ' + a + ' and ' + b + '. ' + r, [1, 5]],
     [/^(.+ · )?(\d+) m, (.+)$/, (p, n, r) => (p || '') + n + ' m, ' + r, [1, 3]],
     [/^Limitation à (\d+) dans (.+)$/, (a, b) => 'Speed limit ' + a + ' in ' + b.replace('mètres', 'metres').replace('quelques metres', 'a few metres')],
@@ -364,6 +366,8 @@ window.ROUTA_I18N_PX = {
     [/^Prochain bump possible dans (\d+) min\.$/, (a) => 'Next bump possible in ' + a + ' min.']
   ],
   tr: [
+    [/^(.+) autour de toi$/, (a) => 'Çevrende ' + a.toLowerCase(), [1]],
+    [/^(-?\d+)°, ([^,]+)(.*)$/, (a, b, c) => a + '°, ' + b + c, [2, 3]],
     [/^(.+ · )?(\d+) m, entre (.+?) et (.+?)\. (.+)$/, (p, n, a, b, r) => (p || '') + n + ' m, ' + a + ' ile ' + b + ' arasında. ' + r, [1, 5]],
     [/^(.+ · )?(\d+) m, (.+)$/, (p, n, r) => (p || '') + n + ' m, ' + r, [1, 3]],
     [/^Limitation à (\d+) dans (.+)$/, (a, b) => b.replace('quelques mètres', 'birkaç metre').replace('mètres', 'metre') + ' sonra hız sınırı ' + a],
