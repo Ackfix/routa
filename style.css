@@ -341,3 +341,18 @@ body.navigating .fab-report { right: var(--eR); }
 body.navigating .fabs-right { right: calc(var(--eR) + 8px); }
 body.navigating .speedbox, body.navigating .limitsign { left: var(--eL); }
 .maplibregl-ctrl-bottom-right { bottom: auto; top: var(--eT); right: var(--eR); }
+/* 0.9.9b : finitions d'affichage */
+html, body { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.tiles.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tile { min-width: 0; padding: 14px 12px; }
+.tile span { display: block; max-width: 100%; overflow-wrap: anywhere; hyphens: auto; -webkit-hyphens: auto; }
+.tile .badge { display: inline-flex; vertical-align: 1px; margin-left: 4px; }
+.sheet-body { padding-top: 8px; }
+.card { min-width: 0; }
+.card b, .card .sub { overflow-wrap: anywhere; }
+.menusos .sub, .menuprof .sub { margin-top: 2px; }
+@media (min-width: 760px) {
+  .sheet { left: var(--eL); width: 440px; }
+  .sheet-head { padding-left: 20px; padding-right: 16px; }
+  .sheet-body { padding-left: 20px; padding-right: 20px; padding-bottom: 20px; }
+}
