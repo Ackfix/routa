@@ -272,3 +272,28 @@ body:not(.navigating) .limitsign { bottom: calc(var(--sab) + 142px); }
 .card .plain { background: none; border: 0; color: inherit; text-align: left; padding: 0; font: inherit; cursor: pointer; }
 .danger-t { color: var(--danger); }
 body.night.sat #map .maplibregl-canvas { filter: brightness(.78) saturate(.9); }
+
+/* 0.9 : amis, convoi, rassemblements, navigation */
+.ptsfly{position:fixed;left:50%;top:38%;transform:translateX(-50%);background:#3DDC97;color:#06210f;font-weight:800;padding:8px 16px;border-radius:999px;z-index:200;pointer-events:none;animation:ptsfly 1.6s ease-out forwards}
+@keyframes ptsfly{0%{opacity:0;transform:translate(-50%,10px)}20%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-40px)}}
+.rank{width:26px;text-align:center;font-weight:800;opacity:.8}
+.card.meRow{outline:2px solid var(--accent,#FF8A3D)}
+.mk-event{width:34px;height:34px;border-radius:12px;background:#C9A2FF;border:2px solid #fff;display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.35);padding:0}
+.mk-event svg,.mk-parked svg{width:20px;height:20px;fill:none;stroke:#1a1030;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mk-parked{width:34px;height:34px;border-radius:50%;background:#FFC24D;border:2px solid #fff;display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.35);padding:0}
+.mate{filter:drop-shadow(0 0 6px #3DDC97)}
+.cvchat{max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.cvchat .msg{background:rgba(255,255,255,.07);border-radius:12px;padding:7px 10px;max-width:85%}
+.cvchat .msg.mine{align-self:flex-end;background:rgba(255,138,61,.22)}
+.cvchat .meta{font-size:11px;opacity:.6}
+.routex h3{margin:12px 0 6px}
+.altlist{display:flex;gap:8px;overflow-x:auto}
+.altbtn{flex:1;min-width:96px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:transparent;color:inherit;padding:8px;text-align:left;display:flex;flex-direction:column;gap:2px;font:inherit}
+.altbtn span{font-size:12px;opacity:.75}
+.altbtn.on{border-color:var(--accent,#FF8A3D);background:rgba(255,138,61,.15)}
+.avoid{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0;font-size:14px}
+.avoid label{display:flex;align-items:center;gap:6px}
+.pill.ok{background:rgba(61,220,151,.2);color:#3DDC97}
+.pill.warn{background:rgba(255,92,92,.2);color:#ff8a8a}
+.pill.tap{cursor:pointer;border:0;font:inherit;color:inherit}
+#btnShareTrip.active{background:#3DDC97;color:#06210f}
