@@ -313,3 +313,6 @@ body.night.sat #map .maplibregl-canvas { filter: brightness(.78) saturate(.9); }
 .quickplaces button svg{color:var(--info);flex-shrink:0}
 .quickplaces span{display:flex;flex-direction:column;min-width:0}
 .quickplaces small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 0.9.5 : limite suivante */
+.limitnext{position:fixed;z-index:15;left:calc(max(12px, var(--sal)) + 72px);bottom:calc(var(--sab) + 244px);display:flex;align-items:center;gap:6px;padding:6px 10px 6px 6px;border-radius:24px;background:var(--surface);box-shadow:0 6px 18px rgba(0,0,0,.35);font-size:13px;font-weight:600}
+.limitnext .ln-sign{width:34px;height:34px;border-radius:17px;background:#fff;border:4px solid #E5484D;color:#0E1116;font:700 13px var(--display);display:flex;align-items:center;justify-content:center;box-sizing:border-box}
