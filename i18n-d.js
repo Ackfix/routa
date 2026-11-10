@@ -291,13 +291,56 @@ window.ROUTA_I18N_ROWS = (window.ROUTA_I18N_ROWS || []).concat([
 ["Plus là", "Gone", "Artık yok"],
 ["Toujours là", "Still there", "Hâlâ orada"],
 ["Classement · 0 pts", "Leaderboard · 0 pts", "Sıralama · 0 puan"],
-["Pas de destination", "No destination", "Hedef yok"]
+["Pas de destination", "No destination", "Hedef yok"],
+["Carte © OpenStreetMap, OpenFreeMap. Itinéraires OSRM et Valhalla. Recherche Photon.", "Map © OpenStreetMap, OpenFreeMap. Routing OSRM and Valhalla. Search Photon.", "Harita © OpenStreetMap, OpenFreeMap. Rota OSRM ve Valhalla. Arama Photon."],
+["Afficher la limite de vitesse (indicative)", "Show the speed limit (indicative)", "Hız sınırını göster (bilgi amaçlı)"],
+["Précision (facultatif)", "Details (optional)", "Ayrıntı (isteğe bağlı)"],
+["Choisis", "Choose", "Seç"],
+["ici", "here", "burada"],
+["Route des vignobles au-dessus du lac, superbe au coucher du soleil.", "Vineyard road above the lake, superb at sunset.", "Gölün üzerinde bağ yolu, gün batımında muhteşem."],
+["Courbes en forêt dans le Jura.", "Forest bends in the Jura.", "Jura'da orman içinde virajlar."],
+["Belle route du Jura.", "Scenic road in the Jura.", "Jura'nın güzel yolu."],
+["Grande route des Préalpes, ouverte toute l'année.", "Major Pre-Alps road, open all year.", "Ön Alpler'in ana yolu, yıl boyunca açık."],
+["Vue sur le Glacier 3000.", "View of Glacier 3000.", "Glacier 3000 manzarası."],
+["Haute montagne et lacs au sommet.", "High mountains and lakes at the top.", "Yüksek dağlar ve zirvede göller."],
+["Fermé en hiver.", "Closed in winter.", "Kışın kapalı."],
+["Plateau du Jura avec éoliennes.", "Jura plateau with wind turbines.", "Rüzgâr türbinli Jura platosu."],
+["Glaciers et lacs, ouvert toute l'année.", "Glaciers and lakes, open all year.", "Buzullar ve göller, yıl boyunca açık."],
+["Vue sur le glacier du Rhône, route mythique.", "View of the Rhône glacier, a legendary road.", "Rhône buzulu manzarası, efsanevi yol."],
+["Route douce avec lac de barrage.", "Gentle road with a reservoir.", "Baraj gölü olan yumuşak bir yol."],
+["Route étroite et sauvage.", "Narrow, wild road.", "Dar ve vahşi yol."],
+["Lacs de barrage et virages en série.", "Reservoirs and a string of bends.", "Baraj gölleri ve art arda virajlar."],
+["Ancienne route au-dessus du tunnel.", "Old road above the tunnel.", "Tünelin üzerindeki eski yol."],
+["Vue sur les Mythen et le lac des Quatre-Cantons.", "View of the Mythen and Lake Lucerne.", "Mythen ve Lucerne Gölü manzarası."],
+["Panorama sur toute la chaîne des Alpes par beau temps.", "Panorama of the whole Alps in good weather.", "Açık havada tüm Alpler'in panoraması."],
+["Petite route de montagne.", "Small mountain road.", "Küçük dağ yolu."],
+["Ancienne route pavée de la Tremola côté Tessin.", "Old cobbled Tremola road on the Ticino side.", "Ticino tarafında eski Tremola Arnavut kaldırımı yolu."],
+["Pâturages du Jura, vue sur le Léman en montant.", "Jura pastures, view of Lake Geneva on the way up.", "Jura meraları, çıkarken Cenevre Gölü manzarası."],
+["Panorama sur les Alpes bernoises.", "Panorama of the Bernese Alps.", "Bern Alpleri panoraması."],
+["Vue sur la plaine du Rhône et le vignoble.", "View of the Rhône plain and vineyards.", "Rhône ovası ve bağlar manzarası."],
+["Ouvert toute l'année, vue sur l'Engadine.", "Open all year, view of the Engadine.", "Yıl boyunca açık, Engadin manzarası."],
+["Belle route des Préalpes fribourgeoises.", "Scenic road in the Fribourg Pre-Alps.", "Fribourg Ön Alpleri'nin güzel yolu."],
+["Lacets très serrés côté italien.", "Very tight hairpins on the Italian side.", "İtalyan tarafında çok keskin virajlar."],
+["Phare au sommet, près de la source du Rhin.", "Lighthouse at the top, near the source of the Rhine.", "Zirvede deniz feneri, Ren'in kaynağına yakın."],
+["Longue route panoramique avec cascades.", "Long panoramic road with waterfalls.", "Şelaleli uzun panoramik yol."],
+["Belvédère sur le Plateau et les Alpes.", "Lookout over the Plateau and the Alps.", "Plato ve Alpler'e bakan seyir noktası."],
+["Route jusqu'à l'hôtel, vue sur les Alpes et trois lacs.", "Road up to the hotel, view of the Alps and three lakes.", "Otele kadar yol, Alpler ve üç göl manzarası."],
+["Le plus haut col routier entièrement suisse.", "The highest pass road entirely in Switzerland.", "Tamamen İsviçre'de olan en yüksek geçit yolu."],
+["Large route ouverte toute l'année.", "Wide road open all year.", "Yıl boyunca açık geniş yol."],
+["Lacets, hospice et lac au sommet.", "Hairpins, hospice and lake at the top.", "Virajlar, zirvede bakımevi ve göl."],
+["Route de forêt, frontière au sommet.", "Forest road, border at the top.", "Orman yolu, zirvede sınır."],
+["Tunnels, glaciers et grandes courbes.", "Tunnels, glaciers and sweeping bends.", "Tüneller, buzullar ve geniş virajlar."],
+["au sud de Berne.", "south of Bern.", "Bern'in güneyinde."],
+["au-dessus de Soleure.", "above Solothurn.", "Solothurn'un üzerinde."],
+["plus haut sommet du Jura bernois.", "highest summit of the Bernese Jura.", "Bern Jura'sının en yüksek zirvesi."]
 ]);
 /* Mots seuls à traduire aussi au milieu d'une phrase */
-window.ROUTA_I18N_SUB_EXTRA = ["Classement", "Convoi", "Garée", "libres", "participants", "participant", "Bumps", "Véhicule", "Voiture", "Hybride", "Électrique"];
+window.ROUTA_I18N_SUB_EXTRA = ["ici", "Classement", "Convoi", "Garée", "libres", "participants", "participant", "Bumps", "Véhicule", "Voiture", "Hybride", "Électrique"];
 /* Phrases avec des nombres ou des noms */
 window.ROUTA_I18N_PX = {
   en: [
+    [/^(.+ · )?(\d+) m, entre (.+?) et (.+?)\. (.+)$/, (p, n, a, b, r) => (p || '') + n + ' m, between ' + a + ' and ' + b + '. ' + r, [1, 5]],
+    [/^(.+ · )?(\d+) m, (.+)$/, (p, n, r) => (p || '') + n + ' m, ' + r, [1, 3]],
     [/^Limitation à (\d+) dans (.+)$/, (a, b) => 'Speed limit ' + a + ' in ' + b.replace('mètres', 'metres').replace('quelques metres', 'a few metres')],
     [/^Ton parking se termine dans (\d+) minutes$/, (a) => 'Your parking ends in ' + a + ' minutes'],
     [/^Garée (.+)$/, (a) => 'Parked ' + a, [1]],
@@ -321,6 +364,8 @@ window.ROUTA_I18N_PX = {
     [/^Prochain bump possible dans (\d+) min\.$/, (a) => 'Next bump possible in ' + a + ' min.']
   ],
   tr: [
+    [/^(.+ · )?(\d+) m, entre (.+?) et (.+?)\. (.+)$/, (p, n, a, b, r) => (p || '') + n + ' m, ' + a + ' ile ' + b + ' arasında. ' + r, [1, 5]],
+    [/^(.+ · )?(\d+) m, (.+)$/, (p, n, r) => (p || '') + n + ' m, ' + r, [1, 3]],
     [/^Limitation à (\d+) dans (.+)$/, (a, b) => b.replace('quelques mètres', 'birkaç metre').replace('mètres', 'metre') + ' sonra hız sınırı ' + a],
     [/^Ton parking se termine dans (\d+) minutes$/, (a) => 'Parkının bitmesine ' + a + ' dakika kaldı'],
     [/^Garée (.+)$/, (a) => 'Park edildi: ' + a, [1]],
