@@ -3,7 +3,7 @@
 'use strict';
 
 const CFG = window.ROUTA_CONFIG || {};
-const VERSION = '0.9.7';
+const VERSION = '0.9.8';
 const I18N = window.ROUTA_I18N || { lang: 'fr', t: (s) => s, speech: 'fr-FR', valhalla: 'fr-FR', langs: { fr: 'Français' }, setLang() {} };
 const $ = (id) => document.getElementById(id);
 
@@ -351,6 +351,8 @@ const map = new maplibregl.Map({
   center: CFG.defaultCenter || [6.6323, 46.5197],
   zoom: CFG.defaultZoom || 11,
   attributionControl: { compact: true },
+  pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+  fadeDuration: 0,
   pitchWithRotate: true,
   dragRotate: true,
   maxPitch: 75
@@ -665,6 +667,9 @@ function followCam() {
   const pitch = moving ? (north ? 30 : 58) : 0;
   const bearing = north ? 0 : (moving && S.heading != null ? S.heading : map.getBearing());
   const off = moving ? Math.round(window.innerHeight * 0.28) : 0;
+  const c = map.getCenter(), lc = S.lastCam;
+  if (!moving && lc && !lc.moving && Math.abs(map.getPitch() - pitch) < 1 && Math.abs(map.getZoom() - zoom) < 0.05 && dist({ lat: c.lat, lon: c.lng }, S.pos) < 3) return;
+  S.lastCam = { moving };
   map.easeTo({ center: [S.pos.lon, S.pos.lat], bearing, pitch, zoom, duration: 1000, easing: (t) => t, offset: [0, off], essential: true });
 }
 setInterval(() => { if (S.follow && S.pos && !document.hidden) followCam(); }, 1500);
