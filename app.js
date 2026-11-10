@@ -353,6 +353,9 @@ const map = new maplibregl.Map({
   attributionControl: { compact: true },
   pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
   fadeDuration: 0,
+  renderWorldCopies: false,
+  refreshExpiredTiles: false,
+  maxTileCacheSize: 120,
   pitchWithRotate: true,
   dragRotate: true,
   maxPitch: 75
