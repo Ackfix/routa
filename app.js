@@ -987,6 +987,7 @@ async function fetchValhalla(from, to, costing, opts) {
 }
 async function fetchRoute(from, to) {
   const v = veh();
+  if (v.heavy && window.ROUTA_X && ROUTA_X.route) { try { const R = await ROUTA_X.route(from, to); if (R) { R.vehicle = vehSummary(); return R; } } catch (e) { console.warn('tomtom poids lourd', e); } }
   if (v.heavy) {
     const d = v.dims;
     const o = { height: d.height, width: d.width, length: d.length, weight: d.weight };
@@ -2644,7 +2645,7 @@ if (!store.get('routa.mig096', false)) { S.settings.voice = false; S.settings.re
 if (!store.get('routa.mig0913', false)) { S.settings.traffic = true; S.settings.showPlaces = true; S.settings.showTransit = false; saveSettings(); store.set('routa.mig0913', true); }
 S.settings.mapType = 'plan';
 S.settings.relief3d = false;
-window.ROUTA = { updateSpeed, bump, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials, veh, nameOf, openDriver, startNav, openSpot, openK };
+window.ROUTA = { updateSpeed, bump, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials, veh, nameOf, openDriver, startNav, openSpot, openK, overpass };
 if (!S.me || !S.me.pseudo) onboarding(); else boot();
 
 })();
