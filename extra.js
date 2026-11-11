@@ -960,10 +960,24 @@ const PRO = Object.assign({ on: false, regime: null, auto: true, segs: [] }, sto
 const H = 3600000, MIN = 60000;
 const PRO_RULES = {
   otr1: { label: 'OTR 1', sub: 'Transport de marchandises de plus de 3,5 t, et transport de personnes avec plus de 8 places assises sans compter le conducteur (dès 9 places avec lui)', cont: 4.5 * H, day: 9 * H, dayExt: 10 * H, week: 56 * H, twoWeeks: 90 * H, rest: 11 * H, restRed: 9 * H, split1: 15 * MIN },
+  ue: { label: 'UE 561', sub: 'Règlement (CE) 561/2006 (France et Union européenne) : transport de marchandises de plus de 3,5 t, et transport de plus de 9 personnes conducteur compris', cont: 4.5 * H, day: 9 * H, dayExt: 10 * H, week: 56 * H, twoWeeks: 90 * H, rest: 11 * H, restRed: 9 * H, split1: 15 * MIN },
   otr2: { label: 'OTR 2', sub: 'Transport professionnel de personnes en voiture légère ou de tourisme (taxis, VTC, limousines) : 8 places passagers au maximum', cont: 4.5 * H, day: 9 * H, dayExt: null, week: 45 * H, twoWeeks: null, rest: 11 * H, restRed: 9 * H, split1: 20 * MIN }
 };
 const ACT = { drive: 'Conduite', break: 'Pause', work: 'Autre travail', rest: 'Repos' };
-function proRegime() { if (PRO.regime) return PRO.regime; const t = (A.veh ? A.veh().type : 'voiture'); return (t === 'camion' || t === 'bus' || t === 'minibus') ? 'otr1' : 'otr2'; }
+function proRegime() { if (PRO.regime && PRO_RULES[PRO.regime]) return PRO.regime; const t = (A.veh ? A.veh().type : 'voiture'); const ch = !A.S.country || A.S.country === 'CH'; return (t === 'camion' || t === 'bus' || t === 'minibus') ? (ch ? 'otr1' : 'ue') : 'otr2'; }
+/* jours fériés nationaux en France (pour l'interdiction poids lourds du week-end) */
+function frHoliday(d) {
+  const y = d.getFullYear(), md = (d.getMonth() + 1) * 100 + d.getDate();
+  if ([101, 501, 508, 714, 815, 1101, 1111, 1225].includes(md)) return true;
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, dd = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - dd - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const easter = new Date(y, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1);
+  return [1, 39, 50].some((n) => { const x = new Date(easter); x.setDate(x.getDate() + n); return x.getMonth() === d.getMonth() && x.getDate() === d.getDate(); });
+}
+function frHgvBan(now) {
+  const h = now.getHours(), dow = now.getDay(), next = new Date(now); next.setDate(next.getDate() + 1);
+  const offDay = dow === 0 || frHoliday(now), offNext = next.getDay() === 0 || frHoliday(next);
+  return (offDay && h < 22) || (offNext && h >= 22);
+}
 function proSave() { const cut = Date.now() - 15 * 24 * H; PRO.segs = PRO.segs.filter((s) => !s.e || s.e > cut); store.set('routa.pro', PRO); }
 function proCur() { const s = PRO.segs[PRO.segs.length - 1]; return s && !s.e ? s : null; }
 function proSet(a, at) {
@@ -1030,8 +1044,9 @@ function proTick(force) {
   if (R.day - st.day <= 30 * MIN) proWarn('d' + k, TRX('Plus que {t} de conduite aujourd\'hui (limite {l}).', { t: '<b>' + hm(R.day - st.day) + '</b>', l: hm(R.day) }));
   if (R.week - st.week <= 2 * H) proWarn('w' + Math.floor(now / (7 * 24 * H)), TRX('Plus que {t} de conduite cette semaine.', { t: '<b>' + hm(R.week - st.week) + '</b>' }));
   const v = A.veh ? A.veh() : {};
-  const h = new Date().getHours(), sunday = new Date().getDay() === 0;
-  if (v.isHgv && kmh > 8 && (h >= 22 || h < 5 || sunday)) proWarn('ban' + new Date().toDateString() + (h >= 22 || h < 5 ? 'n' : 's'), TRX('Poids lourd : la circulation est interdite en Suisse la nuit (22 h – 5 h) et le dimanche, sauf autorisation.'));
+  const h = new Date().getHours(), sunday = new Date().getDay() === 0, cc = A.S.country || 'CH';
+  if (cc === 'FR' && v.type === 'camion' && ((v.dims && v.dims.weight) || 0) > 7.5 && kmh > 8 && frHgvBan(new Date())) proWarn('banfr' + new Date().toDateString() + (h >= 22 ? 'n' : ''), TRX('Poids lourd de plus de 7,5 t : en France, la circulation est interdite du samedi 22 h au dimanche 22 h et la veille des jours fériés dès 22 h, sauf dérogation.'));
+  if (cc === 'CH' && v.isHgv && kmh > 8 && (h >= 22 || h < 5 || sunday)) proWarn('ban' + new Date().toDateString() + (h >= 22 || h < 5 ? 'n' : 's'), TRX('Poids lourd : la circulation est interdite en Suisse la nuit (22 h – 5 h) et le dimanche, sauf autorisation.'));
   if (force && S.sheetView === 'pro') openPro();
 }
 setInterval(() => proTick(false), 5000);
@@ -1054,7 +1069,7 @@ function openPro() {
       (st.restBy ? '<div class="procard"><b>' + TRX('Repos journalier') + '</b><span class="muted small">' + TRX('11 h de repos à commencer au plus tard vers {t} (9 h possibles trois fois par semaine).', { t: fmtClock(new Date(st.restBy)) }) + '</span></div>' : '') +
       '<div class="row wrap"><button class="btn soft grow" id="proPark">Parkings proches</button><button class="btn soft grow" id="proLog">Relevé 14 jours</button></div>'
     ) : '') +
-    '<p class="muted small">' + TRX('Aide au respect de l\'{r}. Ne remplace ni le tachygraphe ni le livret de travail : en cas de contrôle, seuls ceux-ci font foi.', { r: reg === 'otr1' ? 'OTR 1 (RS 822.221)' : 'OTR 2 (RS 822.222)' }) + '</p>', 'pro');
+    '<p class="muted small">' + (reg === 'ue' ? TRX('Aide au respect du règlement (CE) 561/2006. Ne remplace pas le tachygraphe : en cas de contrôle, seul celui-ci fait foi.') : TRX('Aide au respect de l\'{r}. Ne remplace ni le tachygraphe ni le livret de travail : en cas de contrôle, seuls ceux-ci font foi.', { r: reg === 'otr1' ? 'OTR 1 (RS 822.221)' : 'OTR 2 (RS 822.222)' })) + '</p>', 'pro');
   body.querySelector('#proOn').onchange = (e) => { PRO.on = e.target.checked; if (!PRO.on) proSet(null); proSave(); proTick(); openPro(); };
   body.querySelectorAll('#proReg button').forEach((b) => { b.onclick = () => { PRO.regime = b.dataset.r; proSave(); proTick(); openPro(); }; });
   body.querySelectorAll('.proacts button').forEach((b) => { b.onclick = () => { PRO.auto = b.dataset.a === 'drive' ? PRO.auto : false; proSet(b.dataset.a); openPro(); }; });
