@@ -1,5 +1,13 @@
 /* ROUTA – traductions (3/3) : nouveautés 0.9 (amis, convoi, rassemblements, carnet, parking, cols, menu…) */
 window.ROUTA_I18N_ROWS = (window.ROUTA_I18N_ROWS || []).concat([
+["WC", "Toilets", "Tuvalet"],
+["WC public", "Public toilet", "Umumi tuvalet"],
+["Gratuits", "Free", "Ücretsiz"],
+["Réservé aux clients", "Customers only", "Sadece müşteriler"],
+["Accessible en fauteuil", "Wheelchair accessible", "Tekerlekli sandalyeye uygun"],
+["Table à langer", "Changing table", "Bebek bakım masası"],
+["Lieux et horaires : OpenStreetMap, parfois pas à jour. En cas d'urgence vitale : 112.", "Places and hours: OpenStreetMap, sometimes outdated. In a life-threatening emergency: 112.", "Yerler ve saatler: OpenStreetMap, bazen güncel değil. Hayati acil durumda: 112."],
+["Cherche la pharmacie de garde de la région (affichée sur la porte des pharmacies ou sur le site officiel local).", "Look for the local on-duty pharmacy (posted on pharmacy doors or on the official local website).", "Bölgenin nöbetçi eczanesini ara (eczane kapılarında veya resmi yerel sitede yazar)."],
 ["Horaires et affluence en temps réel", "Real-time hours and crowding", "Gerçek zamanlı saatler ve yoğunluk"],
 ["Les horaires à jour et le temps d'attente en direct des urgences vaudoises sont dans l'app Medigo, plus fiable que nos horaires.", "Up-to-date hours and live waiting times for emergency rooms in Vaud are in the Medigo app, more reliable than our hours.", "Vaud acil servislerinin güncel saatleri ve canlı bekleme süreleri Medigo uygulamasında, bizim saatlerimizden daha güvenilir."],
 ["Voir les horaires et l'affluence sur Medigo", "See hours and crowding in Medigo", "Saatleri ve yoğunluğu Medigo'da gör"],
@@ -368,7 +376,7 @@ window.ROUTA_I18N_ROWS = (window.ROUTA_I18N_ROWS || []).concat([
 ["plus haut sommet du Jura bernois.", "highest summit of the Bernese Jura.", "Bern Jura'sının en yüksek zirvesi."]
 ]);
 /* Mots seuls à traduire aussi au milieu d'une phrase */
-window.ROUTA_I18N_SUB_EXTRA = ["ici", "Classement", "Convoi", "Garée", "libres", "participants", "participant", "Bumps", "Véhicule", "Voiture", "Hybride", "Électrique"];
+window.ROUTA_I18N_SUB_EXTRA = ["ici", "Réservé aux clients", "Accessible en fauteuil", "Table à langer", "Payant", "Gratuit", "WC public", "Classement", "Convoi", "Garée", "libres", "participants", "participant", "Bumps", "Véhicule", "Voiture", "Hybride", "Électrique"];
 /* Phrases avec des nombres ou des noms */
 window.ROUTA_I18N_PX = {
   en: [
