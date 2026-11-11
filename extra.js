@@ -1074,6 +1074,17 @@ function openProLog() {
 }
 X.openPro = openPro;
 
+/* ======================= Hauteur réelle de la barre de navigation ======================= */
+/* La vitesse, les panneaux et les boutons se placent toujours au-dessus, quelle que soit la taille du téléphone */
+(function () {
+  const bar = $('navBar'); if (!bar) return;
+  const set = () => { const h = bar.hidden ? 0 : Math.round(bar.getBoundingClientRect().height); if (h) document.documentElement.style.setProperty('--navH', h + 'px'); };
+  if (window.ResizeObserver) new ResizeObserver(set).observe(bar);
+  new MutationObserver(set).observe(bar, { attributes: true, attributeFilter: ['hidden'] });
+  window.addEventListener('resize', set);
+  set();
+})();
+
 /* ======================= Démarrage ======================= */
 async function start() {
   for (let i = 0; i < 40 && !(S.me && S.me.pseudo && DB.sb); i++) await new Promise((r) => setTimeout(r, 500));
