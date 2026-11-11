@@ -250,8 +250,11 @@ function leaveConvoy() {
 }
 async function convoyMembers() {
   if (!DB.sb || !X.convoy) return [];
-  const { data } = await DB.sb.from('drivers').select('id,pseudo,color,car,lat,lon,updated_at').eq('convoy', X.convoy.id).limit(50);
-  return data || [];
+  await DB.liveDrivers();
+  const out = [];
+  S.drivers.forEach((d) => { if (d.convoy === X.convoy.id) out.push(d); });
+  if (S.me) out.push({ id: S.me.id, pseudo: S.me.pseudo, color: S.me.color, car: S.me.car, lat: S.pos ? S.pos.lat : null, lon: S.pos ? S.pos.lon : null, updated_at: new Date().toISOString() });
+  return out;
 }
 async function openConvoy() {
   if (!X.convoy) {
