@@ -540,13 +540,17 @@ setInterval(() => {
   let cur = L[i];
   if (cur == null) { for (let k = i; k >= 0 && k > i - 20; k--) if (L[k]) { cur = L[k]; break; } }
   if (cur !== S.limit) { S.limit = cur; if (A.updateSpeed) A.updateSpeed(); }
-  if (cur && limShownCur && cur !== limShownCur && cur < limShownCur) vibrate(40);
-  limShownCur = cur;
-  let j = i; while (j < L.length && (L[j] === cur || L[j] == null)) j++;
+  const vc = window.ROUTA_VCAP ? window.ROUTA_VCAP() : null;
+  const cap = (l) => (l && vc ? Math.min(l, vc) : l);
+  const ccur = cap(cur);
+  if (ccur && limShownCur && ccur !== limShownCur && ccur < limShownCur) vibrate(40);
+  limShownCur = ccur;
+  let j = i; while (j < L.length && (cap(L[j]) === ccur || L[j] == null)) j++;
   const d = j < L.length ? N.R.cum[j] - (N.along || 0) : Infinity;
-  if (j < L.length && L[j] && d > 0 && d < 800) {
-    box.hidden = false; box.querySelector('.ln-sign').textContent = L[j]; box.querySelector('.ln-dist').textContent = 'dans ' + fmtDist(Math.round(d / 10) * 10);
-    if (cur && L[j] < cur && d < 350 && limSaidFor !== j && S.settings.speedAlert) { limSaidFor = j; say('Limitation à ' + L[j] + ' dans ' + (d < 100 ? 'quelques mètres' : Math.round(d / 50) * 50 + ' mètres')); }
+  const nx = j < L.length ? cap(L[j]) : null;
+  if (nx && d > 0 && d < 800) {
+    box.hidden = false; box.querySelector('.ln-sign').textContent = nx; box.querySelector('.ln-dist').textContent = 'dans ' + fmtDist(Math.round(d / 10) * 10);
+    if (ccur && nx < ccur && d < 350 && limSaidFor !== j && S.settings.speedAlert) { limSaidFor = j; say('Limitation à ' + nx + ' dans ' + (d < 100 ? 'quelques mètres' : Math.round(d / 50) * 50 + ' mètres')); }
   } else box.hidden = true;
 }, 1000);
 
