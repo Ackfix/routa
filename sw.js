@@ -1,5 +1,5 @@
 /* ROUTA – service worker : l'app s'ouvre même avec un réseau faible. */
-const CACHE = 'routa-v0.9.16';
+const CACHE = 'routa-v0.9.17';
 const SHELL = ['./', './index.html', './style.css', './app.js', './native.js', './extra.js', './i18n-a.js', './i18n-c.js', './i18n-d.js', './i18n.js', './config.js', './countries.js', './aide.html', './confidentialite.html', './i18n-e.js', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
