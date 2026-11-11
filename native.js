@@ -44,7 +44,9 @@
     const noop = () => {};
     if (map.painter) map.painter.render = noop;
     const c = map.getCenter();
-    RM.start({ styleURL: typeof o.style === 'string' ? o.style : '', lng: c.lng, lat: c.lat, zoom: map.getZoom() }).catch(fail);
+    const D = N.diag = { start: '…', style: 0, cam: 0, sent: 0, err: '' };
+    RM.start({ styleURL: typeof o.style === 'string' ? o.style : '', lng: c.lng, lat: c.lat, zoom: map.getZoom() }).then(() => { D.start = 'ok'; }).catch((e) => { D.start = 'ERR'; fail(e); });
+    diagPanel(D);
 
     /* caméra : page -> iPhone */
     const oj = map.jumpTo.bind(map), oe = map.easeTo.bind(map), of = map.flyTo.bind(map);
@@ -73,6 +75,7 @@
     const NEV = { type: 'native', target: null, preventDefault() {} };
     RM.addListener('camera', (k) => {
       if (!k || !isFinite(k.lng)) return;
+      D.cam++;
       N.syncing = true;
       try { NEV.target = map.getCanvas(); oj({ center: [k.lng, k.lat], zoom: k.zoom, bearing: k.bearing, pitch: k.pitch }, k.gesture ? { originalEvent: NEV } : undefined); } catch (e) { console.warn(e); }
       N.syncing = false;
@@ -87,7 +90,7 @@
       const r = N.byId.get(k && k.id);
       if (r && r.el) r.el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     });
-    RM.addListener('style', () => { flushMarkers(true); });
+    RM.addListener('style', () => { D.style++; flushMarkers(true); });
 
     /* style : toute modification structurelle renvoie le style complet ; les plus fréquentes passent en direct */
     const structural = ['addSource', 'addLayer', 'removeLayer', 'removeSource', 'setLayerZoomRange', 'setPaintProperty', 'setFilter', 'moveLayer'];
@@ -155,6 +158,7 @@
     const lay = (id, al) => ({ id, type: 'symbol', source: 'routa-mk', filter: ['==', ['get', 'al'], al], layout: { 'icon-image': ['get', 'img'], 'icon-rotate': ['get', 'rot'], 'icon-allow-overlap': true, 'icon-ignore-placement': true, 'icon-rotation-alignment': al === 'm' ? 'map' : 'viewport', 'icon-pitch-alignment': al === 'm' ? 'map' : 'viewport', 'symbol-sort-key': ['get', 'z'] } });
     s.layers.push(lay('routa-mk-v', 'v'), lay('routa-mk-m', 'm'));
     N.styleSent = true;
+    if (N.diag) N.diag.sent++;
     call('setStyle', { json: JSON.stringify(s) });
   }
 
@@ -427,6 +431,27 @@
     let h1 = 5381, h2 = 52711;
     for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = (h1 * 33) ^ c; h2 = (h2 * 33) ^ c; }
     return (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36) + s.length.toString(36);
+  }
+
+  /* diagnostic temporaire (40 s au démarrage) */
+  function diagPanel(D) {
+    const go = () => {
+      const d = document.createElement('div');
+      d.style.cssText = 'position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 56px);transform:translateX(-50%);z-index:9999;background:rgba(0,0,0,.75);color:#7CFC9A;font:11px/1.35 monospace;padding:6px 8px;border-radius:8px;pointer-events:none;max-width:92vw;white-space:pre-wrap';
+      document.body.appendChild(d);
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        const W = innerWidth, H = innerHeight;
+        const e = document.elementFromPoint(W / 2, H / 2);
+        const cs = e ? getComputedStyle(e) : null;
+        const hb = getComputedStyle(document.documentElement).backgroundColor + ' / ' + getComputedStyle(document.body).backgroundColor;
+        d.textContent = 'NATIF start:' + D.start + ' style envoyé:' + D.sent + ' chargé:' + D.style + ' caméra:' + D.cam + ' marqueurs:' + N.recs.size +
+          '\ncentre: ' + (e ? e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + '.' + String(e.className).slice(0, 40) + ' fond:' + cs.backgroundColor + ' opac:' + cs.opacity : '-') +
+          '\nhtml/body: ' + hb;
+        if (Date.now() - t0 > 40000) { clearInterval(iv); d.remove(); }
+      }, 500);
+    };
+    if (document.body) go(); else document.addEventListener('DOMContentLoaded', go);
   }
 
   /* ---------- Zones de l'interface : là, les touchers restent à la page ---------- */
