@@ -445,6 +445,8 @@ function setupMapLayers() {
   const before = (style.layers.find((l) => /^tunnel_|^road_/.test(l.id)) || {}).id;
   map.addSource('sat-world', { type: 'raster', tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/{z}/{y}/{x}.jpg'], tileSize: 256, maxzoom: 15, attribution: '<a href="https://s2maps.eu" target="_blank" rel="noopener">Sentinel-2 cloudless</a> – EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016)' });
   map.addLayer({ id: 'sat-world', type: 'raster', source: 'sat-world', layout: { visibility: 'none' } }, before);
+  map.addSource('sat-fr', { type: 'raster', tiles: ['https://data.geopf.fr/wms-r?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ORTHOIMAGERY.ORTHOPHOTOS&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=true'], tileSize: 256, minzoom: 10, maxzoom: 19, bounds: [-5.3, 41.3, 9.7, 51.2], attribution: '© <a href="https://www.ign.fr" target="_blank" rel="noopener">IGN</a>' });
+  map.addLayer({ id: 'sat-fr', type: 'raster', source: 'sat-fr', minzoom: 10, layout: { visibility: 'none' } }, before);
   map.addSource('sat-ch', { type: 'raster', tiles: ['https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg'], tileSize: 256, minzoom: 8, maxzoom: 20, bounds: [5.95, 45.81, 10.5, 47.81], attribution: '© <a href="https://www.swisstopo.admin.ch" target="_blank" rel="noopener">swisstopo</a>' });
   map.addLayer({ id: 'sat-ch', type: 'raster', source: 'sat-ch', minzoom: 8, layout: { visibility: 'none' } }, before);
   if (CFG.tomtomKey) {
@@ -466,7 +468,7 @@ function setupMapLayers() {
 function applyMapView(animate) {
   if (!map.getSource('dem')) return;
   const sat = S.settings.mapType === 'sat';
-  ['sat-world', 'sat-ch'].forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', sat ? 'visible' : 'none'); });
+  ['sat-world', 'sat-fr', 'sat-ch'].forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', sat ? 'visible' : 'none'); });
   map.getStyle().layers.forEach((l) => { if (SAT_HIDE.test(l.id)) map.setLayoutProperty(l.id, 'visibility', sat ? 'none' : 'visible'); });
   if (map.getLayer('building-3d')) map.setLayoutProperty('building-3d', 'visibility', 'none');
   document.body.classList.toggle('sat', sat);
@@ -492,7 +494,7 @@ function openMapView() {
     '<h3>Couleurs</h3>' + seg('mvNight', [['auto', 'Auto'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
     '<h3>Pendant la navigation</h3>' + seg('mvNav', [['route', 'Dans le sens de la route'], ['north', 'Nord en haut']], S.settings.navNorth ? 'north' : 'route') +
     '<div class="banner">' + ic('info') + '<span><b>Tourner la carte :</b> pose deux doigts et tourne-les (sur ordinateur : clic droit et glisser). <b>Incliner :</b> glisse deux doigts vers le haut ou le bas. La boussole montre le nord : touche-la pour remettre le nord en haut.</span></div>' +
-    '<p class="muted small">Images satellite : swisstopo (Suisse), Sentinel-2 cloudless – EOX (monde).</p>', 'mapview');
+    '<p class="muted small">Images satellite : swisstopo (Suisse), IGN (France), Sentinel-2 cloudless – EOX (monde).</p>', 'mapview');
   body.querySelectorAll('#mvType button').forEach((b) => { b.onclick = () => { S.settings.mapType = b.dataset.v; saveSettings(); body.querySelectorAll('#mvType button').forEach((x) => x.classList.toggle('on', x === b)); applyMapView(true); }; });
   body.querySelector('#mvTraffic').onchange = (e) => { S.settings.traffic = e.target.checked; saveSettings(); applyMapView(false); };
   body.querySelector('#mvStreets').onchange = (e) => { S.settings.showStreets = e.target.checked; saveSettings(); applyStreets(); };
