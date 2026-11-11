@@ -105,6 +105,37 @@
       return r;
     };
     map.setTerrain = function () { return map; };
+
+    /* la carte web ne dessine plus : les lieux et arrêts (symboles) sont retrouvés directement dans les données */
+    const oq = map.queryRenderedFeatures.bind(map);
+    map.queryRenderedFeatures = function (geom, opts) {
+      if (geom && !Array.isArray(geom) && geom.x == null && opts === undefined) { opts = geom; geom = undefined; }
+      let res = [];
+      try { res = oq(geom, opts) || []; } catch (e) { res = []; }
+      const ids = (opts && opts.layers) || [];
+      const sym = ids.filter((id) => { const L = map.getLayer(id); return L && L.type === 'symbol'; });
+      if (!sym.length) return res;
+      res = res.filter((f) => !(f.layer && sym.includes(f.layer.id)));
+      let x0, y0, x1, y1;
+      if (Array.isArray(geom) && Array.isArray(geom[0])) { x0 = Math.min(geom[0][0], geom[1][0]); x1 = Math.max(geom[0][0], geom[1][0]); y0 = Math.min(geom[0][1], geom[1][1]); y1 = Math.max(geom[0][1], geom[1][1]); }
+      else if (geom && (geom.x != null || Array.isArray(geom))) { const px = geom.x != null ? geom.x : geom[0], py = geom.y != null ? geom.y : geom[1]; x0 = px - 10; x1 = px + 10; y0 = py - 10; y1 = py + 10; }
+      else { x0 = 0; y0 = 0; x1 = map.getContainer().clientWidth; y1 = map.getContainer().clientHeight; }
+      const z = map.getZoom(), seen = new Set();
+      for (const id of sym) {
+        const L = map.getLayer(id);
+        if (map.getLayoutProperty(id, 'visibility') === 'none' || z < (L.minzoom || 0) || z >= (L.maxzoom || 24)) continue;
+        let fs = [];
+        try { fs = map.querySourceFeatures(L.source, { sourceLayer: L.sourceLayer, filter: L.filter }); } catch (e) { fs = []; }
+        for (const f of fs) {
+          const g = f.geometry; if (!g) continue;
+          const c = g.type === 'Point' ? g.coordinates : g.type === 'MultiPoint' ? g.coordinates[0] : null; if (!c) continue;
+          const p = map.project(c); if (p.x < x0 || p.x > x1 || p.y < y0 || p.y > y1) continue;
+          const k = id + '|' + c[0].toFixed(6) + ',' + c[1].toFixed(6); if (seen.has(k)) continue; seen.add(k);
+          res.push({ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: f.properties, layer: { id, type: 'symbol' }, source: L.source, sourceLayer: L.sourceLayer });
+        }
+      }
+      return res;
+    };
     map.on('load', () => scheduleStyle(50));
     new MutationObserver(() => {
       const k = nightKey(); if (k !== N.nightKey) { N.nightKey = k; if (N.styleSent) scheduleStyle(30); }
