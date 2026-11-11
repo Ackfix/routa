@@ -429,3 +429,22 @@ body.navigating .prochip { top: auto; bottom: calc(var(--sab) + 236px); }
 .probar i.warn { background: var(--alert); }
 .probar i.over { background: #E5484D; }
 .prolog { white-space: pre-wrap; font: 13px/1.5 ui-monospace, Menlo, monospace; background: rgba(255,255,255,.04); padding: 12px; border-radius: 12px; max-height: 50vh; overflow: auto; }
+
+/* Navigation : tout reste au-dessus de la barre du bas, même sur les petits écrans */
+body.navigating .speedbox { bottom: calc(var(--navH, 150px) + 14px); }
+body.navigating .limitsign { bottom: calc(var(--navH, 150px) + 96px); }
+body.navigating .limitnext { bottom: calc(var(--navH, 150px) + 104px); }
+body.navigating .fab-report { bottom: calc(var(--navH, 150px) + 14px); }
+body.navigating .fabs-right { bottom: calc(var(--navH, 150px) + 92px); }
+body.navigating .prochip { bottom: calc(var(--navH, 150px) + 180px); }
+.navbar-info { min-width: 92px; }
+.eta { white-space: nowrap; }
+.etarest { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 430px) {
+  .navbar { gap: 8px; padding-left: max(12px, var(--sal)); padding-right: max(12px, var(--sar)); }
+  .navbar-act { gap: 6px; }
+  .navbar-act .iconbtn { width: 42px; height: 42px; }
+  .navbar-act .btn { padding-left: 12px; padding-right: 12px; }
+  .eta { font-size: 24px; }
+  .etarest { font-size: 14px; }
+}
