@@ -753,10 +753,158 @@ X.tiles = () => [
 X.icons = IC;
 X.pendingCount = () => pendingReq.length;
 X.open = (k) => {
-  const f = { install: openInstall, friends: openFriends, convoy: openConvoy, events: openEvents, ranking: () => openRanking('all'), shareme: openShareSheet, chargers: openChargers, parkfree: openFreeParking, cols: openCols, carnet: openCarnet, parked: openParked }[k];
+  const f = { install: openInstall, friends: openFriends, convoy: openConvoy, events: openEvents, ranking: () => openRanking('all'), shareme: openShareSheet, chargers: openChargers, parkfree: openFreeParking, cols: openCols, carnet: openCarnet, parked: openParked, trips: openTrips, offline: openOffline }[k];
   if (f) { f(); return true; }
   return false;
 };
+
+/* ======================= Mes trajets (gardés seulement sur ce téléphone) ======================= */
+function openTrips() {
+  const t = store.get('routa.trips', []);
+  const body = openSheet('Mes trajets',
+    (t.length ? t.map((r, i) => '<div class="card"><div class="grow"><b>' + esc(r.name || 'Destination') + '</b><div class="sub">' +
+      esc(new Date(r.at).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })) + ' · ' + fmtClock(new Date(r.at)) +
+      ' · ' + (r.km || 0).toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' km · ' + (r.min || 0) + ' min' + (r.done ? '' : ' · interrompu') +
+      '</div></div><button class="btn small soft" data-go="' + i + '">Y retourner</button></div>').join('') +
+      '<button class="btn ghost block" id="tripsClear">Effacer l\'historique</button>'
+      : '<div class="empty">Aucun trajet pour l\'instant. Tes trajets guidés apparaîtront ici.</div>') +
+    '<p class="muted small">L\'historique reste uniquement sur ce téléphone.</p>', 'trips');
+  body.querySelectorAll('[data-go]').forEach((b) => { b.onclick = () => { const r = t[+b.dataset.go]; closeSheet(); chooseDestination({ name: r.name, sub: r.sub || '', lat: r.lat, lon: r.lon }); }; });
+  const c = body.querySelector('#tripsClear'); if (c) c.onclick = () => { store.set('routa.trips', []); openTrips(); };
+}
+
+/* ======================= Dangers sur ma route (alerte visuelle discrète) ======================= */
+const hz = el('<div class="hazchip" id="hazChip" hidden role="status" aria-live="polite"></div>');
+document.body.appendChild(hz);
+function routeHazard() {
+  const N = S.nav; if (!N || !N.R || !N.R.cum || !S.pos) { hz.hidden = true; return; }
+  const R = N.R, from = Math.max(0, (N.seg || 0) - 1);
+  let best = null;
+  S.alerts.forEach((a) => {
+    if (!a || Date.parse(a.expires_at) <= Date.now() || (a.denies || 0) > (a.confirms || 1)) return;
+    if (dist(S.pos, a) > 6000) return;
+    let bi = -1, bd = 45;
+    for (let i = from; i < R.coords.length; i++) {
+      const ahead = R.cum[i] - N.along;
+      if (ahead > 5000) break;
+      const d = dist(R.coords[i], a);
+      if (d < bd) { bd = d; bi = i; }
+    }
+    if (bi < 0) return;
+    const ahead = R.cum[bi] - N.along;
+    if (ahead < 40 || ahead > 3000) return;
+    if (!best || ahead < best.ahead) best = { a, ahead };
+  });
+  if (!best) { hz.hidden = true; return; }
+  const T = window.ROUTA_ALERT_TYPES || {};
+  const lab = (T[best.a.type] && T[best.a.type].label) || 'Danger signalé';
+  hz.innerHTML = '<span class="hzdot"></span><span>' + esc(A.I18N ? A.I18N.t(lab) : lab) + ' · ' + fmtDist(best.ahead) + '</span>';
+  hz.hidden = false;
+}
+setInterval(routeHazard, 3000);
+
+/* ======================= Un ami est tout près ======================= */
+const friendSeen = new Map();
+function checkFriendsNear() {
+  if (!S.pos || !S.me) return;
+  S.drivers.forEach((d) => {
+    if (!d || !Array.isArray(d.friends) || !d.friends.includes(S.me.id) || d.lat == null) return;
+    if (Date.now() - Date.parse(d.updated_at) > 3 * 60000) return;
+    const m = dist(S.pos, d);
+    const last = friendSeen.get(d.id) || 0;
+    if (m <= 2000 && Date.now() - last > 30 * 60000) {
+      friendSeen.set(d.id, Date.now());
+      toast('<b>' + esc(d.pseudo || 'Un ami') + '</b> est à ' + fmtDist(m) + ' de toi', { action: 'Voir', onAction: () => A.openDriver && A.openDriver(d.id), ms: 7000 });
+    }
+  });
+}
+setInterval(checkFriendsNear, 15000);
+
+/* ======================= Carte hors connexion de ma région ======================= */
+const RMAP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RoutaMap;
+const nativeMap = () => !!(RMAP && document.documentElement.classList.contains('native-map'));
+const OFF_KM = 20;
+function tileXY(lat, lon, z) {
+  const n = Math.pow(2, z), x = Math.floor((lon + 180) / 360 * n);
+  const r = lat * Math.PI / 180, y = Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n);
+  return [Math.max(0, Math.min(n - 1, x)), Math.max(0, Math.min(n - 1, y))];
+}
+function regionTiles(lat, lon, km, zmin, zmax) {
+  const dLat = km / 111, dLon = km / (111 * Math.cos(lat * Math.PI / 180));
+  const out = [];
+  for (let z = zmin; z <= zmax; z++) {
+    const [x0, y0] = tileXY(lat + dLat, lon - dLon, z), [x1, y1] = tileXY(lat - dLat, lon + dLon, z);
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) out.push([z, x, y]);
+  }
+  return out;
+}
+async function downloadWeb(lat, lon, prog) {
+  if (!('caches' in window)) throw new Error('cache');
+  const cache = await caches.open('routa-map');
+  const st = map.getStyle() || {};
+  const extra = [CFG.mapStyle];
+  let tpl = null;
+  Object.keys(st.sources || {}).forEach((id) => {
+    const s = st.sources[id]; if (s.type !== 'vector') return;
+    if (s.url) extra.push(s.url);
+    const src = map.getSource(id); const t = (src && src.tiles) || s.tiles; if (t && t[0] && !tpl) tpl = t[0];
+  });
+  if (!tpl) throw new Error('tiles');
+  if (st.sprite && typeof st.sprite === 'string') ['.json', '.png', '@2x.json', '@2x.png'].forEach((e) => extra.push(st.sprite + e));
+  const fonts = new Set();
+  (st.layers || []).forEach((l) => { const f = l.layout && l.layout['text-font']; if (Array.isArray(f) && f.every((v) => typeof v === 'string')) fonts.add(f.join(',')); });
+  if (st.glyphs) fonts.forEach((f) => ['0-255', '256-511', '8192-8447'].forEach((r) => extra.push(st.glyphs.replace('{fontstack}', encodeURIComponent(f)).replace('{range}', r))));
+  const urls = extra.concat(regionTiles(lat, lon, OFF_KM, 6, 14).map(([z, x, y]) => tpl.replace('{z}', z).replace('{x}', x).replace('{y}', y)));
+  let done = 0, bytes = 0, i = 0;
+  const work = async () => {
+    while (i < urls.length) {
+      const u = urls[i++];
+      try { const r = await fetch(u, { mode: 'cors' }); if (r.ok) { const b = await r.clone().arrayBuffer(); bytes += b.byteLength; await cache.put(u, r); } } catch (e) { /* on continue */ }
+      done++; if (done % 10 === 0 || done === urls.length) prog(done, urls.length, bytes);
+    }
+  };
+  await Promise.all([work(), work(), work(), work(), work(), work()]);
+  store.set('routa.offline', { at: Date.now(), lat, lon, km: OFF_KM, bytes, web: true });
+}
+async function openOffline() {
+  const info = store.get('routa.offline', null);
+  const mb = (b) => Math.max(1, Math.round(b / 1048576)) + ' Mo';
+  const body = openSheet('Carte hors connexion',
+    '<p>Télécharge la carte autour de toi (environ ' + OFF_KM + ' km) pour la garder dans les tunnels, à la montagne ou sans réseau.</p>' +
+    (info ? '<div class="card"><div class="grow"><b>Carte enregistrée</b><div class="sub">' + esc(new Date(info.at).toLocaleDateString()) + (info.bytes ? ' · ' + mb(info.bytes) : '') + '</div></div></div>' : '') +
+    '<div id="offProg" class="muted small" hidden></div>' +
+    '<button class="btn block" id="offGo">' + (info ? 'Mettre à jour avec ma position actuelle' : 'Télécharger ma région') + '</button>' +
+    '<p class="muted small">Environ 30 à 60 Mo : utilise le Wi-Fi de préférence.</p>', 'offline');
+  body.querySelector('#offGo').onclick = async () => {
+    if (!S.pos) { toast('J\'attends ta position GPS…'); return; }
+    const b = body.querySelector('#offGo'), p = body.querySelector('#offProg');
+    b.disabled = true; p.hidden = false; p.textContent = 'Préparation…';
+    try {
+      if (nativeMap() && RMAP.downloadRegion) {
+        await RMAP.downloadRegion({ lat: S.pos.lat, lon: S.pos.lon, radiusKm: OFF_KM, styleURL: CFG.mapStyle });
+        store.set('routa.offline', { at: Date.now(), lat: S.pos.lat, lon: S.pos.lon, km: OFF_KM, native: true });
+        const tick = async () => {
+          if (S.sheetView !== 'offline') return;
+          try {
+            const s = await RMAP.regionStatus();
+            if (s && s.exists) {
+              const pc = s.total ? Math.min(100, Math.round(s.done / s.total * 100)) : 0;
+              p.textContent = s.complete ? 'Carte enregistrée sur ce téléphone.' : 'Téléchargement… ' + pc + ' %';
+              if (s.complete) { b.disabled = false; return; }
+            }
+          } catch (e) { /* */ }
+          setTimeout(tick, 1500);
+        };
+        tick();
+      } else {
+        await downloadWeb(S.pos.lat, S.pos.lon, (d, t, by) => { p.textContent = 'Téléchargement… ' + Math.round(d / t * 100) + ' % · ' + mb(by); });
+        p.textContent = 'Carte enregistrée sur ce téléphone.'; b.disabled = false;
+      }
+    } catch (e) { p.textContent = 'Le téléchargement n\'a pas abouti. Vérifie ta connexion et réessaie.'; b.disabled = false; }
+  };
+}
+X.openTrips = openTrips;
+X.openOffline = openOffline;
 
 /* ======================= Démarrage ======================= */
 async function start() {
