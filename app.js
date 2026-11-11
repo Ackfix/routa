@@ -66,6 +66,7 @@ const P = {
   parking: '<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M10 17V7h3.5a3 3 0 010 6H10"/>',
   hospital: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 7.5v9M7.5 12h9"/>',
   pharmacy: '<circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/>',
+  wc: '<rect x="2.5" y="5" width="19" height="14" rx="3"/><text x="12" y="15.6" font-size="9" font-weight="800" font-family="Arial,Helvetica,sans-serif" text-anchor="middle" fill="currentColor" stroke="none">WC</text>',
   spot: '<path d="M3 20l6-10 4 6 3-4 5 8z"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
   msg: '<path d="M4 5h16v11H9l-5 4z"/>',
@@ -1168,12 +1169,13 @@ const OVERPASS_FILTER = {
   shops: ['["shop"~"^(supermarket|convenience|bakery|kiosk|butcher|deli|mall|department_store|car_parts|car_repair|tyres|hardware|doityourself)$"]'],
   hospital: ['["amenity"="hospital"]'],
   pharmacy: ['["amenity"="pharmacy"]'],
+  wc: ['["amenity"="toilets"]["access"!~"^(private|no)$"]'],
   truckstop: ['["amenity"="parking"]["hgv"~"^(yes|designated)$"]', '["highway"~"^(rest_area|services)$"]', '["amenity"="fuel"]["hgv"~"^(yes|designated)$"]']
 };
-const KIND_LABEL = { hospital: 'Hôpitaux', pharmacy: 'Pharmacies', fuel: 'Essence', charge: 'Recharge', parking: 'Parking', food: 'Restos', shops: 'Magasins', truckstop: 'Aires poids lourds', place: 'Lieu' };
-const KIND_COLOR = { hospital: '#E5484D', pharmacy: '#16A05A', fuel: 'var(--alert)', charge: 'var(--ok)', parking: 'var(--info)', food: '#FF9DA1', shops: '#C9A2FF', truckstop: '#7FE0C2', place: '#F2F4F7' };
-const KIND_RADIUS = { hospital: 30000, pharmacy: 5000, fuel: 6000, charge: 6000, parking: 2500, food: 2000, shops: 2500, truckstop: 20000 };
-const RATED = { food: 1, shops: 1, truckstop: 1, fuel: 1, parking: 1, charge: 1, place: 1 };
+const KIND_LABEL = { hospital: 'Hôpitaux', pharmacy: 'Pharmacies', wc: 'WC', fuel: 'Essence', charge: 'Recharge', parking: 'Parking', food: 'Restos', shops: 'Magasins', truckstop: 'Aires poids lourds', place: 'Lieu' };
+const KIND_COLOR = { hospital: '#E5484D', pharmacy: '#16A05A', wc: '#0E7C86', fuel: 'var(--alert)', charge: 'var(--ok)', parking: 'var(--info)', food: '#FF9DA1', shops: '#C9A2FF', truckstop: '#7FE0C2', place: '#F2F4F7' };
+const KIND_RADIUS = { hospital: 30000, pharmacy: 5000, wc: 2500, fuel: 6000, charge: 6000, parking: 2500, food: 2000, shops: 2500, truckstop: 20000 };
+const RATED = { food: 1, shops: 1, truckstop: 1, fuel: 1, parking: 1, charge: 1, place: 1, wc: 1 };
 const SHOP_FR = { supermarket: 'Supermarché', convenience: 'Épicerie', bakery: 'Boulangerie', kiosk: 'Kiosque', butcher: 'Boucherie', deli: 'Traiteur', mall: 'Centre commercial', department_store: 'Grand magasin', car_parts: 'Pièces auto', car_repair: 'Garage', tyres: 'Pneus', hardware: 'Quincaillerie', doityourself: 'Bricolage' };
 const CUISINE_FR = { pizza: 'Pizza', burger: 'Burger', kebab: 'Kebab', italian: 'Italien', turkish: 'Turc', chinese: 'Chinois', japanese: 'Japonais', sushi: 'Sushi', indian: 'Indien', thai: 'Thaï', french: 'Français', swiss: 'Suisse', regional: 'Régional', asian: 'Asiatique', mexican: 'Mexicain', lebanese: 'Libanais', portuguese: 'Portugais', spanish: 'Espagnol', greek: 'Grec', vietnamese: 'Vietnamien', chicken: 'Poulet', sandwich: 'Sandwichs', coffee_shop: 'Café', ice_cream: 'Glaces', steak_house: 'Grill', seafood: 'Fruits de mer', vegetarian: 'Végétarien', vegan: 'Végan' };
 function parseOsm(e, kind) {
@@ -1181,7 +1183,8 @@ function parseOsm(e, kind) {
   const lat = e.lat != null ? e.lat : e.center && e.center.lat;
   const lon = e.lon != null ? e.lon : e.center && e.center.lon;
   const DEF = { fuel: 'Station-service', charge: 'Borne de recharge', parking: 'Parking', food: 'Restaurant', shops: SHOP_FR[t.shop] || 'Magasin', truckstop: t.highway === 'services' ? 'Aire de service' : t.highway === 'rest_area' ? 'Aire de repos' : t.amenity === 'fuel' ? 'Station poids lourds' : 'Parking poids lourds' };
-  let name = t.name || t.brand || t.operator || DEF[kind] || (kind === 'hospital' ? 'Hôpital' : kind === 'pharmacy' ? 'Pharmacie' : 'Lieu');
+  let name = t.name || t.brand || t.operator || DEF[kind] || (kind === 'hospital' ? 'Hôpital' : kind === 'pharmacy' ? 'Pharmacie' : kind === 'wc' ? 'WC public' : 'Lieu');
+  if (kind === 'wc' && !t.name) name = 'WC public';
   if (t.brand && t.name && !t.name.toLowerCase().includes(t.brand.toLowerCase())) name = t.brand + ' · ' + t.name;
   const details = [];
   if (kind === 'fuel') {
@@ -1214,6 +1217,12 @@ function parseOsm(e, kind) {
   } else if (kind === 'hospital') {
     if (t.emergency === 'yes') details.push('Urgences');
   } else if (kind === 'pharmacy') {
+    if (t.opening_hours === '24/7') details.push('24 h/24');
+  } else if (kind === 'wc') {
+    if (t.fee === 'yes') details.push(t.charge ? 'Payant · ' + t.charge : 'Payant'); else if (t.fee === 'no') details.push('Gratuit');
+    if (t.access === 'customers') details.push('Réservé aux clients');
+    if (t.wheelchair === 'yes') details.push('Accessible en fauteuil');
+    if (t.changing_table === 'yes' || t.diaper === 'yes') details.push('Table à langer');
     if (t.opening_hours === '24/7') details.push('24 h/24');
   } else if (kind === 'charge') {
     const sockets = [];
@@ -1332,7 +1341,7 @@ function renderHealthList(kind, list) {
     sorted = list.filter((p) => hospScore(p) < 1e7).sort((a, b) => (a.dist + hospScore(a)) - (b.dist + hospScore(b)));
   } else {
     list.forEach((p) => { p.rank = p.st ? (p.st.open ? 0 : 2) : 1; });
-    sorted = list.slice().sort((a, b) => a.rank - b.rank || a.dist - b.dist);
+    sorted = list.slice().filter((p) => kind !== 'wc' || !S.wcFree || (p.tags || {}).fee !== 'yes').sort((a, b) => a.rank - b.rank || a.dist - b.dist);
   }
   sorted = sorted.slice(0, 40);
   showPois(sorted, kind);
@@ -1345,20 +1354,22 @@ function renderHealthList(kind, list) {
     html += '<div class="banner">' + ic(kind) + '<span><b>' + head + '</b><br>' + esc(best.name) + ' · ' + fmtDist(best.dist) + (best.st ? ' · ' + esc(best.st.txt) : '') + '</span></div>';
     html += '<button class="btn block" id="hGo">' + ic('nav') + 'Y aller</button>';
   }
-  if (kind === 'pharmacy' && !anyOpen) html += '<div class="banner">' + ic('info') + '<span><b>Aucune pharmacie ouverte trouvée</b><br>Pour la pharmacie de garde, appelle la Centrale des médecins de garde : <a href="tel:0848133133">0848 133 133</a> (Vaud).</span></div>';
-  if (kind === 'hospital') html += medigoBlock();
+  if (kind === 'wc') html = '<div class="seg" id="wcSeg"><button data-f="0" class="' + (S.wcFree ? '' : 'on') + '">Tous</button><button data-f="1" class="' + (S.wcFree ? 'on' : '') + '">Gratuits</button></div>' + html;
+  if (kind === 'pharmacy' && !anyOpen) html += '<div class="banner">' + ic('info') + '<span><b>Aucune pharmacie ouverte trouvée</b><br>' + (best && inVaud(best) ? 'Pour la pharmacie de garde, appelle la Centrale des médecins de garde : <a href="tel:0848133133">0848 133 133</a> (Vaud).' : 'Cherche la pharmacie de garde de la région (affichée sur la porte des pharmacies ou sur le site officiel local).') + '</span></div>';
+  if (kind === 'hospital' && best && inVaud(best)) html += medigoBlock();
   if (!sorted.length) html += '<div class="empty">Rien trouvé dans ce coin. Déplace la carte et réessaie.</div>';
   html += sorted.map((p, i) => '<button class="card tap" data-i="' + i + '"><div class="ico" style="background:' + KIND_COLOR[kind] + '">' + ic(kind) + '</div><div class="grow"><b>' + esc(p.name) + '</b><div class="sub">' +
-    (p.st ? '<span class="' + (p.st.open ? 'oh-open' : 'oh-closed') + '">' + esc(p.st.txt) + '</span>' : esc(p.details || 'Horaires inconnus')) + '</div></div><div class="val"><small>' + fmtDist(p.dist) + '</small></div></button>').join('');
-  html += '<p class="muted small">Lieux et horaires : OpenStreetMap, parfois pas à jour. En cas d\'urgence vitale : 144.</p>';
+    (p.st ? '<span class="' + (p.st.open ? 'oh-open' : 'oh-closed') + '">' + esc(p.st.txt) + '</span>' + (kind === 'wc' && p.details ? ' · ' + esc(p.details) : '') : esc(p.details || 'Horaires inconnus')) + '</div></div><div class="val"><small>' + fmtDist(p.dist) + '</small></div></button>').join('');
+  html += '<p class="muted small">Lieux et horaires : OpenStreetMap, parfois pas à jour. En cas d\'urgence vitale : ' + (best && !inCH(best) ? '112' : '144') + '.</p>';
   body.innerHTML = html;
   const g = body.querySelector('#hGo'); if (g) g.onclick = () => { closeSheet(); chooseDestination({ name: best.name, sub: KIND_LABEL[kind], lat: best.lat, lon: best.lon }); };
   body.querySelectorAll('.card').forEach((b) => { b.onclick = () => openPoi(sorted[+b.dataset.i], kind); });
+  body.querySelectorAll('#wcSeg button').forEach((b) => { b.onclick = () => { S.wcFree = b.dataset.f === '1'; renderHealthList(kind, list); }; });
   S.lastPoiList = { kind, list };
 }
 function renderPoiList(kind, list, c) {
   if (S.sheetView !== 'poi-' + kind) return;
-  if (kind === 'hospital' || kind === 'pharmacy') { renderHealthList(kind, list); return; }
+  if (kind === 'hospital' || kind === 'pharmacy' || kind === 'wc') { renderHealthList(kind, list); return; }
   let sorted = list.slice();
   if (kind === 'fuel' && poiSort === 'cheap') sorted.sort((a, b) => (a.mainPrice == null) - (b.mainPrice == null) || (a.mainPrice || 0) - (b.mainPrice || 0) || a.dist - b.dist);
   else if (kind !== 'fuel' && poiSort === 'best') sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0) || b.ratingCount - a.ratingCount || a.dist - b.dist);
@@ -1476,7 +1487,7 @@ function openPoi(p, kind) {
   html += '<button class="btn block" id="poiGo">' + ic('nav') + 'Y aller</button>';
   html += '<button class="btn soft block" id="poiFav">' + ic('star') + (favAt(p, 25) ? 'Dans tes favoris' : 'Enregistrer en favori') + '</button>';
   const body = openSheet(p.name, html, 'poi');
-  if (kind === 'hospital') body.insertAdjacentHTML('afterbegin', medigoBlock());
+  if (kind === 'hospital' && inVaud(p)) body.insertAdjacentHTML('afterbegin', medigoBlock());
   const rb = body.querySelector('#poiRate'); if (rb) rb.onclick = () => openRateForm(p, kind);
   body.querySelector('#poiGo').onclick = () => { closeSheet(); chooseDestination({ name: p.name, sub: KIND_LABEL[kind], lat: p.lat, lon: p.lon }); };
   body.querySelector('#poiFav').onclick = () => addFav({ name: p.name, addr: p.addr || '', lat: p.lat, lon: p.lon });
@@ -1563,7 +1574,8 @@ async function openStop(f) {
 const ESS = [
   { id: 'hosp', f: ['all', ['==', ['get', 'class'], 'hospital'], ['==', ['get', 'subclass'], 'hospital']], min: 11, lab: 13, fill: '#E5484D', ring: '#FFFFFF', glyph: '+', txt: '#C62828', big: 1.25 },
   { id: 'police', f: ['==', ['get', 'class'], 'police'], min: 13, lab: 15, fill: '#FFFFFF', ring: '#1E4FD8', icon: 'police', txt: '#1E4FD8' },
-  { id: 'pharm', f: ['==', ['get', 'class'], 'pharmacy'], min: 14, lab: 16, fill: '#16A05A', ring: '#FFFFFF', glyph: '+', txt: '#0F7A43' }
+  { id: 'pharm', f: ['==', ['get', 'class'], 'pharmacy'], min: 14, lab: 16, fill: '#16A05A', ring: '#FFFFFF', glyph: '+', txt: '#0F7A43' },
+  { id: 'wc', f: ['==', ['get', 'class'], 'toilets'], min: 14.5, lab: 99, fill: '#0E7C86', ring: '#FFFFFF', glyph: 'WC', gs: 0.5, txt: '#0E7C86' }
 ];
 const ESS_ANY = ['any'].concat(ESS.map((k) => k.f));
 const ESS_DOTS = ESS.map((k) => 'ess-' + k.id);
@@ -1581,9 +1593,9 @@ function setupEssentials() {
         ? { id: 'ess-' + k.id + '-g', type: 'symbol', source: 'openmaptiles', 'source-layer': 'poi', minzoom: k.min, filter: filt,
           layout: { 'icon-image': k.icon, 'icon-size': ['interpolate', ['linear'], ['zoom'], k.min, 0.6, 15, 0.95, 18, 1.3], 'icon-allow-overlap': true, 'icon-ignore-placement': true } }
         : { id: 'ess-' + k.id + '-g', type: 'symbol', source: 'openmaptiles', 'source-layer': 'poi', minzoom: k.min, filter: filt,
-          layout: { 'text-field': k.glyph, 'text-font': ['Noto Sans Bold'], 'text-size': ['interpolate', ['linear'], ['zoom'], k.min, 13 * (k.big || 1), 15, 19 * (k.big || 1), 18, 26 * (k.big || 1)], 'text-allow-overlap': true, 'text-ignore-placement': true, 'text-offset': [0, -0.05] },
+          layout: { 'text-field': k.glyph, 'text-font': ['Noto Sans Bold'], 'text-size': ['interpolate', ['linear'], ['zoom'], k.min, 13 * (k.big || 1) * (k.gs || 1), 15, 19 * (k.big || 1) * (k.gs || 1), 18, 26 * (k.big || 1) * (k.gs || 1)], 'text-allow-overlap': true, 'text-ignore-placement': true, 'text-offset': [0, -0.05] },
           paint: { 'text-color': '#FFFFFF' } }, before);
-      map.addLayer({ id: 'ess-' + k.id + '-n', type: 'symbol', source: 'openmaptiles', 'source-layer': 'poi', minzoom: k.lab, filter: filt,
+      if (k.lab < 24) map.addLayer({ id: 'ess-' + k.id + '-n', type: 'symbol', source: 'openmaptiles', 'source-layer': 'poi', minzoom: k.lab, filter: filt,
         layout: { 'text-field': ['coalesce', ['get', 'name:fr'], ['get', 'name']], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-anchor': 'top', 'text-offset': [0, 1.2], 'text-max-width': 9, 'text-optional': true },
         paint: { 'text-color': k.txt, 'text-halo-color': '#FFFFFF', 'text-halo-width': 1.6 } }, before);
     });
@@ -1598,10 +1610,21 @@ function setupEssentials() {
     let best = fs[0], bd = Infinity;
     fs.forEach((f) => { const g = f.geometry && f.geometry.coordinates; if (!g) return; const p = map.project(g); const d = Math.hypot(p.x - e.point.x, p.y - e.point.y); if (d < bd) { bd = d; best = f; } });
     e._routaDone = true;
-    openPlace(best);
+    if ((best.properties || {}).class === 'toilets') openWcAt(best.geometry.coordinates); else openPlace(best);
   });
 }
+async function openWcAt(g) {
+  openSheet('WC public', '<p class="muted">Chargement…</p>', 'place');
+  let p = null;
+  try {
+    const els = await overpass('[out:json][timeout:10];nwr(around:30,' + g[1] + ',' + g[0] + ')["amenity"="toilets"];out center tags 3;', inCH({ lat: g[1], lon: g[0] }));
+    if (els && els.length) p = parseOsm(els[0], 'wc');
+  } catch (e) { /* hors ligne */ }
+  if (!p) p = { id: 'wc@' + g[1].toFixed(5) + ',' + g[0].toFixed(5), name: 'WC public', lat: g[1], lon: g[0], details: '', tags: {} };
+  if (S.sheetView === 'place') openPoi(p, 'wc');
+}
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const inVaud = (p) => p && p.lat > 46.18 && p.lat < 47.0 && p.lon > 6.06 && p.lon < 7.25;
 function medigoBlock() {
   const url = IS_IOS ? 'https://apps.apple.com/ch/app/urgences-vaud/id1091227650' : 'https://medigo.ch/';
   return '<div class="banner">' + ic('clock') + '<span><b>Horaires et affluence en temps réel</b><br>Les horaires à jour et le temps d\'attente en direct des urgences vaudoises sont dans l\'app Medigo, plus fiable que nos horaires.</span></div>' +
@@ -1655,7 +1678,7 @@ async function openPlace(f) {
   if (addr) p.details = label + ' · ' + addr;
   if (S.sheetView === 'place') {
     openPoi(p, kind);
-    if (pr.class === 'hospital') { const b = $('sheetBody'); if (b) b.insertAdjacentHTML('afterbegin', medigoBlock()); }
+    if (pr.class === 'hospital' && inVaud(p)) { const b = $('sheetBody'); if (b) b.insertAdjacentHTML('afterbegin', medigoBlock()); }
   }
 }
 function openRateForm(p, kind) {
