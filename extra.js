@@ -259,7 +259,7 @@ async function openConvoy() {
       '<p>Roulez à plusieurs : chaque membre voit les autres précisément sur la carte, la destination est partagée et vous avez un chat de groupe.</p>' +
       '<form id="cvNew"><label class="field" for="cvName">Nom de la sortie<input id="cvName" maxlength="40" placeholder="Ex. : Balade col du Pillon"></label><button class="btn block" type="submit">' + IC.convoy + 'Créer un convoi</button></form>' +
       '<form id="cvJoin" class="row"><label class="field grow" for="cvCode">Code du convoi<input id="cvCode" maxlength="6" autocapitalize="characters" placeholder="Ex. : K7P2QX"></label><button class="btn soft" type="submit">Rejoindre</button></form>', 'convoy');
-    body.querySelector('#cvNew').onsubmit = (e) => { e.preventDefault(); if (!DB.sb) { toast('Le convoi demande le mode en ligne.'); return; } createConvoy($('cvName').value.trim()); };
+    body.querySelector('#cvNew').onsubmit = (e) => { e.preventDefault(); if (!DB.sb) { toast('Le convoi demande le mode en ligne.'); return; } if (ctrlBlocked($('cvName').value)) { toast('Pas de mention de contrôles de police ou de radars : c\'est interdit en Suisse.'); return; } createConvoy($('cvName').value.trim()); };
     body.querySelector('#cvJoin').onsubmit = async (e) => { e.preventDefault(); if (await joinConvoy($('cvCode').value.trim())) openConvoy(); };
     return;
   }
@@ -345,6 +345,7 @@ function openNewEvent() {
   body.querySelector('#evSave').onclick = async () => {
     const title = $('evT').value.trim(); const when = new Date($('evD').value);
     if (title.length < 3) { toast('Donne un titre au rassemblement.'); return; }
+    if (ctrlBlocked(title, $('evDesc').value)) { toast('Pas de mention de contrôles de police ou de radars : c\'est interdit en Suisse.'); return; }
     if (isNaN(when) || when.getTime() < Date.now() - 3600000) { toast('Choisis une date à venir.'); return; }
     const p = where === 'here' && S.pos ? S.pos : (() => { const c = map.getCenter(); return { lat: c.lat, lon: c.lng }; })();
     const e = { id: uuid(), title, description: $('evDesc').value.trim() || null, lat: p.lat, lon: p.lon, starts_at: when.toISOString(), created_by: S.me.id, created_name: S.me.pseudo, created_at: nowIso() };
@@ -360,7 +361,7 @@ function openEvent(id) {
   const mine = e.created_by === S.me.id;
   const body = openSheet(e.title,
     '<div class="row wrap"><span class="pill">' + fmtWhen(e.starts_at) + '</span>' + (S.pos ? '<span class="pill">' + fmtDist(dist(S.pos, e)) + '</span>' : '') + '<span class="pill">Par ' + esc(e.created_name || '?') + '</span></div>' +
-    (e.description ? '<p>' + esc(e.description) + '</p>' : '') +
+    (ctrlSafe(e.description) ? '<p>' + esc(e.description) + '</p>' : '') +
     '<p><b>' + e.going.length + ' participant' + (e.going.length > 1 ? 's' : '') + '</b>' + (e.going.length ? ' : ' + e.going.slice(0, 12).map((r) => esc(r.pseudo || '?')).join(', ') : '') + '</p>' +
     '<button class="btn block" id="evGoing">' + (going ? 'Je ne viens plus' : 'Je viens') + '</button>' +
     '<div class="row"><button class="btn soft grow" id="evNav">' + ic('nav') + 'Y aller</button><button class="btn soft grow" id="evCal">' + IC.event + 'Calendrier</button></div>' +
