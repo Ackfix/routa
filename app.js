@@ -1479,12 +1479,13 @@ async function openStop(f) {
 function setupPlaces() {
   setupTransit();
   try { map.setLayerZoomRange('poi_r1', 15, 24); map.setLayerZoomRange('poi_r7', 16, 24); map.setLayerZoomRange('poi_r20', 17, 24); } catch (e) { /* style différent */ }
+  POI_LAYERS.forEach((id) => { try { if (map.getLayer(id)) map.setLayoutProperty(id, 'icon-size', 1.4); } catch (e) { /* */ } });
   applyPlaces();
   map.on('click', (e) => {
     if (e._routaDone || S.placing || S.nav || !S.settings.showPlaces) return;
     const layers = POI_LAYERS.filter((id) => map.getLayer(id));
     if (!layers.length) return;
-    const pad = 22;
+    const pad = 30;
     const fs = map.queryRenderedFeatures([[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]], { layers });
     if (!fs.length) return;
     let best = fs[0], bd = Infinity;
