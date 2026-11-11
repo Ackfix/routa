@@ -109,7 +109,7 @@ const P = {
 };
 const ic = (n) => '<svg aria-hidden="true" viewBox="0 0 24 24">' + (P[n] || P.pin) + '</svg>';
 
-const ALERT_TYPES = {
+const ALERT_TYPES = window.ROUTA_ALERT_TYPES = {
   trou: { label: 'Trou', say: 'trou dans la chaussée' },
   objet: { label: 'Objet', say: 'objet sur la route' },
   accident: { label: 'Accident', say: 'accident', cls: 'red' },
@@ -737,7 +737,6 @@ function checkNearAlerts() {
     $('alertNearSub').textContent = 'à ' + fmtDist(best.d) + ' · signalé ' + ago(best.a.created_at) + ' · confirmé ' + (best.a.confirms || 1) + ' fois';
     $('alertNear').hidden = false;
     vibrate([60, 40, 60]);
-    say('Attention, ' + t.say + ' dans ' + fmtDist(best.d).replace(',', ' virgule '));
     clearTimeout(checkNearAlerts.t);
     checkNearAlerts.t = setTimeout(() => { $('alertNear').hidden = true; }, 20000);
   }
@@ -1089,8 +1088,18 @@ function startNav(R, dest) {
   followCam();
   carSync(true);
 }
+function saveTrip(N) {
+  try {
+    const km = (N.trav || 0) / 1000;
+    if (km < 0.3 || !N.dest) return;
+    const t = store.get('routa.trips', []);
+    t.unshift({ name: N.dest.name, sub: N.dest.sub || '', lat: N.dest.lat, lon: N.dest.lon, at: N.startedAt, min: Math.max(1, Math.round((Date.now() - N.startedAt) / 60000)), km: Math.round(km * 10) / 10, done: !!N.arrived });
+    store.set('routa.trips', t.slice(0, 50));
+  } catch (e) { /* */ }
+}
 function stopNav(silent) {
   if (!S.nav) return;
+  saveTrip(S.nav);
   S.nav = null;
   document.body.classList.remove('navigating');
   $('navBanner').hidden = true; $('navBar').hidden = true;
@@ -1170,6 +1179,8 @@ function project(R, p, from, to) {
 }
 function navUpdate() {
   const N = S.nav; if (!N || !S.pos) return;
+  if (N.lastP) { const dd = dist(N.lastP, S.pos); if (dd < 500) N.trav = (N.trav || 0) + dd; }
+  N.lastP = S.pos;
   const R = N.R;
   let pr = project(R, S.pos, N.seg - 3, N.seg + 300);
   if (pr.d > 40) pr = project(R, S.pos, 0, R.coords.length - 1);
@@ -1224,6 +1235,7 @@ function arrive() {
   const name = S.nav.dest.name;
   const arrDest = S.nav.dest;
   say('Vous êtes arrivé.');
+  S.nav.arrived = true;
   stopNav(true);
   if (window.ROUTA_X && ROUTA_X.arrived) ROUTA_X.arrived(arrDest);
   openSheet('Tu es arrivé', '<p>' + esc(name) + '</p><div class="row"><button class="btn soft grow" id="arrSpot">' + ic('spot') + 'Ajouter en spot</button><button class="btn soft grow" id="arrPark">' + ic('parking') + 'Parkings autour</button></div><button class="btn ghost" id="arrFb">Un souci pendant ce trajet ? Dis-le-nous</button>', 'arrive');
@@ -2496,7 +2508,9 @@ function openMenu() {
       ['favs', ic('star'), 'Favoris'],
       ['spots', ic('spot'), 'Spots, routes et cols'],
       v.ev && X.open && ['chargers', XI.plug || ic('charge'), 'Bornes libres'],
-      ['mapview', '<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>', 'Affichage carte']
+      ['mapview', '<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>', 'Affichage carte'],
+      X.openTrips && ['trips', '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', 'Mes trajets'],
+      X.openOffline && ['offline', '<svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>', 'Carte hors connexion']
     ]],
     ['Ma voiture', [
       ['vehicle', ic(v.icon), 'Véhicule · ' + v.label],
