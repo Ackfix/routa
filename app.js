@@ -798,7 +798,7 @@ async function geoSearch(text, c) {
 async function geoSearchBase(text, c) {
   if (Date.now() > GEO.photonOffUntil) {
     try {
-      const params = new URLSearchParams({ q: text, limit: '7', lang: I18N.lang === 'fr' ? 'fr' : 'en', lat: c.lat.toFixed(4), lon: c.lon.toFixed(4) });
+      const params = new URLSearchParams({ q: text, limit: '7', lang: (/^(fr|de|it)$/.test(I18N.lang) ? I18N.lang : 'en'), lat: c.lat.toFixed(4), lon: c.lon.toFixed(4) });
       const j = await fetchJson(CFG.searchUrl + '?' + params.toString(), 5000);
       return (j.features || []).map((f) => {
         const p = f.properties || {};
@@ -822,7 +822,7 @@ async function geoSearchBase(text, c) {
 async function geoReverse(p) {
   if (Date.now() > GEO.photonOffUntil) {
     try {
-      const j = await fetchJson((CFG.searchUrl || 'https://photon.komoot.io/api/').replace(/api\/?$/, 'reverse') + '?lat=' + p.lat + '&lon=' + p.lon + '&lang=' + (I18N.lang === 'fr' ? 'fr' : 'en'), 3500);
+      const j = await fetchJson((CFG.searchUrl || 'https://photon.komoot.io/api/').replace(/api\/?$/, 'reverse') + '?lat=' + p.lat + '&lon=' + p.lon + '&lang=' + ((/^(fr|de|it)$/.test(I18N.lang) ? I18N.lang : 'en')), 3500);
       const q = (j.features && j.features[0] && j.features[0].properties) || {};
       return { street: q.osm_key === 'highway' ? q.name : q.street, housenumber: q.housenumber, city: q.city || q.town || q.village, cc: (q.countrycode || '').toUpperCase() };
     } catch (e) { GEO.photonOffUntil = Date.now() + 10 * 60000; }
