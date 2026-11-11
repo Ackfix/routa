@@ -162,6 +162,16 @@ function veh() {
   const isHgv = !!v.hgv || (S.vehicle.type === 'camping' && (dims.weight || 0) > 3.5);
   return Object.assign({}, v, { type: S.vehicle.type, dims, hazmat: !!S.vehicle.hazmat && S.vehicle.type === 'camion', isHgv });
 }
+/* Vitesse maximale propre au véhicule (Suisse) : poids lourds 80 km/h, cars, minibus et camping-cars de plus de 3,5 t 100 km/h */
+function vehCap() {
+  const v = veh();
+  if (v.type === 'camion') return 80;
+  if (v.type === 'bus' || v.type === 'minibus') return 100;
+  if (v.type === 'camping' && (v.dims.weight || 0) > 3.5) return 100;
+  return null;
+}
+window.ROUTA_VCAP = vehCap;
+const capLimit = (l) => { const c = vehCap(); return l && c ? Math.min(l, c) : l; };
 function vehSummary() {
   const v = veh();
   if (!v.heavy) return v.label;
@@ -668,7 +678,7 @@ function updateSpeed() {
   box.hidden = false;
   const kmh = S.speed * 3.6 < 6 ? 0 : Math.round(S.speed * 3.6);
   $('speedVal').textContent = kmh;
-  const lim = S.settings.showLimit ? S.limit : null;
+  const lim = S.settings.showLimit ? capLimit(S.limit) : null;
   const sign = $('limitSign');
   sign.hidden = !lim;
   if (lim) sign.textContent = lim;
