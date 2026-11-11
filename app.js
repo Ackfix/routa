@@ -1308,22 +1308,44 @@ async function openPoiList(kind) {
   renderPoiList(kind, list, c);
 }
 /* Hôpitaux et pharmacies : le plus proche ouvert en premier */
+function hospScore(p) {
+  const t = p.tags || {}; const n = (p.name || '') + ' ' + (t.official_name || ''); const sp = t['healthcare:speciality'] || '';
+  if (/\bEMS\b|cabinet|ost[eé]o|physio|dentaire|v[ée]t[ée]rinaire|psychiatr/i.test(n + ' ' + sp)) return 1e7;
+  if (/h[oô]pital|hospitalier|\bCHUV\b|\bHUG\b|\beHnv\b|\bHFR\b|\bHRC\b|\bGHOL\b|\bRHNe\b|Kantonsspital|Spital/i.test(n)) return 0;
+  if (t.emergency === 'yes' && !sp) return 600;
+  if (/intensive/.test(sp)) return 1500;
+  if (t.emergency === 'yes') return 2500;
+  return 4000;
+}
 function healthStatus(p, kind) {
   const t = p.tags || {};
-  if (kind === 'hospital' && t.emergency === 'yes') return { open: true, txt: 'Urgences 24 h/24' };
+  if (kind === 'hospital') {
+    if (t.emergency === 'yes') return { open: true, txt: 'Urgences 24 h/24' };
+    if (hospScore(p) === 0) return { open: true, txt: 'Hôpital' };
+  }
   return ohStatus(ohParse(p.hours));
 }
 function renderHealthList(kind, list) {
-  list.forEach((p) => { p.st = healthStatus(p, kind); p.rank = p.st ? (p.st.open ? 0 : 2) : 1; if (kind === 'hospital' && (p.tags || {}).emergency === 'yes') p.rank -= 0.5; });
-  const sorted = list.slice().sort((a, b) => a.rank - b.rank || a.dist - b.dist).slice(0, 40);
+  let sorted;
+  list.forEach((p) => { p.st = healthStatus(p, kind); });
+  if (kind === 'hospital') {
+    sorted = list.filter((p) => hospScore(p) < 1e7).sort((a, b) => (a.dist + hospScore(a)) - (b.dist + hospScore(b)));
+  } else {
+    list.forEach((p) => { p.rank = p.st ? (p.st.open ? 0 : 2) : 1; });
+    sorted = list.slice().sort((a, b) => a.rank - b.rank || a.dist - b.dist);
+  }
+  sorted = sorted.slice(0, 40);
   showPois(sorted, kind);
   const body = $('sheetBody');
   let html = '';
-  const best = sorted.find((p) => p.st && p.st.open) || sorted[0];
+  const anyOpen = sorted.some((p) => p.st && p.st.open);
+  const best = kind === 'hospital' ? sorted[0] : (sorted.find((p) => p.st && p.st.open) || sorted[0]);
   if (best) {
-    html += '<div class="banner">' + ic(kind) + '<span><b>' + (best.st && best.st.open ? 'Le plus proche ouvert' : 'Le plus proche') + '</b><br>' + esc(best.name) + ' · ' + fmtDist(best.dist) + (best.st ? ' · ' + esc(best.st.txt) : '') + '</span></div>';
+    const head = kind === 'hospital' ? 'Hôpital le plus proche' : (best.st && best.st.open ? 'Le plus proche ouvert' : 'Le plus proche');
+    html += '<div class="banner">' + ic(kind) + '<span><b>' + head + '</b><br>' + esc(best.name) + ' · ' + fmtDist(best.dist) + (best.st ? ' · ' + esc(best.st.txt) : '') + '</span></div>';
     html += '<button class="btn block" id="hGo">' + ic('nav') + 'Y aller</button>';
   }
+  if (kind === 'pharmacy' && !anyOpen) html += '<div class="banner">' + ic('info') + '<span><b>Aucune pharmacie ouverte trouvée</b><br>Pour la pharmacie de garde, appelle la Centrale des médecins de garde : <a href="tel:0848133133">0848 133 133</a> (Vaud).</span></div>';
   if (kind === 'hospital') html += medigoBlock();
   if (!sorted.length) html += '<div class="empty">Rien trouvé dans ce coin. Déplace la carte et réessaie.</div>';
   html += sorted.map((p, i) => '<button class="card tap" data-i="' + i + '"><div class="ico" style="background:' + KIND_COLOR[kind] + '">' + ic(kind) + '</div><div class="grow"><b>' + esc(p.name) + '</b><div class="sub">' +
