@@ -1076,6 +1076,7 @@ function startNav(R, dest) {
   say("C'est parti. " + stepText(R.steps[0]) + '. Puis, ' + stepText(first).toLowerCase());
   navUpdate();
   followCam();
+  carSync(true);
 }
 function stopNav(silent) {
   if (!S.nav) return;
@@ -1087,6 +1088,51 @@ function stopNav(silent) {
   map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
   updateCompass();
   if (!silent) toast('Navigation arrêtée.');
+  carSync(true);
+}
+
+/* ======================= CarPlay ======================= */
+/* L'écran de la voiture est piloté depuis ici : on lui envoie le trajet, la prochaine manœuvre et les destinations. */
+const CAR = (window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.RoutaCar) || null;
+const CAR_ALERTS = ['accident', 'bouchon', 'travaux', 'objet', 'arret', 'glissant', 'animal', 'fermee'];
+let carLast = 0, carSentRoute = null, carOn = false;
+function carPlaces() {
+  const out = [];
+  ['home', 'work'].forEach((k) => { const f = slotFav(k); if (f) out.push({ name: I18N.t(SLOTS[k]), sub: f.addr || '', lat: f.lat, lon: f.lon, icon: k === 'home' ? 'house.fill' : 'briefcase.fill' }); });
+  S.favs.filter((f) => !f.slot).slice(0, 6).forEach((f) => out.push({ name: f.name, sub: f.addr || '', lat: f.lat, lon: f.lon, icon: 'star.fill' }));
+  S.recents.slice(0, 6).forEach((r) => { if (!out.some((o) => Math.abs(o.lat - r.lat) < 1e-4 && Math.abs(o.lon - r.lon) < 1e-4)) out.push({ name: r.name, sub: r.sub || '', lat: r.lat, lon: r.lon, icon: 'clock.fill' }); });
+  return out;
+}
+function carSync(force) {
+  if (!CAR || !carOn) return;
+  const now = Date.now(); if (!force && now - carLast < 900) return; carLast = now;
+  const t = (x) => I18N.t(x);
+  const st = {
+    navigating: !!S.nav, tomtomKey: CFG.tomtomKey || '', traffic: !!S.settings.traffic,
+    labels: { dest: t('Destinations'), report: t('Signaler'), stop: t('Arrêter'), empty: t('Aucune destination enregistrée : ajoute des favoris sur ton téléphone.') },
+    alerts: CAR_ALERTS.map((k) => ({ k, label: t(ALERT_TYPES[k].label) })),
+    places: carPlaces()
+  };
+  if (S.nav) {
+    Object.assign(st, S.nav.car || {}, { destName: S.nav.dest.name, destLat: S.nav.dest.lat, destLon: S.nav.dest.lon });
+    if (carSentRoute !== S.nav.R) { carSentRoute = S.nav.R; st.routeId = uuid(); st.route = S.nav.R.coords.map((c) => [+c.lon.toFixed(6), +c.lat.toFixed(6)]); }
+  } else if (carSentRoute) { carSentRoute = null; st.routeId = ''; st.route = []; }
+  CAR.update(st).catch(() => {});
+}
+if (CAR) {
+  CAR.addListener('carConnected', (e) => { carOn = !!(e && e.connected); carSentRoute = null; carSync(true); });
+  CAR.status().then((r) => { carOn = !!(r && r.connected); carSync(true); }).catch(() => {});
+  CAR.addListener('carAction', async (a) => {
+    if (!a) return;
+    if (a.action === 'stop') { stopNav(); return; }
+    if (a.action === 'alert') { if (S.pos && ALERT_TYPES[a.type]) { sendAlert(a.type, S.pos); say(I18N.t('Alerte envoyée')); } return; }
+    if (a.action === 'go') {
+      const dest = { name: a.name || '', sub: a.sub || '', lat: +a.lat, lon: +a.lon };
+      if (!S.pos) { toast("J'attends ta position GPS pour calculer le trajet…"); return; }
+      try { remember(dest); setDestMarker(dest); if (S.nav) stopNav(true); const R = await fetchRoute(S.pos, dest); closeSheet(); startNav(R, dest); }
+      catch (e) { toast('Impossible de calculer le trajet pour le moment. Vérifie ta connexion et réessaie.'); }
+    }
+  });
 }
 $('btnStop').onclick = () => stopNav();
 $('btnOverview').onclick = () => { if (S.nav) { stopFollow(); fitRoute(S.nav.R); } };
@@ -1145,6 +1191,8 @@ function navUpdate() {
   else if (!sp.near && toNext <= 90 && next.maneuver.type !== 'arrive') { sp.near = sp.mid = sp.far = true; say(txt); }
 
   const remTime = R.duration * (remaining / R.total);
+  N.car = { instr: stepText(next), icon: stepIcon(next), dist: Math.round(toNext), stepKey: String(i + 1), remaining: Math.round(remaining), remTime: Math.round(remTime) };
+  carSync(false);
   $('etaMin').textContent = fmtDur(remTime);
   $('etaRest').textContent = fmtDist(remaining) + ' · ' + fmtClock(new Date(Date.now() + remTime * 1000));
   if (S.follow) followCam();
