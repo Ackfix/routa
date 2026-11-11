@@ -138,7 +138,7 @@ const DIM_LABELS = [['height', 'Hauteur', 'm'], ['width', 'Largeur', 'm'], ['len
 /* ======================= État ======================= */
 const S = {
   me: store.get('routa.me', null),
-  settings: Object.assign({ voice: false, readMsgs: true, night: 'auto', traffic: true, mapType: 'plan', relief3d: false, navNorth: false, showPlaces: true, googleLinks: true, showLimit: true, speedAlert: true, showTransit: false }, store.get('routa.settings', {})),
+  settings: Object.assign({ voice: false, readMsgs: true, night: 'auto', traffic: true, mapType: 'plan', relief3d: false, navNorth: false, showPlaces: true, googleLinks: true, showLimit: true, speedAlert: true, showTransit: false, showStreets: true }, store.get('routa.settings', {})),
   vehicle: Object.assign({ type: 'voiture', dims: {}, hazmat: false }, store.get('routa.vehicle', {})),
   recents: store.get('routa.recents', []),
   lastRead: store.get('routa.lastRead', 0),
@@ -434,12 +434,15 @@ function applyMapView(animate) {
   if (map.getLayer('building-3d')) map.setLayoutProperty('building-3d', 'visibility', 'none');
   document.body.classList.toggle('sat', sat);
   ['traffic', 'incidents'].forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', S.settings.traffic ? 'visible' : 'none'); });
+  applyStreets();
   try { map.setTerrain(S.settings.relief3d ? { source: 'dem', exaggeration: 1.3 } : null); } catch (e) { console.warn('relief', e); }
   if (animate && !S.nav) map.easeTo({ pitch: S.settings.relief3d ? 60 : 0, duration: 800 });
   if (S.nav) followCam();
   $('btnLayers').classList.toggle('active', sat || S.settings.relief3d);
   updateCompass();
 }
+const STREET_LAYERS = ['highway-name-minor', 'highway-name-path'];
+function applyStreets() { STREET_LAYERS.forEach((id) => { try { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', S.settings.showStreets === false ? 'none' : 'visible'); } catch (e) { /* */ } }); }
 function openMapView() {
   const seg = (id, opts, cur) => '<div class="seg" id="' + id + '">' + opts.map(([k, v]) => '<button data-v="' + k + '" class="' + (k === cur ? 'on' : '') + '">' + v + '</button>').join('') + '</div>';
   const body = openSheet('Affichage de la carte',
@@ -448,12 +451,14 @@ function openMapView() {
     (CFG.tomtomKey ? '' : '<p class="muted small">Trafic en direct bientôt disponible.</p>') +
     '<label class="switch" for="mvTransit"><span><b>Transports publics</b><br><span class="muted small">Arrêts de bus, tram, métro et gares. Touche un arrêt pour voir les lignes et les prochains départs.</span></span><input id="mvTransit" type="checkbox"' + (S.settings.showTransit ? ' checked' : '') + '></label>' +
     '<label class="switch" for="mvPlaces"><span>Afficher les établissements (restos, magasins…) en zoomant</span><input id="mvPlaces" type="checkbox"' + (S.settings.showPlaces ? ' checked' : '') + '></label>' +
+    '<label class="switch" for="mvStreets"><span><b>Noms des rues</b><br><span class="muted small">Les grands axes et les villes restent toujours affichés.</span></span><input id="mvStreets" type="checkbox"' + (S.settings.showStreets === false ? '' : ' checked') + '></label>' +
     '<h3>Couleurs</h3>' + seg('mvNight', [['auto', 'Auto'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
     '<h3>Pendant la navigation</h3>' + seg('mvNav', [['route', 'Dans le sens de la route'], ['north', 'Nord en haut']], S.settings.navNorth ? 'north' : 'route') +
     '<div class="banner">' + ic('info') + '<span><b>Tourner la carte :</b> pose deux doigts et tourne-les (sur ordinateur : clic droit et glisser). <b>Incliner :</b> glisse deux doigts vers le haut ou le bas. La boussole montre le nord : touche-la pour remettre le nord en haut.</span></div>' +
     '<p class="muted small">Images satellite : Esri.</p>', 'mapview');
   body.querySelectorAll('#mvType button').forEach((b) => { b.onclick = () => { S.settings.mapType = b.dataset.v; saveSettings(); body.querySelectorAll('#mvType button').forEach((x) => x.classList.toggle('on', x === b)); applyMapView(true); }; });
   body.querySelector('#mvTraffic').onchange = (e) => { S.settings.traffic = e.target.checked; saveSettings(); applyMapView(false); };
+  body.querySelector('#mvStreets').onchange = (e) => { S.settings.showStreets = e.target.checked; saveSettings(); applyStreets(); };
   body.querySelector('#mvTransit').onchange = (e) => { S.settings.showTransit = e.target.checked; saveSettings(); applyTransit(); if (S.settings.showTransit && map.getZoom() < 15) map.easeTo({ zoom: 15.5, duration: 600 }); };
   body.querySelector('#mvPlaces').onchange = (e) => { S.settings.showPlaces = e.target.checked; saveSettings(); applyPlaces(); if (S.settings.showPlaces && map.getZoom() < 15) map.easeTo({ zoom: 15.5, duration: 600 }); };
   body.querySelectorAll('#mvNight button').forEach((b) => { b.onclick = () => { S.settings.night = b.dataset.v; saveSettings(); applyNight(); body.querySelectorAll('#mvNight button').forEach((x) => x.classList.toggle('on', x === b)); }; });
@@ -833,8 +838,9 @@ const runSearch = debounce(async (text) => {
   try {
     const c = S.pos || (() => { const m = map.getCenter(); return { lat: m.lat, lon: m.lng }; })();
     const items = await geoSearch(text, c);
+    const ack = /(informati|ordinateur|ordi\b|\bpc\b|\bmac\b|macbook|laptop|portable|computer|r[ée]paration|d[ée]pann|ackfix|bilgisayar|tamir)/i.test(text) && inVaud(c) ? [{ name: 'ACKFIX', sub: 'Dépannage PC et Mac · tout le Canton de Vaud', ackfix: true, nodist: true }] : [];
     const spotHits = [...S.spots.values()].filter((s) => s.name.toLowerCase().includes(text.toLowerCase())).slice(0, 3).map((s) => ({ name: s.name, sub: 'Spot · ' + (SPOT_CATS[s.category] || ''), lat: s.lat, lon: s.lon, spot: true }));
-    showResults(spotHits.concat(items));
+    showResults(ack.concat(spotHits, items));
   } catch (e) {
     showResults([], 'Recherche indisponible. Vérifie ta connexion.');
   }
@@ -842,9 +848,14 @@ const runSearch = debounce(async (text) => {
 function showResults(items, msg) {
   const box = $('results');
   if (!items.length) { box.innerHTML = '<div class="result"><span class="muted">' + esc(msg || 'Aucun résultat.') + '</span></div>'; box.hidden = false; return; }
-  box.innerHTML = items.map((it, i) => '<button class="result" data-i="' + i + '">' + ic(it.fav ? 'star' : it.spot ? 'spot' : it.recent ? 'clock' : 'pin') + '<span class="grow"><b>' + esc(it.name) + '</b><small>' + esc(it.sub || '') + (S.pos ? ' · ' + fmtDist(dist(S.pos, it)) : '') + '</small></span></button>').join('');
+  box.innerHTML = items.map((it, i) => '<button class="result" data-i="' + i + '">' + (it.ackfix ? '<span class="ackico">A</span>' : ic(it.fav ? 'star' : it.spot ? 'spot' : it.recent ? 'clock' : 'pin')) + '<span class="grow"><b>' + esc(it.name) + '</b><small>' + esc(it.sub || '') + (S.pos && !it.nodist ? ' · ' + fmtDist(dist(S.pos, it)) : '') + '</small></span></button>').join('');
   box.hidden = false;
-  box.querySelectorAll('.result').forEach((b) => { b.onclick = () => { const it = items[+b.dataset.i]; hideResults(); q.blur(); if (S.pickSlot) { const k = S.pickSlot; q.value = ''; saveSlot(k, it); return; } chooseDestination(it); }; });
+  box.querySelectorAll('.result').forEach((b) => { b.onclick = () => { const it = items[+b.dataset.i]; hideResults(); q.blur(); if (it.ackfix) { openAckfix(); return; } if (S.pickSlot) { const k = S.pickSlot; q.value = ''; saveSlot(k, it); return; } chooseDestination(it); }; });
+}
+function openAckfix() {
+  openSheet('ACKFIX', '<div class="banner"><span class="ackico">A</span><span><b>Informatique, simplement.</b><br>Dépannage, réparation et maintenance PC et Mac, PC sur mesure. On récupère ton ordinateur et on te le ramène, partout dans le Canton de Vaud.</span></div>' +
+    '<a class="btn block" href="https://ackfix.com" target="_blank" rel="noopener">' + ic('web') + 'Voir ackfix.com</a>' +
+    '<p class="muted small">ROUTA est développé par ACKFIX.</p>', 'ackfix');
 }
 function hideResults() { $('results').hidden = true; }
 function showRecents() {
@@ -2411,6 +2422,7 @@ function openMenu() {
     '<button class="card tap menusos" data-k="country"><span class="sosdot big">SOS</span><span class="grow"><b>Urgences et infos pays</b><span class="sub">' + ($('ctryLabel').textContent === 'Infos pays' ? 'Numéros d\'urgence, règles, vignettes' : esc($('ctryLabel').textContent)) + '</span></span></button>' +
     groups.map(([g, ts]) => { const list = ts.filter(Boolean); return '<h3 class="menuh">' + g + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
     '<div class="menulinks">' + (X.canInstall && X.canInstall() ? '<button data-k="install">Installer l\'app</button>' : '') + '<button data-k="share">Partager ROUTA</button><button data-k="feedback">Mon avis</button><button data-k="help">Aide</button></div>' +
+    '<a class="menusig" href="https://ackfix.com" target="_blank" rel="noopener">ROUTA par <b>ACKFIX</b> · Informatique, simplement.<br><span>Dépannage PC et Mac dans tout le Canton de Vaud</span></a>' +
     langSeg(), 'menu');
   body.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => openK(b.dataset.k); });
   bindLangSeg(body);
