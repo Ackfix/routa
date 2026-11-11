@@ -156,6 +156,8 @@ const S = {
 };
 const saveMe = () => store.set('routa.me', S.me);
 const saveSettings = () => store.set('routa.settings', S.settings);
+const applyUi = () => { try { document.documentElement.style.setProperty('--ui', String(+S.settings.uiSize || 1)); } catch (e) { /* */ } };
+applyUi();
 function veh() {
   const v = VEHICLES[S.vehicle.type] || VEHICLES.voiture;
   const dims = Object.assign({}, v.dims || {}, v.heavy ? (S.vehicle.dims || {}) : {});
@@ -2453,6 +2455,7 @@ function openProfile() {
     '<label class="switch" for="stLimit"><span>Afficher la limite de vitesse (indicative)</span><input id="stLimit" type="checkbox"' + (S.settings.showLimit ? ' checked' : '') + '></label>' +
     '<label class="switch" for="stAlert"><span>Alerte vocale si je dépasse la limite</span><input id="stAlert" type="checkbox"' + (S.settings.speedAlert ? ' checked' : '') + '></label>' +
     '<label class="field" for="stNight">Mode nuit de la carte<select id="stNight"><option value="auto"' + (S.settings.night === 'auto' ? ' selected' : '') + '>Automatique (19 h – 7 h)</option><option value="on"' + (S.settings.night === 'on' ? ' selected' : '') + '>Toujours</option><option value="off"' + (S.settings.night === 'off' ? ' selected' : '') + '>Jamais</option></select></label>' +
+    '<label class="field" for="stUi">Taille des boutons et de l\'affichage<select id="stUi">' + [['0.85', 'Petite'], ['1', 'Normale'], ['1.15', 'Grande'], ['1.3', 'Très grande']].map(([v, l]) => '<option value="' + v + '"' + (String(+S.settings.uiSize || 1) === String(+v) ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
     '<div class="banner">' + ic('info') + '<span>' + (S.online ? 'Mode en ligne : alertes, spots, conducteurs et messages partagés.' : 'Mode solo : tes alertes et spots restent sur ce téléphone.') + ' Version ' + VERSION + '. Carte © OpenStreetMap, OpenFreeMap. Itinéraires OSRM et Valhalla. Recherche Photon.</span></div>' +
     '<button class="btn ghost" id="pfReset">Réinitialiser mon profil sur ce téléphone</button>' +
     '<button class="btn danger block" id="pfWipe">Supprimer mes données</button>' +
@@ -2478,6 +2481,7 @@ function openProfile() {
   body.querySelector('#stGoogle').onchange = (e) => { S.settings.googleLinks = e.target.checked; saveSettings(); };
   body.querySelector('#stLimit').onchange = (e) => { S.settings.showLimit = e.target.checked; saveSettings(); updateSpeed(); };
   body.querySelector('#stAlert').onchange = (e) => { S.settings.speedAlert = e.target.checked; saveSettings(); };
+  body.querySelector('#stUi').onchange = (e) => { S.settings.uiSize = +e.target.value; saveSettings(); applyUi(); };
   body.querySelector('#stNight').onchange = (e) => { S.settings.night = e.target.value; saveSettings(); applyNight(); };
   body.querySelector('#pfReset').onclick = () => {
     const b = body.querySelector('#pfReset');
