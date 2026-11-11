@@ -351,6 +351,8 @@ window.ROUTA_I18N_SUB = ["Suisse", "France", "Italie", "Allemagne", "Autriche", 
     if (x.v && KEYS.length >= x.n && hk(x.n) === x.h) { for (let i = 0; i < x.n; i++) if (x.v[i]) d[KEYS[i]] = x.v[i]; DATA[k] = d; }
     else DATA[k] = DATA.en;
   });
+  const X2 = window.ROUTA_I18N_X2 || {};
+  Object.keys(X2).forEach((k) => { if (k !== 'en' && (!DATA[k] || DATA[k] === DATA.en)) DATA[k] = Object.assign({}, DATA[k] || {}); Object.assign(DATA[k], X2[k]); });
   const LANGS = { fr: 'Français', en: 'English', de: 'Deutsch', it: 'Italiano', pt: 'Português', es: 'Español', sq: 'Shqip', sr: 'Srpski', tr: 'Türkçe' };
   let lang = null;
   try { lang = localStorage.getItem('routa.lang'); } catch (e) { /* */ }
