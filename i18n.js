@@ -427,6 +427,7 @@ window.ROUTA_I18N_SUB = ["Suisse", "France", "Italie", "Allemagne", "Autriche", 
         if (g) { const args = g.slice(1).map((x, i) => (tr && tr.includes(i + 1) ? t(x) : x)); out = fn(...args); break; }
       }
     }
+    if (out == null && core.includes(' · ')) { const segs = core.split(' · '); const tr = segs.map((g) => { const r = look(g.trim()); return r != null ? r : g; }); if (tr.some((g, k) => g !== segs[k])) out = tr.join(' · '); }
     if (out == null && subRe) out = core.replace(subRe, (k) => dict[k]);
     return m[1] + out + m[3];
   }
