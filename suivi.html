@@ -50,8 +50,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1
   let car = null, dest = null, first = true;
   async function tick() {
     try {
-      const r = await fetch(CFG.supabaseUrl + '/rest/v1/drivers?id=eq.' + encodeURIComponent(id) + '&select=pseudo,car,lat,lon,speed,updated_at,share_until,nav_name,nav_lat,nav_lon,nav_eta', { headers: { apikey: CFG.supabaseKey, Authorization: 'Bearer ' + CFG.supabaseKey } });
-      const d = (await r.json())[0];
+      const r = await fetch(CFG.supabaseUrl + '/rest/v1/rpc/driver_shared', { method: 'POST', headers: { apikey: CFG.supabaseKey, Authorization: 'Bearer ' + CFG.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ did: id }) });
+      const d = await r.json();
       if (!d || !d.share_until || Date.parse(d.share_until) < Date.now()) { box.innerHTML = '<b>' + W.end + '</b><div class="sub">' + W.endSub + '</div>'; if (car) { car.remove(); car = null; } return; }
       if (d.lat == null) { box.innerHTML = '<b>' + esc(d.pseudo) + '</b><div class="sub">' + W.nopos + '</div>'; return; }
       if (!car) car = new maplibregl.Marker({ element: Object.assign(document.createElement('div'), { className: 'car' }) }).setLngLat([d.lon, d.lat]).addTo(map);
