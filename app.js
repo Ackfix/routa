@@ -381,12 +381,6 @@ map.on('load', () => {
   });
   setupPlaces();
   setupMapLayers();
-  map.on('click', (e) => {
-    if (e._routaDone || S.placing || S.nav) return;
-    const t = e.originalEvent && e.originalEvent.target;
-    if (t && t.closest && t.closest('.maplibregl-marker')) return;
-    openPoint({ lat: e.lngLat.lat, lon: e.lngLat.lng });
-  });
   drawFavs();
 });
 map.on('error', (e) => console.warn('carte', e && e.error));
@@ -1422,7 +1416,7 @@ function setupTransit() {
       map.setFilter('poi_transit', f ? ['all', f, ['!', TRANSIT_STOP]] : ['!', TRANSIT_STOP]);
       const c = JSON.parse(JSON.stringify(def));
       c.id = 'transit-stops'; c.minzoom = 14.5; c.filter = ['all', ['match', ['geometry-type'], ['MultiPoint', 'Point'], true, false], TRANSIT_STOP];
-      c.layout = Object.assign({}, c.layout, { visibility: 'none' });
+      c.layout = Object.assign({}, c.layout, { visibility: 'none', 'icon-size': 1.45 });
       map.addLayer(c);
     }
   } catch (e) { console.warn('transports', e); }
@@ -1431,8 +1425,9 @@ function setupTransit() {
     if (e._routaDone || S.placing || S.nav) return;
     const layers = ['transit-stops', 'poi_transit'].filter((id) => map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== 'none');
     if (!layers.length) return;
-    const pad = 14;
+    const pad = 30;
     const fs = map.queryRenderedFeatures([[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]], { layers }).filter((f) => (f.properties || {}).class !== 'airport');
+    fs.sort((a, b) => { const d = (f) => { const p = map.project(f.geometry.coordinates); return Math.hypot(p.x - e.point.x, p.y - e.point.y); }; return d(a) - d(b); });
     if (!fs.length) return;
     e._routaDone = true;
     openStop(fs[0]);
@@ -1489,7 +1484,7 @@ function setupPlaces() {
     if (e._routaDone || S.placing || S.nav || !S.settings.showPlaces) return;
     const layers = POI_LAYERS.filter((id) => map.getLayer(id));
     if (!layers.length) return;
-    const pad = 16;
+    const pad = 22;
     const fs = map.queryRenderedFeatures([[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]], { layers });
     if (!fs.length) return;
     let best = fs[0], bd = Infinity;
@@ -2317,6 +2312,8 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => { /* hors ligne non disponible */ });
 }
 if (!store.get('routa.mig096', false)) { S.settings.voice = false; S.settings.relief3d = false; saveSettings(); store.set('routa.mig096', true); }
+if (!store.get('routa.mig0913', false)) { S.settings.traffic = true; S.settings.showPlaces = true; S.settings.showTransit = false; saveSettings(); store.set('routa.mig0913', true); }
+S.settings.mapType = 'plan';
 S.settings.relief3d = false;
 window.ROUTA = { updateSpeed, bump, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials, veh, nameOf, openDriver, startNav, openSpot, openK };
 if (!S.me || !S.me.pseudo) onboarding(); else boot();
