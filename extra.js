@@ -787,7 +787,7 @@ X.tiles = () => [
 X.icons = IC;
 X.pendingCount = () => pendingReq.length;
 X.open = (k) => {
-  const f = { install: openInstall, friends: openFriends, convoy: openConvoy, events: openEvents, ranking: () => openRanking('all'), shareme: openShareSheet, chargers: openChargers, parkfree: openFreeParking, cols: openCols, carnet: openCarnet, parked: openParked, trips: openTrips, offline: openOffline }[k];
+  const f = { install: openInstall, friends: openFriends, convoy: openConvoy, events: openEvents, ranking: () => openRanking('all'), shareme: openShareSheet, chargers: openChargers, parkfree: openFreeParking, cols: openCols, carnet: openCarnet, parked: openParked, trips: openTrips, offline: openOffline, pro: openPro }[k];
   if (f) { f(); return true; }
   return false;
 };
@@ -939,6 +939,136 @@ async function openOffline() {
 }
 X.openTrips = openTrips;
 X.openOffline = openOffline;
+
+/* ======================= Mode pro : temps de conduite et de repos (OTR 1 / OTR 2) ======================= */
+/* Aide pour les chauffeurs professionnels. Ne remplace ni le tachygraphe ni le livret de travail. */
+const PRO = Object.assign({ on: false, regime: null, auto: true, segs: [] }, store.get('routa.pro', {}));
+const H = 3600000, MIN = 60000;
+const PRO_RULES = {
+  otr1: { label: 'OTR 1', sub: 'Poids lourds (> 3,5 t) et cars (> 8 places)', cont: 4.5 * H, day: 9 * H, dayExt: 10 * H, week: 56 * H, twoWeeks: 90 * H, rest: 11 * H, restRed: 9 * H, split1: 15 * MIN },
+  otr2: { label: 'OTR 2', sub: 'Taxis, VTC et transport professionnel de personnes', cont: 4.5 * H, day: 9 * H, dayExt: null, week: 45 * H, twoWeeks: null, rest: 11 * H, restRed: 9 * H, split1: 20 * MIN }
+};
+const ACT = { drive: 'Conduite', break: 'Pause', work: 'Autre travail', rest: 'Repos' };
+function proRegime() { if (PRO.regime) return PRO.regime; const t = (A.veh ? A.veh().type : 'voiture'); return (t === 'camion' || t === 'bus') ? 'otr1' : 'otr2'; }
+function proSave() { const cut = Date.now() - 15 * 24 * H; PRO.segs = PRO.segs.filter((s) => !s.e || s.e > cut); store.set('routa.pro', PRO); }
+function proCur() { const s = PRO.segs[PRO.segs.length - 1]; return s && !s.e ? s : null; }
+function proSet(a, at) {
+  at = at || Date.now();
+  const c = proCur();
+  if (c && c.a === a) return;
+  if (c) c.e = at;
+  if (a) PRO.segs.push({ a, s: at, e: null });
+  proSave(); proTick(true);
+}
+const segDur = (s, from, to) => Math.max(0, Math.min(s.e || Date.now(), to || Date.now()) - Math.max(s.s, from || 0));
+function proStats() {
+  const R = PRO_RULES[proRegime()], now = Date.now(), segs = PRO.segs;
+  /* début de la journée de travail : après le dernier repos d'au moins 9 h sans conduite ni travail */
+  const acts = segs.filter((s) => s.a === 'drive' || s.a === 'work');
+  let shiftStart = acts.length ? acts[0].s : now;
+  for (let i = 1; i < acts.length; i++) { if (acts[i].s - (acts[i - 1].e || now) >= R.restRed) shiftStart = acts[i].s; }
+  const lastEnd = acts.length ? (acts[acts.length - 1].e || now) : 0;
+  if (!acts.length || now - lastEnd >= R.restRed) shiftStart = now;
+  /* conduite continue depuis la dernière pause valable (45 min, ou en 2 fois) */
+  let cont = 0, partial = false;
+  segs.forEach((s) => {
+    if ((s.e || now) < shiftStart) return;
+    const d = segDur(s, shiftStart);
+    if (s.a === 'drive') cont += d;
+    else if (d >= 45 * MIN) { cont = 0; partial = false; }
+    else if (d >= 30 * MIN && partial) { cont = 0; partial = false; }
+    else if (d >= R.split1) partial = true;
+  });
+  const sum = (from, to) => segs.filter((s) => s.a === 'drive').reduce((t, s) => t + segDur(s, from, to), 0);
+  const day = sum(shiftStart);
+  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+  const monday = d0.getTime() - ((d0.getDay() + 6) % 7) * 24 * H;
+  const week = sum(monday), prevWeek = sum(monday - 7 * 24 * H, monday);
+  return { R, shiftStart, cont, day, week, two: week + prevWeek, restBy: acts.length && shiftStart < now ? shiftStart + 24 * H - R.rest : null };
+}
+const hm = (ms) => { const m = Math.max(0, Math.round(ms / MIN)); return Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0'); };
+
+/* petit compteur sur la carte */
+const proChip = el('<button class="prochip" id="proChip" hidden aria-label="Temps de conduite"><span class="pcdot"></span><span class="pctxt"></span></button>');
+document.body.appendChild(proChip);
+proChip.onclick = () => openPro();
+let stopSince = 0;
+const proWarned = {};
+function proWarn(key, msg) { if (proWarned[key]) return; proWarned[key] = true; vibrate([80, 60, 80]); toast(msg, { action: 'Parkings proches', onAction: () => A.openK && A.openK('parking'), ms: 10000 }); }
+function proTick(force) {
+  if (!PRO.on) { proChip.hidden = true; return; }
+  const kmh = (S.speed || 0) * 3.6, now = Date.now();
+  if (PRO.auto && S.pos) {
+    const c = proCur();
+    if (kmh > 8) { stopSince = 0; if (!c || c.a !== 'drive') proSet('drive'); }
+    else if (c && c.a === 'drive') { if (!stopSince) stopSince = now; if (now - stopSince > 3 * MIN) proSet('break', stopSince); }
+  }
+  const st = proStats(), R = st.R, cur = proCur();
+  const left = R.cont - st.cont;
+  proChip.hidden = false;
+  proChip.querySelector('.pctxt').textContent = (cur && cur.a === 'drive' ? '' : (cur ? ACT[cur.a] + ' · ' : '')) + hm(st.cont) + ' / 4 h 30';
+  proChip.classList.toggle('warn', left < 30 * MIN && left > 0);
+  proChip.classList.toggle('over', left <= 0);
+  const k = Math.floor(st.shiftStart / MIN);
+  if (st.cont < 10 * MIN) { delete proWarned.c30; delete proWarned.c0; }
+  if (left <= 30 * MIN && left > 0) proWarn('c30', 'Pause obligatoire dans <b>' + hm(left) + '</b> (45 min après 4 h 30 de conduite).');
+  if (left <= 0) proWarn('c0', '<b>Pause obligatoire</b> : 4 h 30 de conduite atteintes. Arrête-toi 45 minutes.');
+  if (R.day - st.day <= 30 * MIN) proWarn('d' + k, 'Plus que <b>' + hm(R.day - st.day) + '</b> de conduite aujourd\'hui (limite ' + hm(R.day) + ').');
+  if (R.week - st.week <= 2 * H) proWarn('w' + Math.floor(now / (7 * 24 * H)), 'Plus que <b>' + hm(R.week - st.week) + '</b> de conduite cette semaine.');
+  const v = A.veh ? A.veh() : {};
+  const h = new Date().getHours(), sunday = new Date().getDay() === 0;
+  if (v.isHgv && kmh > 8 && (h >= 22 || h < 5 || sunday)) proWarn('ban' + new Date().toDateString() + (h >= 22 || h < 5 ? 'n' : 's'), 'Poids lourd : la circulation est interdite en Suisse la nuit (22 h – 5 h) et le dimanche, sauf autorisation.');
+  if (force && S.sheetView === 'pro') openPro();
+}
+setInterval(() => proTick(false), 5000);
+
+function openPro() {
+  const reg = proRegime(), st = PRO.on ? proStats() : null, cur = proCur();
+  const bar = (v, max) => '<div class="probar"><i style="width:' + Math.min(100, Math.round(v / max * 100)) + '%"' + (v >= max ? ' class="over"' : v >= max * 0.9 ? ' class="warn"' : '') + '></i></div>';
+  const R = PRO_RULES[reg];
+  const body = openSheet('Temps de conduite (pro)',
+    '<label class="switch" for="proOn"><span><b>Activer le mode pro</b><br><span class="muted small">Compteur de conduite et de pauses sur la carte</span></span><input type="checkbox" id="proOn"' + (PRO.on ? ' checked' : '') + '></label>' +
+    '<div class="seg" id="proReg">' + Object.keys(PRO_RULES).map((k) => '<button data-r="' + k + '" class="' + (k === reg ? 'on' : '') + '">' + PRO_RULES[k].label + '</button>').join('') + '</div>' +
+    '<p class="muted small">' + esc(R.sub) + '</p>' +
+    (PRO.on ? (
+      '<div class="proacts">' + Object.keys(ACT).map((a) => '<button data-a="' + a + '" class="' + (cur && cur.a === a ? 'on' : '') + '">' + ACT[a] + '</button>').join('') + '</div>' +
+      '<label class="switch" for="proAuto"><span><b>Détection automatique</b><br><span class="muted small">Conduite dès 8 km/h, pause après 3 min à l\'arrêt</span></span><input type="checkbox" id="proAuto"' + (PRO.auto ? ' checked' : '') + '></label>' +
+      '<div class="procard"><div class="prorow"><b>Conduite continue</b><span>' + hm(st.cont) + ' / 4 h 30</span></div>' + bar(st.cont, R.cont) + '<span class="muted small">Puis pause de 45 min (ou 15 + 30 min' + (reg === 'otr2' ? ', ou 30 min / 2 × 20 min si elle est prise plus tôt' : '') + ').</span></div>' +
+      '<div class="procard"><div class="prorow"><b>Conduite aujourd\'hui</b><span>' + hm(st.day) + ' / ' + hm(R.day) + '</span></div>' + bar(st.day, R.day) + (R.dayExt ? '<span class="muted small">10 h possibles deux fois par semaine.</span>' : '') + '</div>' +
+      '<div class="procard"><div class="prorow"><b>Conduite cette semaine</b><span>' + hm(st.week) + ' / ' + hm(R.week) + '</span></div>' + bar(st.week, R.week) +
+        (R.twoWeeks ? '<span class="muted small">Sur deux semaines : ' + hm(st.two) + ' / ' + hm(R.twoWeeks) + '</span>' : '') + '</div>' +
+      (st.restBy ? '<div class="procard"><b>Repos journalier</b><span class="muted small">11 h de repos à commencer au plus tard vers ' + fmtClock(new Date(st.restBy)) + ' (9 h possibles trois fois par semaine).</span></div>' : '') +
+      '<div class="row wrap"><button class="btn soft grow" id="proPark">Parkings proches</button><button class="btn soft grow" id="proLog">Relevé 14 jours</button></div>'
+    ) : '') +
+    '<p class="muted small">Aide au respect de l\'' + (reg === 'otr1' ? 'OTR 1 (RS 822.221)' : 'OTR 2 (RS 822.222)') + '. Ne remplace ni le tachygraphe ni le livret de travail : en cas de contrôle, seuls ceux-ci font foi.</p>', 'pro');
+  body.querySelector('#proOn').onchange = (e) => { PRO.on = e.target.checked; if (!PRO.on) proSet(null); proSave(); proTick(); openPro(); };
+  body.querySelectorAll('#proReg button').forEach((b) => { b.onclick = () => { PRO.regime = b.dataset.r; proSave(); proTick(); openPro(); }; });
+  body.querySelectorAll('.proacts button').forEach((b) => { b.onclick = () => { PRO.auto = b.dataset.a === 'drive' ? PRO.auto : false; proSet(b.dataset.a); openPro(); }; });
+  const au = body.querySelector('#proAuto'); if (au) au.onchange = (e) => { PRO.auto = e.target.checked; proSave(); };
+  const pk = body.querySelector('#proPark'); if (pk) pk.onclick = () => A.openK && A.openK('parking');
+  const lg = body.querySelector('#proLog'); if (lg) lg.onclick = openProLog;
+}
+function proLogText() {
+  const days = {};
+  PRO.segs.forEach((s) => {
+    const k = new Date(s.s).toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: '2-digit' });
+    (days[k] = days[k] || []).push(s);
+  });
+  return Object.keys(days).map((k) => {
+    const list = days[k];
+    const drive = list.filter((s) => s.a === 'drive').reduce((t, s) => t + segDur(s), 0);
+    return k + ' – conduite ' + hm(drive) + '\n' + list.map((s) => '  ' + fmtClock(new Date(s.s)) + '–' + (s.e ? fmtClock(new Date(s.e)) : '…') + ' ' + ACT[s.a]).join('\n');
+  }).reverse().join('\n\n');
+}
+function openProLog() {
+  const t = proLogText();
+  const body = openSheet('Relevé des 14 derniers jours',
+    (t ? '<pre class="prolog">' + esc(t) + '</pre><button class="btn block" id="proShare">Partager le relevé</button>' : '<div class="empty">Aucune activité enregistrée.</div>') +
+    '<p class="muted small">Relevé indicatif tenu par ROUTA, gardé uniquement sur ce téléphone.</p>', 'prolog');
+  const b = body.querySelector('#proShare');
+  if (b) b.onclick = async () => { try { if (navigator.share) await navigator.share({ title: 'Relevé de conduite', text: t }); else { await navigator.clipboard.writeText(t); toast('Relevé copié.'); } } catch (e) { /* annulé */ } };
+}
+X.openPro = openPro;
 
 /* ======================= Démarrage ======================= */
 async function start() {
