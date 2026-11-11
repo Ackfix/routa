@@ -72,9 +72,10 @@ jobs:
         run: |
           cd /tmp/app/android
           chmod +x gradlew
-          ./gradlew --no-daemon bundleRelease
+          ./gradlew --no-daemon bundleRelease assembleDebug
           mkdir -p $GITHUB_WORKSPACE/out
           cp app/build/outputs/bundle/release/app-release.aab $GITHUB_WORKSPACE/out/routa-unsigned.aab
+          cp app/build/outputs/apk/debug/app-debug.apk $GITHUB_WORKSPACE/out/routa-test.apk
           ls -la $GITHUB_WORKSPACE/out
 
       - name: Publier le fichier (non signé)
@@ -82,4 +83,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete android-build --yes --cleanup-tag || true
-          gh release create android-build out/routa-unsigned.aab --title "Android build ${{ github.run_number }}" --notes "Fichier Android non signé (signature faite sur le Mac)." --prerelease
+          gh release create android-build out/routa-unsigned.aab out/routa-test.apk --title "Android build ${{ github.run_number }}" --notes "Fichier Android non signé (signature faite sur le Mac)." --prerelease
