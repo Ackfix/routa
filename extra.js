@@ -211,12 +211,6 @@ function subscribeConvoy() {
   if (convoyChan) { DB.sb.removeChannel(convoyChan); convoyChan = null; }
   const to = 'convoy:' + X.convoy.id;
   convoyChan = DB.sb.channel('routa-convoy-' + X.convoy.id)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'to_id=eq.' + to }, (p) => {
-      const m = p.new; if (convoyMsgs.some((x) => x.id === m.id)) return;
-      convoyMsgs.push(m);
-      if (m.from_id !== S.me.id) { vibrate(50); toast('<b>' + esc(X.convoy.name) + '</b> · ' + esc(m.from_name || '') + ' : ' + esc(m.body || ''), { action: 'Ouvrir', onAction: openConvoy, ms: 7000 }); }
-      if (S.sheetView === 'convoy') openConvoy();
-    })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'convoys', filter: 'id=eq.' + X.convoy.id }, (p) => {
       const old = X.convoy.dest_name; Object.assign(X.convoy, p.new); store.set('routa.convoy', X.convoy);
       if (p.new.dest_name && p.new.dest_name !== old && p.new.owner !== S.me.id) toast('Destination du convoi : <b>' + esc(p.new.dest_name) + '</b>', { action: 'Y aller', onAction: () => chooseDestination({ name: p.new.dest_name, sub: 'Convoi ' + X.convoy.name, lat: p.new.dest_lat, lon: p.new.dest_lon }), ms: 12000 });
@@ -226,9 +220,24 @@ function subscribeConvoy() {
 }
 async function loadConvoyMsgs() {
   if (!DB.sb || !X.convoy) return;
-  const { data } = await DB.sb.from('messages').select('*').eq('to_id', 'convoy:' + X.convoy.id).order('created_at', { ascending: false }).limit(40);
-  convoyMsgs = (data || []).reverse();
+  const { data } = await DB.sb.rpc('messages_convoy', { me: S.me.id, s: DB.secret(), cid: X.convoy.id });
+  convoyMsgs = (Array.isArray(data) ? data : []).reverse();
 }
+/* Chat du convoi : seuls les membres du convoi peuvent le lire */
+async function pollConvoy() {
+  if (!DB.sb || !X.convoy || document.hidden) return;
+  const last = convoyMsgs.length ? convoyMsgs[convoyMsgs.length - 1].created_at : null;
+  const { data } = await DB.sb.rpc('messages_convoy', { me: S.me.id, s: DB.secret(), cid: X.convoy.id, since: last });
+  if (!Array.isArray(data) || !data.length) return;
+  let fresh = false;
+  data.slice().reverse().forEach((m) => {
+    if (convoyMsgs.some((x) => x.id === m.id)) return;
+    convoyMsgs.push(m); fresh = true;
+    if (m.from_id !== S.me.id) { vibrate(50); toast('<b>' + esc(X.convoy.name) + '</b> · ' + esc(m.from_name || '') + ' : ' + esc(m.body || ''), { action: 'Ouvrir', onAction: openConvoy, ms: 7000 }); }
+  });
+  if (fresh && S.sheetView === 'convoy') openConvoy();
+}
+setInterval(pollConvoy, 5000);
 async function joinConvoy(code) {
   if (!DB.sb) { toast('Le convoi demande le mode en ligne.'); return false; }
   const { data } = await DB.sb.from('convoys').select('*').eq('id', code.toUpperCase()).limit(1);
@@ -283,8 +292,8 @@ async function openConvoy() {
   const send = async (t) => {
     t = (t || '').trim(); if (!t) return;
     const m = { id: uuid(), from_id: S.me.id, from_name: S.me.pseudo, to_id: 'convoy:' + c.id, kind: 'text', body: t, created_at: nowIso() };
-    const { error } = await DB.sb.from('messages').insert(m);
-    if (error) { toast('Message non envoyé. Vérifie ta connexion.'); return; }
+    const { data, error } = await DB.sb.rpc('message_send', { m, s: DB.secret() });
+    if (error || data === false) { toast('Message non envoyé. Vérifie ta connexion.'); return; }
     if (!convoyMsgs.some((x) => x.id === m.id)) convoyMsgs.push(m); openConvoy();
   };
   const go = body.querySelector('#cvGo'); if (go) go.onclick = () => { closeSheet(); chooseDestination({ name: c.dest_name, sub: 'Convoi ' + c.name, lat: c.dest_lat, lon: c.dest_lon }); };
