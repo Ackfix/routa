@@ -475,6 +475,7 @@ function applyNight() {
   const h = new Date().getHours();
   const on = S.settings.night === 'on' || (S.settings.night === 'auto' && (h >= 19 || h < 7));
   document.body.classList.toggle('night', on);
+  if (document.documentElement.classList.contains('web')) { document.documentElement.classList.toggle('night-bg', on); const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = on ? '#26282C' : '#F8F4F0'; }
   $('btnNight').classList.toggle('active', S.settings.night === 'on');
 }
 setInterval(applyNight, 60000);
