@@ -2560,7 +2560,8 @@ function openMenu() {
     ['Ma voiture', [
       ['vehicle', ic(v.icon), 'Véhicule · ' + v.label],
       X.open && ['carnet', XI.book || ic('info'), 'Carnet d\'entretien'],
-      X.open && ['parked', XI.park || ic('parking'), 'Parking']
+      X.open && ['parked', XI.park || ic('parking'), 'Parking'],
+      X.openPro && ['pro', '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg>', 'Temps de conduite (pro)']
     ]]
   ];
   const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + t[1] + '<span>' + t[2] + '</span></button>';
