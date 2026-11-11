@@ -48,6 +48,10 @@ function ago(iso) {
 }
 const initials = (n) => (n || '?').trim().split(/[\s._-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+/* Loi suisse (art. 98a LCR) : aucun avertissement public des contrôles de police ou radars dans les textes partagés */
+const BANNED_CTRL = /(radar|blitz|flash[ée]?|contr[ôo]le|kontroll|controll|polic|polizei|polizia|pol[ií]cia|flics?\b|keufs?\b|cond[ée]s?\b|gendarm|bullen|schmier|laser|r[ée]p[ée]titeur)/i;
+const ctrlBlocked = (...t) => t.some((x) => x && BANNED_CTRL.test(x));
+const ctrlSafe = (x) => (x && !BANNED_CTRL.test(x) ? x : '');
 
 /* ======================= Icônes ======================= */
 const P = {
@@ -408,8 +412,10 @@ const SAT_HIDE = /^(building|building-3d|road_area_pattern|(road|tunnel|bridge)_
 function setupMapLayers() {
   const style = map.getStyle(); if (!style) return;
   const before = (style.layers.find((l) => /^tunnel_|^road_/.test(l.id)) || {}).id;
-  map.addSource('sat-world', { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 19, attribution: 'Images satellite : Esri, Maxar, Earthstar Geographics' });
+  map.addSource('sat-world', { type: 'raster', tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/{z}/{y}/{x}.jpg'], tileSize: 256, maxzoom: 15, attribution: '<a href="https://s2maps.eu" target="_blank" rel="noopener">Sentinel-2 cloudless</a> – EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016)' });
   map.addLayer({ id: 'sat-world', type: 'raster', source: 'sat-world', layout: { visibility: 'none' } }, before);
+  map.addSource('sat-ch', { type: 'raster', tiles: ['https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg'], tileSize: 256, minzoom: 8, maxzoom: 20, bounds: [5.95, 45.81, 10.5, 47.81], attribution: '© <a href="https://www.swisstopo.admin.ch" target="_blank" rel="noopener">swisstopo</a>' });
+  map.addLayer({ id: 'sat-ch', type: 'raster', source: 'sat-ch', minzoom: 8, layout: { visibility: 'none' } }, before);
   if (CFG.tomtomKey) {
     const tt = (kind, style) => ['https://api.tomtom.com/traffic/map/4/tile/' + kind + '/' + style + '/{z}/{x}/{y}.png?tileSize=256&key=' + encodeURIComponent(CFG.tomtomKey)];
     const top = map.getLayer('boundary_3') ? 'boundary_3' : undefined;
@@ -429,7 +435,7 @@ function setupMapLayers() {
 function applyMapView(animate) {
   if (!map.getSource('dem')) return;
   const sat = S.settings.mapType === 'sat';
-  ['sat-world'].forEach((id) => map.setLayoutProperty(id, 'visibility', sat ? 'visible' : 'none'));
+  ['sat-world', 'sat-ch'].forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', sat ? 'visible' : 'none'); });
   map.getStyle().layers.forEach((l) => { if (SAT_HIDE.test(l.id)) map.setLayoutProperty(l.id, 'visibility', sat ? 'none' : 'visible'); });
   if (map.getLayer('building-3d')) map.setLayoutProperty('building-3d', 'visibility', 'none');
   document.body.classList.toggle('sat', sat);
@@ -455,7 +461,7 @@ function openMapView() {
     '<h3>Couleurs</h3>' + seg('mvNight', [['auto', 'Auto'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
     '<h3>Pendant la navigation</h3>' + seg('mvNav', [['route', 'Dans le sens de la route'], ['north', 'Nord en haut']], S.settings.navNorth ? 'north' : 'route') +
     '<div class="banner">' + ic('info') + '<span><b>Tourner la carte :</b> pose deux doigts et tourne-les (sur ordinateur : clic droit et glisser). <b>Incliner :</b> glisse deux doigts vers le haut ou le bas. La boussole montre le nord : touche-la pour remettre le nord en haut.</span></div>' +
-    '<p class="muted small">Images satellite : Esri.</p>', 'mapview');
+    '<p class="muted small">Images satellite : swisstopo (Suisse), Sentinel-2 cloudless – EOX (monde).</p>', 'mapview');
   body.querySelectorAll('#mvType button').forEach((b) => { b.onclick = () => { S.settings.mapType = b.dataset.v; saveSettings(); body.querySelectorAll('#mvType button').forEach((x) => x.classList.toggle('on', x === b)); applyMapView(true); }; });
   body.querySelector('#mvTraffic').onchange = (e) => { S.settings.traffic = e.target.checked; saveSettings(); applyMapView(false); };
   body.querySelector('#mvStreets').onchange = (e) => { S.settings.showStreets = e.target.checked; saveSettings(); applyStreets(); };
@@ -788,14 +794,14 @@ async function nomiImportant(text, c) {
     });
   } catch (e) { return []; }
 }
-async function geoSearch(text, c) {
-  const imp = nomiImportant(text, c);
-  const base = await geoSearchBase(text, c).catch(() => []);
+async function geoSearch(text, c, full) {
+  const imp = full ? nomiImportant(text, c) : Promise.resolve([]);
+  const base = await geoSearchBase(text, c, full).catch(() => []);
   const top = await imp;
   if (!top.length) return base;
   return top.concat(base.filter((b) => !top.some((t) => dist(t, b) < 150))).slice(0, 8);
 }
-async function geoSearchBase(text, c) {
+async function geoSearchBase(text, c, full) {
   if (Date.now() > GEO.photonOffUntil) {
     try {
       const params = new URLSearchParams({ q: text, limit: '7', lang: (/^(fr|de|it)$/.test(I18N.lang) ? I18N.lang : 'en'), lat: c.lat.toFixed(4), lon: c.lon.toFixed(4) });
@@ -809,6 +815,7 @@ async function geoSearchBase(text, c) {
       });
     } catch (e) { GEO.photonOffUntil = Date.now() + 10 * 60000; }
   }
+  if (!full) return [];
   const vb = [c.lon - 1.5, c.lat + 1, c.lon + 1.5, c.lat - 1].map((x) => x.toFixed(3)).join(',');
   const j = await fetchJson(NOMI + '/search?format=jsonv2&addressdetails=1&limit=7&accept-language=' + I18N.lang + '&viewbox=' + vb + '&q=' + encodeURIComponent(text), 7000);
   return j.map((x) => {
@@ -833,11 +840,11 @@ async function geoReverse(p) {
     return { street: a.road, housenumber: a.house_number, city: a.city || a.town || a.village, cc: (a.country_code || '').toUpperCase() };
   } catch (e) { return null; }
 }
-const runSearch = debounce(async (text) => {
+const runSearch = debounce(async (text, full) => {
   if (text.length < 3) { showRecents(); return; }
   try {
     const c = S.pos || (() => { const m = map.getCenter(); return { lat: m.lat, lon: m.lng }; })();
-    const items = await geoSearch(text, c);
+    const items = await geoSearch(text, c, full);
     const ack = /(informati|ordinateur|ordi\b|\bpc\b|\bmac\b|macbook|laptop|portable|computer|r[ée]paration|d[ée]pann|ackfix|bilgisayar|tamir)/i.test(text) && inVaud(c) ? [{ name: 'ACKFIX', sub: 'Dépannage PC et Mac · tout le Canton de Vaud', ackfix: true, nodist: true }] : [];
     const spotHits = [...S.spots.values()].filter((s) => s.name.toLowerCase().includes(text.toLowerCase())).slice(0, 3).map((s) => ({ name: s.name, sub: 'Spot · ' + (SPOT_CATS[s.category] || ''), lat: s.lat, lon: s.lon, spot: true }));
     showResults(ack.concat(spotHits, items));
@@ -891,7 +898,7 @@ function saveSlot(k, p) {
 }
 q.addEventListener('input', () => { $('qclear').hidden = !q.value; runSearch(q.value.trim()); });
 q.addEventListener('focus', () => { if (!q.value) showRecents(); });
-q.addEventListener('keydown', (e) => { if (e.key === 'Escape') exitSearch(); });
+q.addEventListener('keydown', (e) => { if (e.key === 'Escape') exitSearch(); if (e.key === 'Enter') { e.preventDefault(); runSearch(q.value.trim(), true); } });
 $('qclear').onclick = () => { q.value = ''; $('qclear').hidden = true; hideResults(); q.focus(); };
 map.on('click', (e) => { if (document.body.classList.contains('searching')) { e._routaDone = true; exitSearch(); } });
 
@@ -1492,7 +1499,7 @@ function openPoi(p, kind) {
   }
   if (RATED[kind]) {
     html += '<h3>Avis des testeurs</h3>' + (p.rating != null ? '<div class="row"><span class="stars-big">' + starsTxt(p.rating) + '</span><span class="muted">' + p.ratingCount + ' avis</span></div>' : '') +
-      ((p.reviews && p.reviews.length) ? p.reviews.slice().sort((x, y) => Date.parse(y.created_at) - Date.parse(x.created_at)).slice(0, 8).map((r) => '<div class="card"><div class="grow"><b>' + '★'.repeat(r.stars) + '<span class="muted">' + '★'.repeat(5 - r.stars) + '</span></b>' + (r.comment ? '<div>' + esc(r.comment) + '</div>' : '') + '<div class="sub">' + esc(r.pseudo || 'Testeur') + ' · ' + ago(r.created_at) + '</div></div></div>').join('') : '<div class="empty">Pas encore d\'avis. Donne le tien !</div>') +
+      ((p.reviews && p.reviews.length) ? p.reviews.slice().sort((x, y) => Date.parse(y.created_at) - Date.parse(x.created_at)).slice(0, 8).map((r) => '<div class="card"><div class="grow"><b>' + '★'.repeat(r.stars) + '<span class="muted">' + '★'.repeat(5 - r.stars) + '</span></b>' + (ctrlSafe(r.comment) ? '<div>' + esc(r.comment) + '</div>' : '') + '<div class="sub">' + esc(r.pseudo || 'Testeur') + ' · ' + ago(r.created_at) + '</div></div></div>').join('') : '<div class="empty">Pas encore d\'avis. Donne le tien !</div>') +
       '<button class="btn soft block" id="poiRate">' + ic('star') + 'Noter cet endroit</button>';
   }
   html += '<button class="btn block" id="poiGo">' + ic('nav') + 'Y aller</button>';
@@ -1704,6 +1711,7 @@ function openRateForm(p, kind) {
   body.querySelectorAll('#starPick button').forEach((b) => { b.onclick = () => { stars = +b.dataset.n; paint(); }; });
   body.querySelector('#rateSend').onclick = async () => {
     if (!stars) { toast('Choisis une note de 1 à 5 étoiles.'); return; }
+    if (ctrlBlocked($('rateTxt').value)) { toast('Pas de mention de contrôles de police ou de radars : c\'est interdit en Suisse.'); return; }
     const ok = await DB.rate({ place_id: p.id, place_name: p.name, kind, stars, comment: $('rateTxt').value.trim() || null, created_by: S.me.id, pseudo: S.me.pseudo, created_at: new Date().toISOString() });
     if (ok) {
       toast('Merci ! Ta note est enregistrée.');
@@ -1752,9 +1760,10 @@ async function alongRoute(R, kind) {
 function openReport(at) {
   let type = null;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const moving = (S.speed || 0) * 3.6 > 15;
   const body = openSheet('Que se passe-t-il ?',
+    (moving ? '<div class="banner proto">' + ic('info') + '<span>Au volant, ne touche pas ton téléphone : demande à un passager, utilise le micro ou arrête-toi.</span></div>' : '') +
     '<div class="grid4">' + Object.keys(ALERT_TYPES).map((k) => '<button class="typebtn" data-t="' + k + '">' + ic(k) + esc(ALERT_TYPES[k].label) + '</button>').join('') + '</div>' +
-    '<label class="field" for="repComment">Précision (facultatif)<input id="repComment" type="text" maxlength="120" placeholder="Ex. : pneu sur la voie de droite"></label>' +
     '<button class="btn block" id="repSend" disabled>Choisis un type</button>' +
     (at ? '' : '<button class="btn ghost" id="repPlace">Placer sur la carte plutôt qu\'à ma position</button>'), 'report');
   body.querySelectorAll('.typebtn').forEach((b) => {
@@ -1768,16 +1777,16 @@ function openReport(at) {
   const send = async (where) => {
     if (!type) return;
     const p = where || at || S.pos;
-    if (!p) { toast("Position inconnue : place l'alerte sur la carte."); placePoint('Où est le problème ?', (pt) => sendAlert(type, pt, '')); return; }
+    if (!p) { toast("Position inconnue : place l'alerte sur la carte."); placePoint('Où est le problème ?', (pt) => sendAlert(type, pt)); return; }
     closeSheet();
-    sendAlert(type, p, ($('repComment') && $('repComment').value) || '');
+    sendAlert(type, p);
   };
   $('repSend').onclick = () => send();
-  const pl = $('repPlace'); if (pl) pl.onclick = () => { if (!type) { toast("Choisis d'abord le type d'alerte."); return; } const t = type, cm = $('repComment').value; placePoint('Où est le problème ?', (pt) => sendAlert(t, pt, cm)); };
+  const pl = $('repPlace'); if (pl) pl.onclick = () => { if (!type) { toast("Choisis d'abord le type d'alerte."); return; } const t = type; placePoint('Où est le problème ?', (pt) => sendAlert(t, pt)); };
   const vb = $('repVoice'); if (vb) vb.onclick = () => voiceReport(SR, at);
 }
-async function sendAlert(type, p, comment) {
-  const a = { id: uuid(), type, lat: p.lat, lon: p.lon, comment: comment || null, created_by: S.me.id, created_name: S.me.pseudo, confirms: 1, denies: 0, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + (type === 'travaux' ? 24 : 2) * 3600000).toISOString() };
+async function sendAlert(type, p) {
+  const a = { id: uuid(), type, lat: p.lat, lon: p.lon, comment: null, created_by: S.me.id, created_name: S.me.pseudo, confirms: 1, denies: 0, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + (type === 'travaux' ? 24 : 2) * 3600000).toISOString() };
   S.prompted.add(a.id);
   if (await DB.addAlert(a)) { vibrate(30); toast('Alerte envoyée : <b>' + esc(ALERT_TYPES[type].label) + '</b>. Merci !'); }
 }
@@ -1788,7 +1797,7 @@ function voiceReport(SR, at) {
     const text = [...e.results[0]].map((r) => r.transcript.toLowerCase()).join(' ');
     const rules = [['contresens', /contresens|contre-sens|sens interdit/], ['feu', /feu|signalisation|tricolore/], ['brouillard', /brouillard|visibilit/], ['fermee', /ferm[ée]|barr[ée]|bloqu[ée]/], ['accident', /accident|carambolage|collision/], ['bouchon', /bouchon|embouteillage|trafic|ralenti/], ['travaux', /travaux|chantier/], ['trou', /trou|nid/], ['arret', /arr[êe]t|panne|stationn/], ['glissant', /glissant|verglas|neige|pluie|huile|gravier/], ['animal', /animal|chevreuil|cerf|vache|chien|renard|sanglier/], ['objet', /objet|pneu|d[ée]bris|carton|pierre|caillou|chute/]];
     const hit = rules.find(([, re]) => re.test(text));
-    if (hit) { closeSheet(); sendAlert(hit[0], at || S.pos, text); say('Alerte ' + ALERT_TYPES[hit[0]].say + ' envoyée'); }
+    if (hit) { closeSheet(); sendAlert(hit[0], at || S.pos); say('Alerte ' + ALERT_TYPES[hit[0]].say + ' envoyée'); }
     else { toast('Je n’ai pas compris « ' + esc(text) + ' ». Choisis le type dans la liste.'); $('repVoice').innerHTML = ic('mic') + 'Dire à voix haute'; }
   };
   rec.onerror = () => { toast('Micro indisponible. Choisis le type dans la liste.'); const v = $('repVoice'); if (v) v.innerHTML = ic('mic') + 'Dire à voix haute'; };
@@ -1802,7 +1811,6 @@ function openAlert(id) {
   const mine = a.created_by === S.me.id;
   const body = openSheet(t.label,
     '<div class="row wrap"><span class="pill warn">Signalé ' + ago(a.created_at) + '</span><span class="pill ok">Confirmé ' + (a.confirms || 1) + ' fois</span>' + ((a.denies || 0) ? '<span class="pill">Plus là : ' + a.denies + '</span>' : '') + (S.pos ? '<span class="pill">' + fmtDist(dist(S.pos, a)) + '</span>' : '') + '</div>' +
-    (a.comment ? '<p>« ' + esc(a.comment) + ' »</p>' : '') +
     (a.created_name ? '<p class="muted small">Par ' + esc(a.created_name) + '</p>' : '') +
     '<div class="row"><button class="btn grow" id="aYes">Toujours là</button><button class="btn ghost grow" id="aNo">Plus là</button></div>' +
     (mine ? '<button class="btn danger" id="aDel">' + ic('trash') + 'Supprimer mon alerte</button>' : ''), 'alert');
@@ -1913,7 +1921,7 @@ function openSpot(id) {
   const mine = s.created_by === S.me.id;
   const body = openSheet(s.name,
     '<div class="row wrap"><span class="pill">' + esc(SPOT_CATS[s.category] || 'Spot') + '</span>' + (S.pos ? '<span class="pill">' + fmtDist(dist(S.pos, s)) + '</span>' : '') + (s.created_name ? '<span class="pill">Ajouté par ' + esc(s.created_name) + '</span>' : '') + '</div>' +
-    (s.description ? '<p>' + esc(s.description) + '</p>' : '') +
+    (ctrlSafe(s.description) ? '<p>' + esc(s.description) + '</p>' : '') +
     '<button class="btn block" id="spGo">' + ic('nav') + 'Y aller</button>' +
     '<button class="btn soft block" id="spShow">Voir sur la carte</button>' +
     (mine ? '<button class="btn danger" id="spDel">' + ic('trash') + 'Supprimer ce spot</button>' : ''), 'spot');
@@ -1930,7 +1938,7 @@ function openAddSpot(at) {
     '<label class="field" for="spDesc">Description (facultatif)<textarea id="spDesc" maxlength="200" placeholder="Pourquoi y aller, meilleur moment…"></textarea></label>' +
     (at ? '<button class="btn block" id="spSave">Enregistrer le spot</button>' : '<div class="row"><button class="btn soft grow" id="spHere"' + (S.pos ? '' : ' disabled') + '>À ma position</button><button class="btn grow" id="spPlace">Choisir sur la carte</button></div>'), 'addspot');
   body.querySelectorAll('#spCat button').forEach((b) => { b.onclick = () => { cat = b.dataset.c; body.querySelectorAll('#spCat button').forEach((x) => x.classList.toggle('on', x === b)); }; });
-  const collect = () => { const name = $('spName').value.trim(); if (name.length < 2) { toast('Donne un nom au spot.'); return null; } return { name, desc: $('spDesc').value.trim() }; };
+  const collect = () => { const name = $('spName').value.trim(); if (name.length < 2) { toast('Donne un nom au spot.'); return null; } if (ctrlBlocked(name, $('spDesc').value)) { toast('Pas de mention de contrôles de police ou de radars : c\'est interdit en Suisse.'); return null; } return { name, desc: $('spDesc').value.trim() }; };
   const save = async (p, f) => {
     const s = { id: uuid(), name: f.name, description: f.desc || null, category: cat, lat: p.lat, lon: p.lon, created_by: S.me.id, created_name: S.me.pseudo, created_at: new Date().toISOString() };
     if (await DB.addSpot(s)) toast('Spot ajouté : <b>' + esc(s.name) + '</b>');
@@ -2290,6 +2298,7 @@ function profileForm(isNew) {
       return () => {
         const name = $('pfName').value.trim();
         if (name.length < 2) { toast('Choisis un pseudo d\'au moins 2 caractères.'); return false; }
+        if (ctrlBlocked(name, $('pfCar').value)) { toast('Pas de mention de contrôles de police ou de radars : c\'est interdit en Suisse.'); return false; }
         S.me.pseudo = name; S.me.car = $('pfCar').value.trim(); S.me.color = color;
         saveMe(); updateVisChip(); setAvatar();
         pushPresence(true);
@@ -2316,7 +2325,9 @@ function openProfile() {
     '<label class="switch" for="stAlert"><span>Alerte vocale si je dépasse la limite</span><input id="stAlert" type="checkbox"' + (S.settings.speedAlert ? ' checked' : '') + '></label>' +
     '<label class="field" for="stNight">Mode nuit de la carte<select id="stNight"><option value="auto"' + (S.settings.night === 'auto' ? ' selected' : '') + '>Automatique (19 h – 7 h)</option><option value="on"' + (S.settings.night === 'on' ? ' selected' : '') + '>Toujours</option><option value="off"' + (S.settings.night === 'off' ? ' selected' : '') + '>Jamais</option></select></label>' +
     '<div class="banner">' + ic('info') + '<span>' + (S.online ? 'Mode en ligne : alertes, spots, conducteurs et messages partagés.' : 'Mode solo : tes alertes et spots restent sur ce téléphone.') + ' Version ' + VERSION + '. Carte © OpenStreetMap, OpenFreeMap. Itinéraires OSRM et Valhalla. Recherche Photon.</span></div>' +
-    '<button class="btn ghost" id="pfReset">Réinitialiser mon profil sur ce téléphone</button>', 'profile');
+    '<button class="btn ghost" id="pfReset">Réinitialiser mon profil sur ce téléphone</button>' +
+    '<button class="btn danger block" id="pfWipe">Supprimer mes données</button>' +
+    '<p class="muted small"><a href="confidentialite.html" style="color:var(--info)">Confidentialité et règles d\'utilisation</a></p>', 'profile');
   const save = f.bind(body);
   body.querySelector('#pfSave').onclick = () => { if (save()) { toast('Profil enregistré.'); closeSheet(); } };
   body.querySelector('#pfFeedback').onclick = () => openFeedback();
@@ -2344,6 +2355,23 @@ function openProfile() {
     if (b.dataset.confirm) { try { localStorage.removeItem('routa.me'); } catch (e2) { /* */ } location.reload(); }
     else { b.dataset.confirm = '1'; b.textContent = 'Touche encore pour confirmer (ton code ami changera)'; }
   };
+  body.querySelector('#pfWipe').onclick = async () => {
+    const b = body.querySelector('#pfWipe');
+    if (!b.dataset.confirm) { b.dataset.confirm = '1'; b.textContent = 'Touche encore pour tout effacer (définitif)'; return; }
+    b.disabled = true; b.textContent = 'Suppression…';
+    await wipeMyData();
+  };
+}
+async function wipeMyData() {
+  const id = S.me && S.me.id;
+  if (DB.sb && id) {
+    const jobs = [['alerts', 'created_by'], ['spots', 'created_by'], ['place_ratings', 'created_by'], ['fuel_prices', 'created_by'], ['event_rsvp', 'driver_id'], ['events', 'created_by'], ['messages', 'from_id'], ['messages', 'to_id'], ['drivers', 'id']];
+    for (const [t, c] of jobs) { try { await DB.sb.from(t).delete().eq(c, id); } catch (e) { /* */ } }
+    try { await DB.sb.from('drivers').upsert({ id, code: null, pseudo: '', car: null, visibility: 'invisible', friends: [], lat: null, lon: null, heading: null, speed: null, updated_at: new Date(0).toISOString() }); await DB.sb.from('drivers').delete().eq('id', id); } catch (e) { /* */ }
+  }
+  try { Object.keys(localStorage).filter((k) => /^routa\./.test(k) && k !== 'routa.lang').forEach((k) => localStorage.removeItem(k)); } catch (e) { /* */ }
+  toast('Tes données ont été supprimées.');
+  setTimeout(() => location.reload(), 1200);
 }
 function onboarding() {
   S.me = { id: uuid(), code: makeCode(), pseudo: '', car: '', color: COLORS[Math.floor(Math.random() * COLORS.length)], vis: 'tous', friends: [] };
@@ -2379,6 +2407,7 @@ function openK(k) {
     else if (k === 'profile') openProfile();
     else if (k === 'share') shareApp();
     else if (k === 'help') location.href = 'aide.html';
+    else if (k === 'privacy') location.href = 'confidentialite.html';
     else if (window.ROUTA_X && ROUTA_X.open && ROUTA_X.open(k)) { /* nouveautés */ }
     else openPoiList(k);
 }
@@ -2421,7 +2450,7 @@ function openMenu() {
     '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     '<button class="card tap menusos" data-k="country"><span class="sosdot big">SOS</span><span class="grow"><b>Urgences et infos pays</b><span class="sub">' + ($('ctryLabel').textContent === 'Infos pays' ? 'Numéros d\'urgence, règles, vignettes' : esc($('ctryLabel').textContent)) + '</span></span></button>' +
     groups.map(([g, ts]) => { const list = ts.filter(Boolean); return '<h3 class="menuh">' + g + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
-    '<div class="menulinks">' + (X.canInstall && X.canInstall() ? '<button data-k="install">Installer l\'app</button>' : '') + '<button data-k="share">Partager ROUTA</button><button data-k="feedback">Mon avis</button><button data-k="help">Aide</button></div>' +
+    '<div class="menulinks">' + (X.canInstall && X.canInstall() ? '<button data-k="install">Installer l\'app</button>' : '') + '<button data-k="share">Partager ROUTA</button><button data-k="feedback">Mon avis</button><button data-k="help">Aide</button><button data-k="privacy">Confidentialité</button></div>' +
     '<a class="menusig" href="https://ackfix.com" target="_blank" rel="noopener">ROUTA par <b>ACKFIX</b> · Informatique, simplement.<br><span>Dépannage PC et Mac dans tout le Canton de Vaud</span></a>' +
     langSeg(), 'menu');
   body.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => openK(b.dataset.k); });
