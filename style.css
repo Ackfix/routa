@@ -388,3 +388,9 @@ body.night .speedbox.over .speedunit{color:#fff}
 .menusig b{color:var(--fg);letter-spacing:.04em}
 .menusig span{font-size:11px}
 .ackico{flex:none;width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,#FFC93C,#FF8A3D);color:#0E1116;font:800 13px var(--display);display:inline-grid;place-items:center}
+
+/* Version web (Safari et signet) : la carte passe sous les barres, plus de bandes noires. L'app installée n'est pas concernée. */
+html.web, html.web body { background: #F8F4F0; }
+html.web.night-bg, html.web.night-bg body { background: #26282C; }
+html.web #map { bottom: auto; height: 100lvh; }
+html.web.pwa #map { height: calc(100lvh + var(--sab)); }
