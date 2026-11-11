@@ -517,6 +517,20 @@ setInterval(applyNight, 60000);
 
 function el(html) { const d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstChild; }
 
+/* Cap lissé : un relevé isolé qui part dans tous les sens est ignoré (vue de côté) */
+function smoothHeading(old, nw) {
+  if (old == null || isNaN(old)) { S.hdJump = 0; return nw; }
+  const d = ((nw - old + 540) % 360) - 180;
+  if (Math.abs(d) > 100) { S.hdJump = (S.hdJump || 0) + 1; if (S.hdJump < 2) return old; }
+  S.hdJump = 0;
+  return (old + d * 0.55 + 360) % 360;
+}
+/* En navigation : position et direction calées sur la route (comme Waze ou Google Maps) */
+function myView() {
+  const N = S.nav;
+  if (N && N.snap && Date.now() - N.snap.t < 4000) return { lat: N.snap.lat, lon: N.snap.lon, heading: N.snap.heading };
+  return { lat: S.pos.lat, lon: S.pos.lon, heading: S.heading };
+}
 /* Mon marqueur */
 function renderMe() {
   if (!S.pos) return;
@@ -524,7 +538,8 @@ function renderMe() {
     const e = el('<div class="mk-me"><i>' + '<svg aria-hidden="true" viewBox="0 0 24 24">' + P.nav + '</svg></i></div>');
     S.markers.me = new maplibregl.Marker({ element: e, rotationAlignment: 'map', pitchAlignment: 'map' }).setLngLat([S.pos.lon, S.pos.lat]).addTo(map);
   }
-  S.markers.me.setLngLat([S.pos.lon, S.pos.lat]).setRotation(S.heading || 0);
+  const v = myView();
+  S.markers.me.setLngLat([v.lon, v.lat]).setRotation(v.heading || 0);
 }
 
 /* Conducteurs */
@@ -624,8 +639,10 @@ function startGps() {
     const raw = (c.speed != null && c.speed >= 0) ? c.speed : (S.pos ? estSpeed(S.pos, now) : null);
     S.speed = raw == null ? null : (S.speed == null ? raw : S.speed * 0.35 + raw * 0.65);
     if (S.speed != null && S.speed < 1.7) S.speed = 0;
-    if (c.heading != null && !isNaN(c.heading) && (S.speed || 0) > 1.5) S.heading = c.heading;
-    else if (S.pos && dist(S.pos, now) > 8) S.heading = bearing(S.pos, now);
+    let hd = null;
+    if (c.heading != null && !isNaN(c.heading) && c.heading >= 0 && (S.speed || 0) > 2.5) hd = c.heading;
+    else if (S.pos && (S.speed || 0) > 2.5 && dist(S.pos, now) > Math.max(12, c.accuracy || 10)) hd = bearing(S.pos, now);
+    if (hd != null) S.heading = smoothHeading(S.heading, hd);
     S.prevPos = S.pos; S.pos = now;
     renderMe();
     updateSpeed();
@@ -633,7 +650,7 @@ function startGps() {
     countryTick(false);
     if (first) { first = false; map.jumpTo({ center: [now.lon, now.lat], zoom: 14.5 }); pushPresence(true); }
     else if (S.follow) followCam();
-    else if (S.nav && Date.now() - (S.lastTouch || 0) > 12000) { S.follow = true; $('btnLocate').classList.add('active'); followCam(); }
+    else if ((S.nav || (S.speed || 0) * 3.6 > 25) && Date.now() - (S.lastTouch || 0) > 12000) { S.follow = true; $('btnLocate').classList.add('active'); followCam(); }
     if (S.nav) navUpdate();
     checkNearAlerts();
     pushPresence(false);
@@ -696,16 +713,18 @@ function followCam() {
   const kmh = (S.speed || 0) * 3.6;
   if (kmh >= 12) { S.moving = true; S.slowSince = 0; }
   else if (kmh < 10) { if (!S.slowSince) S.slowSince = nowT; if (nowT - S.slowSince > 4000) S.moving = false; }
-  const moving = !!S.moving;
+  const moving = !!S.moving || !!S.nav;
   const zoom = kmh < 30 ? 17.3 : kmh < 55 ? 16.5 : kmh < 90 ? 15.7 : 15;
   const north = S.settings.navNorth;
   const pitch = moving ? (north ? 30 : 58) : 0;
-  const bearing = north ? 0 : (moving && S.heading != null ? S.heading : map.getBearing());
+  const v = myView();
+  const live = S.moving || (S.nav && S.nav.snap);
+  const bearing = north ? 0 : (live && v.heading != null ? v.heading : map.getBearing());
   const off = moving ? Math.round(window.innerHeight * 0.28) : 0;
   const c = map.getCenter(), lc = S.lastCam;
-  if (!moving && lc && !lc.moving && Math.abs(map.getPitch() - pitch) < 1 && Math.abs(map.getZoom() - zoom) < 0.05 && dist({ lat: c.lat, lon: c.lng }, S.pos) < 3) return;
+  if (!moving && lc && !lc.moving && Math.abs(map.getPitch() - pitch) < 1 && Math.abs(map.getZoom() - zoom) < 0.05 && dist({ lat: c.lat, lon: c.lng }, v) < 3) return;
   S.lastCam = { moving };
-  map.easeTo({ center: [S.pos.lon, S.pos.lat], bearing, pitch, zoom, duration: 1000, easing: (t) => t, offset: [0, off], essential: true });
+  map.easeTo({ center: [v.lon, v.lat], bearing, pitch, zoom, duration: 1000, easing: (t) => t, offset: [0, off], essential: true });
 }
 setInterval(() => { if (S.follow && S.pos && !document.hidden) followCam(); }, 1500);
 
@@ -1174,6 +1193,15 @@ $('btnMute').onclick = () => {
   toast(S.settings.voice ? 'Voix activée.' : 'Voix coupée.');
 };
 
+function pointAt(R, along) {
+  const c = R.cum, n = R.coords.length;
+  if (along <= 0) return R.coords[0];
+  if (along >= c[n - 1]) return R.coords[n - 1];
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (c[m] <= along) lo = m; else hi = m; }
+  const t = (along - c[lo]) / ((c[hi] - c[lo]) || 1), A = R.coords[lo], B = R.coords[hi];
+  return { lat: A.lat + (B.lat - A.lat) * t, lon: A.lon + (B.lon - A.lon) * t };
+}
 function project(R, p, from, to) {
   const lat0 = toRad(p.lat), kx = Math.cos(lat0) * 111320, ky = 110540;
   let best = { d: Infinity, along: 0, seg: 0 };
@@ -1200,6 +1228,11 @@ function navUpdate() {
     if (N.offCount >= 3 && Date.now() - N.lastReroute > 12000) { reroute(); return; }
   } else N.offCount = 0;
   N.along = pr.along; N.seg = pr.seg;
+  if (pr.d < 30 && (S.acc || 0) < 60) {
+    const P0 = pointAt(R, N.along), P1 = pointAt(R, N.along + 40);
+    N.snap = { lat: P0.lat, lon: P0.lon, heading: dist(P0, P1) > 5 ? bearing(P0, P1) : S.heading, t: Date.now() };
+  } else N.snap = null;
+  renderMe();
   drawRoute(R, pr.seg);
 
   const remaining = Math.max(0, R.total - N.along);
