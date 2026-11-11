@@ -394,3 +394,8 @@ html.web, html.web body { background: #F8F4F0; }
 html.web.night-bg, html.web.night-bg body { background: #26282C; }
 html.web #map { bottom: auto; height: 100lvh; }
 html.web.pwa #map { height: calc(100lvh + var(--sab)); }
+
+/* Danger signalé sur ma route : petit bandeau discret */
+.hazchip { position: fixed; z-index: 24; left: 50%; transform: translateX(-50%); top: calc(var(--sat) + 132px); display: inline-flex; align-items: center; gap: 8px; max-width: calc(100% - 32px); padding: 7px 14px; border-radius: 999px; background: rgba(20,23,29,.88); color: #F4F6FA; font-size: 13px; font-weight: 600; box-shadow: 0 6px 18px rgba(0,0,0,.35); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hazchip .hzdot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--alert); }
+body:not(.navigating) .hazchip, #alertNear:not([hidden]) ~ .hazchip { display: none; }
