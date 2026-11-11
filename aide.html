@@ -38,18 +38,18 @@ a { color: var(--info); }
 a:focus-visible, summary:focus-visible { outline: 3px solid var(--info); outline-offset: 2px; }
 </style>
 <style>
-.lang { display: none; } html[data-l="fr"] .lang.fr, html[data-l="en"] .lang.en, html[data-l="tr"] .lang.tr { display: block; }
-.langbar { display: flex; gap: 6px; margin: 16px 0 0; } .langbar button { height: 36px; padding: 0 14px; border-radius: 18px; border: 0; background: var(--card); color: var(--fg); font: 600 14px Inter, sans-serif; }
+.lang { display: none; } html[data-l="fr"] .lang.fr, html[data-l="en"] .lang.en, html[data-l="tr"] .lang.tr, html[data-l="de"] .lang.de, html[data-l="it"] .lang.it, html[data-l="pt"] .lang.pt, html[data-l="es"] .lang.es, html[data-l="sq"] .lang.sq, html[data-l="sr"] .lang.sr { display: block; }
+.langbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; } .langbar button { height: 36px; padding: 0 14px; border-radius: 18px; border: 0; background: var(--card); color: var(--fg); font: 600 14px Inter, sans-serif; }
 .langbar button.on { background: var(--accent); color: #0E1116; }
 </style>
 <script>
-(function () { var l = 'fr'; try { l = localStorage.getItem('routa.lang') || ''; } catch (e) {} if (!/^(fr|en|tr)$/.test(l)) { var n = (navigator.language || 'fr').slice(0, 2); l = n === 'tr' ? 'tr' : n === 'en' ? 'en' : 'fr'; } document.documentElement.setAttribute('data-l', l); document.documentElement.lang = l; })();
+(function () { var l = 'fr'; try { l = localStorage.getItem('routa.lang') || ''; } catch (e) {} if (!/^(fr|en|tr|de|it|pt|es|sq|sr)$/.test(l)) { var n = (navigator.language || 'fr').slice(0, 2).toLowerCase(); if (/^(hr|bs|sh|me)$/.test(n)) n = 'sr'; l = /^(en|tr|de|it|pt|es|sq|sr)$/.test(n) ? n : 'fr'; } document.documentElement.setAttribute('data-l', l); document.documentElement.lang = l; })();
 function setL(l) { try { localStorage.setItem('routa.lang', l); } catch (e) {} document.documentElement.setAttribute('data-l', l); document.documentElement.lang = l; document.querySelectorAll('.langbar button').forEach(function (b) { b.classList.toggle('on', b.dataset.l === l); }); }
 </script>
 </head>
 <body>
 <main>
-<div class="langbar"><button data-l="fr" onclick="setL('fr')">Français</button><button data-l="en" onclick="setL('en')">English</button><button data-l="tr" onclick="setL('tr')">Türkçe</button></div>
+<div class="langbar"><button data-l="fr" onclick="setL('fr')">Français</button><button data-l="en" onclick="setL('en')">English</button><button data-l="de" onclick="setL('de')">Deutsch</button><button data-l="it" onclick="setL('it')">Italiano</button><button data-l="pt" onclick="setL('pt')">Português</button><button data-l="es" onclick="setL('es')">Español</button><button data-l="sq" onclick="setL('sq')">Shqip</button><button data-l="sr" onclick="setL('sr')">Srpski</button><button data-l="tr" onclick="setL('tr')">Türkçe</button></div>
 
 <div class="lang fr">
 <a class="back" href="./">‹ Retour à la carte</a>
@@ -71,10 +71,10 @@ function setL(l) { try { localStorage.setItem('routa.lang', l); } catch (e) {} d
 <section class="card"><ul>
 <li><b>Rond en haut à gauche</b> : le menu (profil, communauté, ta voiture, réglages, langue).</li>
 <li><b>Vitesse</b> en bas à gauche, avec la <b>limite de vitesse</b> au-dessus (indicative : seuls les panneaux font foi).</li>
-<li><b>Loupe</b> : chercher une adresse, aller à Domicile ou Travail, voir Favoris, Essence, Restos, Parking, Spots.</li>
+<li><b>Loupe</b> : chercher une adresse, aller à Domicile ou Travail, voir Favoris, Essence, Restos, Parking, Hôpitaux, Pharmacies, WC, Spots.</li>
 <li><b>Bouton jaune +</b> : signaler un accident, un bouchon, des travaux, un feu hors service, un contresens…</li>
-<li><b>Calques</b> : plan ou satellite, trafic en direct, mode nuit.</li>
-<li><b>Toucher la carte</b> pose un repère ; toucher une zone vide referme ce qui est ouvert.</li>
+<li><b>Calques</b> : plan ou satellite, trafic en direct, arrêts, noms des rues, mode nuit.</li>
+<li><b>Un appui prolongé sur la carte</b> pose un repère ; toucher une zone vide referme ce qui est ouvert.</li>
 </ul></section>
 <h2>Naviguer</h2>
 <section class="card"><ul>
@@ -128,10 +128,10 @@ function setL(l) { try { localStorage.setItem('routa.lang', l); } catch (e) {} d
 <section class="card"><ul>
 <li><b>Circle at the top left</b>: the menu (profile, community, your car, settings, language).</li>
 <li><b>Speed</b> at the bottom left, with the <b>speed limit</b> above it (indicative: only road signs count).</li>
-<li><b>Magnifier</b>: search an address, go Home or to Work, see Favourites, Fuel, Food, Parking, Spots.</li>
+<li><b>Magnifier</b>: search an address, go Home or to Work, see Favourites, Fuel, Food, Parking, Hospitals, Pharmacies, WC, Spots.</li>
 <li><b>Yellow + button</b>: report an accident, traffic jam, roadworks, broken traffic light, wrong-way driver…</li>
-<li><b>Layers</b>: map or satellite, live traffic, night mode.</li>
-<li><b>Tap the map</b> to drop a pin; tap an empty area to close what's open.</li>
+<li><b>Layers</b>: map or satellite, live traffic, stops, street names, night mode.</li>
+<li><b>Long-press the map</b> to drop a pin; tap an empty area to close what's open.</li>
 </ul></section>
 <h2>Navigate</h2>
 <section class="card"><ul>
@@ -185,10 +185,10 @@ function setL(l) { try { localStorage.setItem('routa.lang', l); } catch (e) {} d
 <section class="card"><ul>
 <li><b>Sol üstteki daire</b>: menü (profil, topluluk, araban, ayarlar, dil).</li>
 <li>Sol altta <b>hız</b>, üstünde <b>hız sınırı</b> (bilgi amaçlı: yalnızca trafik levhaları geçerlidir).</li>
-<li><b>Büyüteç</b>: adres ara, Eve veya İşe git, Favoriler, Akaryakıt, Restoranlar, Otopark, Spotlar.</li>
+<li><b>Büyüteç</b>: adres ara, Eve veya İşe git, Favoriler, Akaryakıt, Restoranlar, Otopark, Hastaneler, Eczaneler, WC, Spotlar.</li>
 <li><b>Sarı + düğmesi</b>: kaza, trafik, yol çalışması, arızalı trafik ışığı, ters yönde araç bildir…</li>
-<li><b>Katmanlar</b>: harita veya uydu, canlı trafik, gece modu.</li>
-<li><b>Haritaya dokun</b> ve işaret koy; boş bir yere dokunmak açık olanı kapatır.</li>
+<li><b>Katmanlar</b>: harita veya uydu, canlı trafik, duraklar, sokak adları, gece modu.</li>
+<li><b>Haritaya uzun bas</b> ve işaret koy; boş bir yere dokunmak açık olanı kapatır.</li>
 </ul></section>
 <h2>Navigasyon</h2>
 <section class="card"><ul>
@@ -220,6 +220,348 @@ function setL(l) { try { localStorage.setItem('routa.lang', l); } catch (e) {} d
 <details><summary>Uygulama güncellenmiyor</summary><p>Tamamen kapat (uygulama değiştiricide yukarı kaydır) ve yeniden aç.</p></details>
 <h2>Hakkında</h2>
 <section class="card"><p><b>ROUTA, ACKFIX tarafından geliştirilmiştir</b> · Bilişim, basitçe.<br>Vaud Kantonu genelinde (İsviçre) PC ve Mac arıza giderme, onarım ve bakım, özel PC montajı. <a href="https://ackfix.com" target="_blank" rel="noopener">ackfix.com</a></p></section>
+</div>
+
+<div class="lang de">
+<a class="back" href="./">‹ Zurück zur Karte</a>
+<h1>ROUTA verwenden</h1>
+<p class="lead">Die App für Autofahrer: Navi mit Verkehr, Warnungen, Freunde auf der Karte, Konvois und Treffen.</p>
+<h2>Ein Prototyp im Test</h2>
+<section class="card">
+<p>ROUTA ist in der <b>Testphase</b>: Manches kann noch fehlerhaft sein. Melde alles, was nicht stimmt, und teile deine Ideen über <span class="key">Menü › Feedback</span>. Das dauert 30 Sekunden und dein Standort wird nie mit einem Feedback gesendet.</p>
+</section>
+<h2>App installieren</h2>
+<section class="card">
+<h3>iPhone</h3>
+<ol><li>Öffne den Link in <b>Safari</b>.</li><li>Tippe auf <b>Teilen</b> (Quadrat mit Pfeil), dann auf <b>Zum Home-Bildschirm</b> › <b>Hinzufügen</b>.</li><li>Öffne ROUTA über das neue Symbol und erlaube den Standortzugriff.</li></ol>
+<h3>Android</h3>
+<ol><li>Öffne den Link in <b>Chrome</b>.</li><li>Tippe auf das Menü <b>⋮</b> › <b>App installieren</b> (oder <b>Zum Startbildschirm hinzufügen</b>).</li><li>Erlaube den Standortzugriff beim ersten Start.</li></ol>
+<p class="tip">Für die neueste Version: Schliesse die App vollständig und öffne sie erneut.</p>
+</section>
+<h2>Der Hauptbildschirm</h2>
+<section class="card"><ul>
+<li><b>Kreis oben links</b>: das Menü (Profil, Community, dein Auto, Einstellungen, Sprache).</li>
+<li><b>Geschwindigkeit</b> unten links, darüber das <b>Tempolimit</b> (unverbindlich: Es gelten nur die Verkehrsschilder).</li>
+<li><b>Lupe</b>: Adresse suchen, nach Hause oder zur Arbeit, Favoriten, Tankstellen, Essen, Parkplätze, Spitäler, Apotheken, WC, Spots.</li>
+<li><b>Gelber +-Knopf</b>: Unfall, Stau, Baustelle, defekte Ampel, Falschfahrer… melden.</li>
+<li><b>Ebenen</b>: Karte oder Satellit, Live-Verkehr, Haltestellen, Strassennamen, Nachtmodus.</li>
+<li><b>Lange auf die Karte drücken</b>, um eine Markierung zu setzen; tippe auf eine leere Stelle, um Geöffnetes zu schliessen.</li>
+</ul></section>
+<h2>Navigieren</h2>
+<section class="card"><ul>
+<li>Wähle ein Ziel: ROUTA schlägt bis zu 3 Routen mit <b>Live-Verkehr</b> vor und kann Maut, Autobahnen oder Vignetten vermeiden.</li>
+<li>Das Wetter auf der Strecke und Staus werden vor der Abfahrt angezeigt.</li>
+<li>Während der Fahrt neigt sich die Karte und folgt der Strasse; beim Anhalten wird sie wieder flach.</li>
+<li>Die <b>Sprachansage</b> ist standardmässig aus: Schalte sie während der Navigation mit dem Lautsprecher-Knopf ein.</li>
+<li>Bei der Ankunft wird der Standort deines Autos gespeichert (Menü › Parkplatz).</li>
+</ul></section>
+<h2>Community</h2>
+<section class="card"><ul>
+<li><b>Freunde</b>: Tippe auf einen Fahrer auf der Karte › Als Freund hinzufügen, oder gib seinen Code ein. Dein Code steht in deinem Profil.</li>
+<li><b>Bumps</b>: ein kleiner Gruss, der das Handy der anderen Person vibrieren lässt (höchstens 3 pro 15 Minuten).</li>
+<li><b>Konvoi</b>: Gemeinsam fahren, alle sehen sich und das Ziel wird geteilt.</li>
+<li><b>Treffen</b>: Erstelle ein Treffen oder nimm teil, mit Erinnerung 1 Stunde vorher.</li>
+<li><b>Meinen Standort teilen</b>: Sende einen Link, damit dir jemand live folgen kann.</li>
+<li><b>Rangliste</b>: Sammle Punkte, indem du Warnungen, Spots und Preise meldest.</li>
+<li><b>Sichtbarkeit</b> (Profil): Unsichtbar, Meine Freunde oder Alle (ungefähre Zone für Unbekannte).</li>
+</ul></section>
+<h2>Mein Auto</h2>
+<section class="card"><ul>
+<li><b>Fahrzeug</b>: Auto, Elektro, Hybrid, Wohnmobil, Lastwagen… Routen und Verknüpfungen passen sich an.</li>
+<li><b>Wartungsheft</b>: MFK, Service, Reifen, Versicherung, Vignette, mit Erinnerungen, sowie Tankprotokoll.</li>
+<li><b>Parkplatz</b>: Wo dein Auto steht, Erinnerung vor Ablauf der Parkzeit, freie Plätze live.</li>
+</ul></section>
+<h2>Häufige Probleme</h2>
+<details><summary>Der Standort funktioniert nicht</summary><p>iPhone: Einstellungen › Datenschutz &amp; Sicherheit › Ortungsdienste › Safari (oder ROUTA) › Beim Verwenden der App, mit „Genauer Standort“ aktiviert. Android: Einstellungen › Apps › Chrome (oder ROUTA) › Berechtigungen › Standort. Schliesse die App danach und öffne sie erneut.</p></details>
+<details><summary>Ich höre die Stimme nicht</summary><p>Schalte die Sprachansage während der Navigation mit dem Lautsprecher-Knopf ein, erhöhe die Lautstärke und prüfe, dass der Stummmodus aus ist.</p></details>
+<details><summary>Die App aktualisiert sich nicht</summary><p>Schliesse sie vollständig (im App-Umschalter nach oben wischen) und öffne sie erneut.</p></details>
+<h2>Über ROUTA</h2>
+<section class="card"><p><b>ROUTA wird von ACKFIX entwickelt</b> · Informatik, einfach.<br>Fehlerbehebung, Reparatur und Wartung von PC und Mac, PCs nach Mass, im ganzen Kanton Waadt (Schweiz). <a href="https://ackfix.com" target="_blank" rel="noopener">ackfix.com</a></p></section>
+</div>
+
+<div class="lang it">
+<a class="back" href="./">‹ Torna alla mappa</a>
+<h1>Usare ROUTA</h1>
+<p class="lead">L'app per chi guida: navigatore con traffico, segnalazioni, amici sulla mappa, convogli e raduni.</p>
+<h2>Un prototipo in test</h2>
+<section class="card">
+<p>ROUTA è in <b>fase di test</b>: alcune cose potrebbero ancora non funzionare. Segnala tutto ciò che non va e proponi le tue idee con <span class="key">Menu › Il mio parere</span>. Ci vogliono 30 secondi e la tua posizione non viene mai inviata con un feedback.</p>
+</section>
+<h2>Installare l'app</h2>
+<section class="card">
+<h3>iPhone</h3>
+<ol><li>Apri il link in <b>Safari</b>.</li><li>Tocca <b>Condividi</b> (quadrato con una freccia), poi <b>Aggiungi alla schermata Home</b> › <b>Aggiungi</b>.</li><li>Apri ROUTA dalla nuova icona e consenti la posizione.</li></ol>
+<h3>Android</h3>
+<ol><li>Apri il link in <b>Chrome</b>.</li><li>Tocca il menu <b>⋮</b> › <b>Installa app</b> (o <b>Aggiungi a schermata Home</b>).</li><li>Consenti la posizione al primo avvio.</li></ol>
+<p class="tip">Per avere l'ultima versione: chiudi completamente l'app e riaprila.</p>
+</section>
+<h2>La schermata principale</h2>
+<section class="card"><ul>
+<li><b>Cerchio in alto a sinistra</b>: il menu (profilo, community, la tua auto, impostazioni, lingua).</li>
+<li><b>Velocità</b> in basso a sinistra, con il <b>limite di velocità</b> sopra (indicativo: valgono solo i cartelli).</li>
+<li><b>Lente</b>: cerca un indirizzo, vai a Casa o al Lavoro, vedi Preferiti, Carburante, Cibo, Parcheggi, Ospedali, Farmacie, WC, Spot.</li>
+<li><b>Pulsante giallo +</b>: segnala un incidente, una coda, dei lavori, un semaforo guasto, un'auto contromano…</li>
+<li><b>Livelli</b>: mappa o satellite, traffico in tempo reale, fermate, nomi delle vie, modalità notte.</li>
+<li><b>Tieni premuto sulla mappa</b> per mettere un segnaposto; tocca una zona vuota per chiudere ciò che è aperto.</li>
+</ul></section>
+<h2>Navigare</h2>
+<section class="card"><ul>
+<li>Scegli una destinazione: ROUTA propone fino a 3 percorsi con <b>traffico in tempo reale</b> e può evitare pedaggi, autostrade o vignette.</li>
+<li>Il meteo sul percorso e le code vengono mostrati prima della partenza.</li>
+<li>Durante la guida la mappa si inclina e segue la strada; quando ti fermi torna piatta.</li>
+<li>La <b>guida vocale</b> è disattivata di default: attivala con il pulsante altoparlante durante la navigazione.</li>
+<li>All'arrivo, la posizione della tua auto viene salvata (Menu › Parcheggio).</li>
+</ul></section>
+<h2>Community</h2>
+<section class="card"><ul>
+<li><b>Amici</b>: tocca un conducente sulla mappa › Aggiungi come amico, oppure inserisci il suo codice. Il tuo codice è nel tuo profilo.</li>
+<li><b>Bump</b>: un piccolo saluto che fa vibrare il telefono dell'altra persona (massimo 3 ogni 15 minuti).</li>
+<li><b>Convoglio</b>: guidate insieme, tutti si vedono e la destinazione è condivisa.</li>
+<li><b>Raduni</b>: crea o partecipa a un raduno, con promemoria 1 ora prima.</li>
+<li><b>Condividi la mia posizione</b>: invia un link perché qualcuno possa seguirti in tempo reale.</li>
+<li><b>Classifica</b>: guadagna punti segnalando avvisi, spot e prezzi.</li>
+<li><b>Visibilità</b> (profilo): Invisibile, I miei amici o Tutti (zona approssimativa per gli sconosciuti).</li>
+</ul></section>
+<h2>La mia auto</h2>
+<section class="card"><ul>
+<li><b>Veicolo</b>: auto, elettrica, ibrida, camper, camion… Percorsi e scorciatoie si adattano.</li>
+<li><b>Libretto di manutenzione</b>: collaudo, tagliando, pneumatici, assicurazione, vignetta, con promemoria, e registro dei rifornimenti.</li>
+<li><b>Parcheggio</b>: dove si trova la tua auto, promemoria di fine sosta, posti liberi in tempo reale.</li>
+</ul></section>
+<h2>Problemi frequenti</h2>
+<details><summary>La posizione non funziona</summary><p>iPhone: Impostazioni › Privacy e sicurezza › Localizzazione › Safari (o ROUTA) › Mentre usi l'app, con Posizione esatta attiva. Android: Impostazioni › App › Chrome (o ROUTA) › Autorizzazioni › Posizione. Poi chiudi e riapri l'app.</p></details>
+<details><summary>Non sento la voce</summary><p>Attiva la guida vocale con il pulsante altoparlante durante la navigazione, alza il volume e verifica che la modalità silenziosa sia disattivata.</p></details>
+<details><summary>L'app non si aggiorna</summary><p>Chiudila completamente (scorri verso l'alto nel selettore delle app) e riaprila.</p></details>
+<h2>Informazioni</h2>
+<section class="card"><p><b>ROUTA è sviluppata da ACKFIX</b> · Informatica, semplicemente.<br>Assistenza, riparazione e manutenzione di PC e Mac, PC su misura, in tutto il Canton Vaud (Svizzera). <a href="https://ackfix.com" target="_blank" rel="noopener">ackfix.com</a></p></section>
+</div>
+
+<div class="lang pt">
+<a class="back" href="./">‹ Voltar ao mapa</a>
+<h1>Usar o ROUTA</h1>
+<p class="lead">A app dos condutores: GPS com trânsito, alertas, amigos no mapa, comboios e encontros.</p>
+<h2>Um protótipo em teste</h2>
+<section class="card">
+<p>O ROUTA está em <b>fase de teste</b>: algumas coisas ainda podem falhar. Reporta tudo o que não estiver bem e partilha as tuas ideias em <span class="key">Menu › A minha opinião</span>. Demora 30 segundos e a tua localização nunca é enviada com um comentário.</p>
+</section>
+<h2>Instalar a app</h2>
+<section class="card">
+<h3>iPhone</h3>
+<ol><li>Abre o link no <b>Safari</b>.</li><li>Toca em <b>Partilhar</b> (quadrado com uma seta) e depois em <b>Adicionar ao ecrã principal</b> › <b>Adicionar</b>.</li><li>Abre o ROUTA a partir do novo ícone e permite a localização.</li></ol>
+<h3>Android</h3>
+<ol><li>Abre o link no <b>Chrome</b>.</li><li>Toca no menu <b>⋮</b> › <b>Instalar app</b> (ou <b>Adicionar ao ecrã principal</b>).</li><li>Permite a localização no primeiro arranque.</li></ol>
+<p class="tip">Para teres a versão mais recente: fecha a app por completo e volta a abri-la.</p>
+</section>
+<h2>O ecrã principal</h2>
+<section class="card"><ul>
+<li><b>Círculo no canto superior esquerdo</b>: o menu (perfil, comunidade, o teu carro, definições, idioma).</li>
+<li><b>Velocidade</b> no canto inferior esquerdo, com o <b>limite de velocidade</b> por cima (indicativo: só a sinalização conta).</li>
+<li><b>Lupa</b>: pesquisa uma morada, vai para Casa ou para o Trabalho, vê Favoritos, Combustível, Comida, Estacionamento, Hospitais, Farmácias, WC, Spots.</li>
+<li><b>Botão amarelo +</b>: reporta um acidente, um engarrafamento, obras, um semáforo avariado, um condutor em contramão…</li>
+<li><b>Camadas</b>: mapa ou satélite, trânsito em direto, paragens, nomes das ruas, modo noturno.</li>
+<li><b>Mantém o dedo no mapa</b> para colocar um marcador; toca numa zona vazia para fechar o que está aberto.</li>
+</ul></section>
+<h2>Navegar</h2>
+<section class="card"><ul>
+<li>Escolhe um destino: o ROUTA propõe até 3 percursos com <b>trânsito em direto</b> e pode evitar portagens, autoestradas ou vinhetas.</li>
+<li>A meteorologia no percurso e os engarrafamentos são mostrados antes de partir.</li>
+<li>Durante a condução, o mapa inclina-se e segue a estrada; quando paras, volta a ficar plano.</li>
+<li>A <b>orientação por voz</b> está desligada por defeito: liga-a com o botão do altifalante durante a navegação.</li>
+<li>À chegada, a localização do teu carro é guardada (Menu › Estacionamento).</li>
+</ul></section>
+<h2>Comunidade</h2>
+<section class="card"><ul>
+<li><b>Amigos</b>: toca num condutor no mapa › Adicionar como amigo, ou introduz o código dele. O teu código está no teu perfil.</li>
+<li><b>Bumps</b>: um pequeno olá que faz vibrar o telemóvel da outra pessoa (no máximo 3 a cada 15 minutos).</li>
+<li><b>Comboio</b>: conduzam juntos, todos se veem e o destino é partilhado.</li>
+<li><b>Encontros</b>: cria ou junta-te a um encontro, com lembrete 1 hora antes.</li>
+<li><b>Partilhar a minha localização</b>: envia um link para que alguém te possa seguir em direto.</li>
+<li><b>Ranking</b>: ganha pontos ao reportar alertas, spots e preços.</li>
+<li><b>Visibilidade</b> (perfil): Invisível, Os meus amigos ou Todos (zona aproximada para desconhecidos).</li>
+</ul></section>
+<h2>O meu carro</h2>
+<section class="card"><ul>
+<li><b>Veículo</b>: carro, elétrico, híbrido, autocaravana, camião… Os percursos e atalhos adaptam-se.</li>
+<li><b>Caderneta de manutenção</b>: inspeção, revisão, pneus, seguro, vinheta, com lembretes, e registo de abastecimentos.</li>
+<li><b>Estacionamento</b>: onde está o teu carro, lembrete de fim do estacionamento pago, lugares livres em direto.</li>
+</ul></section>
+<h2>Problemas frequentes</h2>
+<details><summary>A localização não funciona</summary><p>iPhone: Definições › Privacidade e segurança › Serviços de localização › Safari (ou ROUTA) › Durante a utilização da app, com Localização exata ativada. Android: Definições › Apps › Chrome (ou ROUTA) › Autorizações › Localização. Depois fecha e volta a abrir a app.</p></details>
+<details><summary>Não ouço a voz</summary><p>Liga a orientação por voz com o botão do altifalante durante a navegação, aumenta o volume e verifica se o modo silencioso está desligado.</p></details>
+<details><summary>A app não se atualiza</summary><p>Fecha-a por completo (desliza-a para cima no seletor de apps) e volta a abri-la.</p></details>
+<h2>Sobre</h2>
+<section class="card"><p><b>O ROUTA é desenvolvido pela ACKFIX</b> · Informática, de forma simples.<br>Assistência, reparação e manutenção de PC e Mac, PCs por medida, em todo o Cantão de Vaud (Suíça). <a href="https://ackfix.com" target="_blank" rel="noopener">ackfix.com</a></p></section>
+</div>
+
+<div class="lang es">
+<a class="back" href="./">‹ Volver al mapa</a>
+<h1>Usar ROUTA</h1>
+<p class="lead">La app de los conductores: GPS con tráfico, alertas, amigos en el mapa, convoyes y quedadas.</p>
+<h2>Un prototipo en pruebas</h2>
+<section class="card">
+<p>ROUTA está en <b>fase de pruebas</b>: algunas cosas aún pueden fallar. Informa de todo lo que no vaya bien y comparte tus ideas en <span class="key">Menú › Mi opinión</span>. Te lleva 30 segundos y tu ubicación nunca se envía con un comentario.</p>
+</section>
+<h2>Instalar la app</h2>
+<section class="card">
+<h3>iPhone</h3>
+<ol><li>Abre el enlace en <b>Safari</b>.</li><li>Toca <b>Compartir</b> (cuadrado con una flecha) y luego <b>Añadir a pantalla de inicio</b> › <b>Añadir</b>.</li><li>Abre ROUTA desde el nuevo icono y permite la ubicación.</li></ol>
+<h3>Android</h3>
+<ol><li>Abre el enlace en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> › <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li><li>Permite la ubicación en el primer inicio.</li></ol>
+<p class="tip">Para tener la última versión: cierra la app por completo y vuelve a abrirla.</p>
+</section>
+<h2>La pantalla principal</h2>
+<section class="card"><ul>
+<li><b>Círculo arriba a la izquierda</b>: el menú (perfil, comunidad, tu coche, ajustes, idioma).</li>
+<li><b>Velocidad</b> abajo a la izquierda, con el <b>límite de velocidad</b> encima (orientativo: solo valen las señales).</li>
+<li><b>Lupa</b>: busca una dirección, ve a Casa o al Trabajo, mira Favoritos, Gasolina, Comida, Aparcamiento, Hospitales, Farmacias, WC, Spots.</li>
+<li><b>Botón amarillo +</b>: avisa de un accidente, un atasco, obras, un semáforo averiado, un conductor en sentido contrario…</li>
+<li><b>Capas</b>: mapa o satélite, tráfico en directo, paradas, nombres de calles, modo noche.</li>
+<li><b>Mantén pulsado el mapa</b> para poner un marcador; toca una zona vacía para cerrar lo que esté abierto.</li>
+</ul></section>
+<h2>Navegar</h2>
+<section class="card"><ul>
+<li>Elige un destino: ROUTA propone hasta 3 rutas con <b>tráfico en directo</b> y puede evitar peajes, autopistas o viñetas.</li>
+<li>El tiempo en la ruta y los atascos se muestran antes de salir.</li>
+<li>Mientras conduces, el mapa se inclina y sigue la carretera; al parar vuelve a ponerse plano.</li>
+<li>La <b>guía por voz</b> está desactivada por defecto: actívala con el botón del altavoz durante la navegación.</li>
+<li>Al llegar, se guarda la ubicación de tu coche (Menú › Aparcamiento).</li>
+</ul></section>
+<h2>Comunidad</h2>
+<section class="card"><ul>
+<li><b>Amigos</b>: toca un conductor en el mapa › Añadir como amigo, o introduce su código. Tu código está en tu perfil.</li>
+<li><b>Bumps</b>: un pequeño saludo que hace vibrar el móvil de la otra persona (máximo 3 cada 15 minutos).</li>
+<li><b>Convoy</b>: conducid juntos, todos os veis y el destino se comparte.</li>
+<li><b>Quedadas</b>: crea o únete a una quedada, con recordatorio 1 hora antes.</li>
+<li><b>Compartir mi ubicación</b>: envía un enlace para que alguien te siga en directo.</li>
+<li><b>Clasificación</b>: gana puntos avisando de alertas, spots y precios.</li>
+<li><b>Visibilidad</b> (perfil): Invisible, Mis amigos o Todos (zona aproximada para desconocidos).</li>
+</ul></section>
+<h2>Mi coche</h2>
+<section class="card"><ul>
+<li><b>Vehículo</b>: coche, eléctrico, híbrido, autocaravana, camión… Las rutas y los accesos directos se adaptan.</li>
+<li><b>Libro de mantenimiento</b>: ITV, revisión, neumáticos, seguro, viñeta, con recordatorios, y registro de repostajes.</li>
+<li><b>Aparcamiento</b>: dónde está tu coche, aviso de fin del aparcamiento de pago, plazas libres en directo.</li>
+</ul></section>
+<h2>Problemas frecuentes</h2>
+<details><summary>La ubicación no funciona</summary><p>iPhone: Ajustes › Privacidad y seguridad › Localización › Safari (o ROUTA) › Cuando se use la app, con Ubicación exacta activada. Android: Ajustes › Aplicaciones › Chrome (o ROUTA) › Permisos › Ubicación. Después cierra y vuelve a abrir la app.</p></details>
+<details><summary>No oigo la voz</summary><p>Activa la guía por voz con el botón del altavoz durante la navegación, sube el volumen y comprueba que el modo silencio esté desactivado.</p></details>
+<details><summary>La app no se actualiza</summary><p>Ciérrala por completo (deslízala hacia arriba en el selector de apps) y vuelve a abrirla.</p></details>
+<h2>Acerca de</h2>
+<section class="card"><p><b>ROUTA está desarrollada por ACKFIX</b> · Informática, sin complicaciones.<br>Asistencia, reparación y mantenimiento de PC y Mac, PCs a medida, en todo el Cantón de Vaud (Suiza). <a href="https://ackfix.com" target="_blank" rel="noopener">ackfix.com</a></p></section>
+</div>
+
+<div class="lang sq">
+<a class="back" href="./">‹ Kthehu te harta</a>
+<h1>Si të përdorësh ROUTA</h1>
+<p class="lead">Aplikacioni i shoferëve: GPS me trafik, sinjalizime, miq në hartë, kolona dhe takime.</p>
+<h2>Një prototip në testim</h2>
+<section class="card">
+<p>ROUTA është në <b>fazë testimi</b>: disa gjëra mund të kenë ende gabime. Na trego çdo gjë që nuk shkon dhe ndaj idetë e tua te <span class="key">Menyja › Mendimi im</span>. Zgjat 30 sekonda dhe vendndodhja jote nuk dërgohet kurrë bashkë me një koment.</p>
+</section>
+<h2>Instalo aplikacionin</h2>
+<section class="card">
+<h3>iPhone</h3>
+<ol><li>Hap lidhjen në <b>Safari</b>.</li><li>Prek <b>Ndaj</b> (katror me shigjetë), pastaj <b>Shto në ekranin bazë</b> › <b>Shto</b>.</li><li>Hap ROUTA nga ikona e re dhe lejo vendndodhjen.</li></ol>
+<h3>Android</h3>
+<ol><li>Hap lidhjen në <b>Chrome</b>.</li><li>Prek menynë <b>⋮</b> › <b>Instalo aplikacionin</b> (ose <b>Shto në ekranin bazë</b>).</li><li>Lejo vendndodhjen në hapjen e parë.</li></ol>
+<p class="tip">Për versionin më të fundit: mbyll plotësisht aplikacionin dhe hape përsëri.</p>
+</section>
+<h2>Ekrani kryesor</h2>
+<section class="card"><ul>
+<li><b>Rrethi lart majtas</b>: menyja (profili, komuniteti, makina jote, cilësimet, gjuha).</li>
+<li><b>Shpejtësia</b> poshtë majtas, me <b>kufirin e shpejtësisë</b> sipër (orientues: vlejnë vetëm tabelat rrugore).</li>
+<li><b>Lupa</b>: kërko një adresë, shko në Shtëpi ose në Punë, shiko Të preferuarat, Karburant, Ushqim, Parkim, Spitale, Farmaci, WC, Spote.</li>
+<li><b>Butoni i verdhë +</b>: sinjalizo një aksident, bllokim trafiku, punime, semafor të prishur, shofer në kahun e kundërt…</li>
+<li><b>Shtresat</b>: hartë ose satelit, trafik live, stacione, emrat e rrugëve, modaliteti i natës.</li>
+<li><b>Mbaj gishtin gjatë mbi hartë</b> për të vendosur një shënjues; prek një zonë bosh për të mbyllur atë që është e hapur.</li>
+</ul></section>
+<h2>Navigimi</h2>
+<section class="card"><ul>
+<li>Zgjidh një destinacion: ROUTA propozon deri në 3 itinerare me <b>trafik live</b> dhe mund të shmangë pagesat, autostradat ose vinjetat.</li>
+<li>Moti gjatë rrugës dhe bllokimet shfaqen para nisjes.</li>
+<li>Gjatë ngasjes harta anohet dhe ndjek rrugën; kur ndalon, kthehet e sheshtë.</li>
+<li><b>Udhëzimi me zë</b> është i çaktivizuar si parazgjedhje: aktivizoje me butonin e altoparlantit gjatë navigimit.</li>
+<li>Në mbërritje, vendndodhja e makinës tënde ruhet (Menyja › Parkimi).</li>
+</ul></section>
+<h2>Komuniteti</h2>
+<section class="card"><ul>
+<li><b>Miqtë</b>: prek një shofer në hartë › Shto si mik, ose fut kodin e tij. Kodi yt është në profilin tënd.</li>
+<li><b>Bump-et</b>: një përshëndetje e vogël që dridh telefonin e personit tjetër (maksimumi 3 në 15 minuta).</li>
+<li><b>Kolona</b>: ngisni së bashku, të gjithë shihen dhe destinacioni ndahet.</li>
+<li><b>Takimet</b>: krijo ose bashkohu në një takim, me kujtesë 1 orë para.</li>
+<li><b>Ndaj vendndodhjen time</b>: dërgo një lidhje që dikush të të ndjekë live.</li>
+<li><b>Renditja</b>: fito pikë duke sinjalizuar alarme, spote dhe çmime.</li>
+<li><b>Dukshmëria</b> (profili): I padukshëm, Miqtë e mi ose Të gjithë (zonë e përafërt për të panjohurit).</li>
+</ul></section>
+<h2>Makina ime</h2>
+<section class="card"><ul>
+<li><b>Automjeti</b>: makinë, elektrike, hibride, autokamper, kamion… Itineraret dhe shkurtoret përshtaten.</li>
+<li><b>Libreza e mirëmbajtjes</b>: kontrolli teknik, servisi, gomat, sigurimi, vinjeta, me kujtesa, dhe regjistri i karburantit.</li>
+<li><b>Parkimi</b>: ku është makina jote, kujtesë para mbarimit të parkimit me pagesë, vende të lira live.</li>
+</ul></section>
+<h2>Probleme të shpeshta</h2>
+<details><summary>Vendndodhja nuk funksionon</summary><p>iPhone: Cilësimet › Privatësia dhe siguria › Shërbimet e vendndodhjes › Safari (ose ROUTA) › Gjatë përdorimit të aplikacionit, me Vendndodhjen e saktë aktive. Android: Cilësimet › Aplikacionet › Chrome (ose ROUTA) › Lejet › Vendndodhja. Pastaj mbyll dhe rihap aplikacionin.</p></details>
+<details><summary>Nuk e dëgjoj zërin</summary><p>Aktivizo udhëzimin me zë me butonin e altoparlantit gjatë navigimit, rrit volumin dhe kontrollo që modaliteti i heshtur të jetë i çaktivizuar.</p></details>
+<details><summary>Aplikacioni nuk përditësohet</summary><p>Mbylle plotësisht (rrëshqite lart te ndërruesi i aplikacioneve) dhe hape përsëri.</p></details>
+<h2>Rreth nesh</h2>
+<section class="card"><p><b>ROUTA zhvillohet nga ACKFIX</b> · Informatikë, thjesht.<br>Riparim, servis dhe mirëmbajtje PC dhe Mac, PC sipas porosisë, në të gjithë Kantonin e Vaud (Zvicër). <a href="https://ackfix.com" target="_blank" rel="noopener">ackfix.com</a></p></section>
+</div>
+
+<div class="lang sr">
+<a class="back" href="./">‹ Nazad na mapu</a>
+<h1>Kako koristiti ROUTA</h1>
+<p class="lead">Aplikacija za vozače: GPS sa saobraćajem, upozorenja, prijatelji na mapi, konvoji i okupljanja.</p>
+<h2>Prototip u testiranju</h2>
+<section class="card">
+<p>ROUTA je u <b>fazi testiranja</b>: neke stvari još mogu imati greške. Prijavi sve što ne valja i predloži svoje ideje preko <span class="key">Meni › Moje mišljenje</span>. Traje 30 sekundi i tvoja lokacija se nikad ne šalje uz povratnu informaciju.</p>
+</section>
+<h2>Instaliraj aplikaciju</h2>
+<section class="card">
+<h3>iPhone</h3>
+<ol><li>Otvori link u <b>Safariju</b>.</li><li>Dodirni <b>Podeli</b> (kvadrat sa strelicom), zatim <b>Dodaj na početni ekran</b> › <b>Dodaj</b>.</li><li>Otvori ROUTA preko nove ikonice i dozvoli lokaciju.</li></ol>
+<h3>Android</h3>
+<ol><li>Otvori link u <b>Chromeu</b>.</li><li>Dodirni meni <b>⋮</b> › <b>Instaliraj aplikaciju</b> (ili <b>Dodaj na početni ekran</b>).</li><li>Dozvoli lokaciju pri prvom pokretanju.</li></ol>
+<p class="tip">Za najnoviju verziju: potpuno zatvori aplikaciju i ponovo je otvori.</p>
+</section>
+<h2>Glavni ekran</h2>
+<section class="card"><ul>
+<li><b>Krug gore levo</b>: meni (profil, zajednica, tvoj auto, podešavanja, jezik).</li>
+<li><b>Brzina</b> dole levo, sa <b>ograničenjem brzine</b> iznad (okvirno: važe samo saobraćajni znakovi).</li>
+<li><b>Lupa</b>: traži adresu, idi Kući ili na Posao, pogledaj Omiljene, Gorivo, Hranu, Parking, Bolnice, Apoteke, WC, Spotove.</li>
+<li><b>Žuto dugme +</b>: prijavi nesreću, gužvu, radove, pokvaren semafor, vozača u suprotnom smeru…</li>
+<li><b>Slojevi</b>: mapa ili satelit, saobraćaj uživo, stanice, nazivi ulica, noćni režim.</li>
+<li><b>Dugo pritisni mapu</b> da postaviš oznaku; dodirni prazno mesto da zatvoriš ono što je otvoreno.</li>
+</ul></section>
+<h2>Navigacija</h2>
+<section class="card"><ul>
+<li>Izaberi odredište: ROUTA predlaže do 3 rute sa <b>saobraćajem uživo</b> i može da izbegne putarine, autoputeve ili vinjete.</li>
+<li>Vreme na ruti i gužve prikazuju se pre polaska.</li>
+<li>Tokom vožnje mapa se naginje i prati put; kad staneš, vraća se u ravan prikaz.</li>
+<li><b>Glasovno vođenje</b> je podrazumevano isključeno: uključi ga dugmetom zvučnika tokom navigacije.</li>
+<li>Po dolasku se čuva lokacija tvog automobila (Meni › Parking).</li>
+</ul></section>
+<h2>Zajednica</h2>
+<section class="card"><ul>
+<li><b>Prijatelji</b>: dodirni vozača na mapi › Dodaj za prijatelja, ili unesi njegov kod. Tvoj kod je u tvom profilu.</li>
+<li><b>Bumpovi</b>: mali pozdrav koji zavibrira telefon druge osobe (najviše 3 na 15 minuta).</li>
+<li><b>Konvoj</b>: vozite zajedno, svi se vide i odredište je zajedničko.</li>
+<li><b>Okupljanja</b>: napravi okupljanje ili mu se pridruži, uz podsetnik 1 sat ranije.</li>
+<li><b>Podeli moju lokaciju</b>: pošalji link da te neko prati uživo.</li>
+<li><b>Rang lista</b>: osvajaj poene prijavljivanjem upozorenja, spotova i cena.</li>
+<li><b>Vidljivost</b> (profil): Nevidljiv, Moji prijatelji ili Svi (približna zona za nepoznate).</li>
+</ul></section>
+<h2>Moj auto</h2>
+<section class="card"><ul>
+<li><b>Vozilo</b>: automobil, električni, hibrid, kamper, kamion… Rute i prečice se prilagođavaju.</li>
+<li><b>Servisna knjižica</b>: tehnički pregled, servis, gume, osiguranje, vinjeta, sa podsetnicima, i evidencija točenja goriva.</li>
+<li><b>Parking</b>: gde je tvoj auto, podsetnik pre isteka plaćenog parkinga, slobodna mesta uživo.</li>
+</ul></section>
+<h2>Česti problemi</h2>
+<details><summary>Lokacija ne radi</summary><p>iPhone: Podešavanja › Privatnost i bezbednost › Usluge lokacije › Safari (ili ROUTA) › Dok se aplikacija koristi, sa uključenom Preciznom lokacijom. Android: Podešavanja › Aplikacije › Chrome (ili ROUTA) › Dozvole › Lokacija. Zatim zatvori i ponovo otvori aplikaciju.</p></details>
+<details><summary>Ne čujem glas</summary><p>Uključi glasovno vođenje dugmetom zvučnika tokom navigacije, pojačaj zvuk i proveri da je nečujni režim isključen.</p></details>
+<details><summary>Aplikacija se ne ažurira</summary><p>Potpuno je zatvori (prevuci je nagore u prebacivaču aplikacija) i ponovo je otvori.</p></details>
+<h2>O nama</h2>
+<section class="card"><p><b>ROUTA razvija ACKFIX</b> · Informatika, jednostavno.<br>Popravka, servis i održavanje PC i Mac računara, računari po meri, u celom kantonu Vo (Švajcarska). <a href="https://ackfix.com" target="_blank" rel="noopener">ackfix.com</a></p></section>
 </div>
 
 <script>document.querySelectorAll('.langbar button').forEach(function (b) { b.classList.toggle('on', b.dataset.l === document.documentElement.getAttribute('data-l')); });</script>
