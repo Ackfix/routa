@@ -392,6 +392,10 @@ window.ROUTA_I18N_SUB_EXTRA = ["ici", "Réservé aux clients", "Accessible en fa
 /* Phrases avec des nombres ou des noms */
 window.ROUTA_I18N_PX = {
   en: [
+    [/^Fermé · ouvre à (\d\d:\d\d)$/, (a) => 'Closed · opens at ' + a],
+    [/^Fermé · ouvre demain à (\d\d:\d\d)$/, (a) => 'Closed · opens tomorrow at ' + a],
+    [/^Fermé · ouvre (lun|mar|mer|jeu|ven|sam|dim)\. à (\d\d:\d\d)$/, (d, a) => 'Closed · opens ' + ({ lun: 'Mon', mar: 'Tue', mer: 'Wed', jeu: 'Thu', ven: 'Fri', sam: 'Sat', dim: 'Sun' })[d] + ' at ' + a],
+    [/^Ouvert · ferme à (\d\d:\d\d)$/, (a) => 'Open · closes at ' + a],
     [/^(.+) autour de toi$/, (a) => a + ' around you', [1]],
     [/^(-?\d+)°, ([^,]+)(.*)$/, (a, b, c) => a + '°, ' + b + c, [2, 3]],
     [/^(.+ · )?(\d+) m, entre (.+?) et (.+?)\. (.+)$/, (p, n, a, b, r) => (p || '') + n + ' m, between ' + a + ' and ' + b + '. ' + r, [1, 5]],
@@ -419,6 +423,10 @@ window.ROUTA_I18N_PX = {
     [/^Prochain bump possible dans (\d+) min\.$/, (a) => 'Next bump possible in ' + a + ' min.']
   ],
   tr: [
+    [/^Fermé · ouvre à (\d\d:\d\d)$/, (a) => 'Kapalı · ' + a + "'de açılır"],
+    [/^Fermé · ouvre demain à (\d\d:\d\d)$/, (a) => 'Kapalı · yarın ' + a + "'de açılır"],
+    [/^Fermé · ouvre (lun|mar|mer|jeu|ven|sam|dim)\. à (\d\d:\d\d)$/, (d, a) => 'Kapalı · ' + ({ lun: 'Pzt', mar: 'Sal', mer: 'Çar', jeu: 'Per', ven: 'Cum', sam: 'Cmt', dim: 'Paz' })[d] + ' ' + a + "'de açılır"],
+    [/^Ouvert · ferme à (\d\d:\d\d)$/, (a) => 'Açık · ' + a + "'de kapanır"],
     [/^(.+) autour de toi$/, (a) => 'Çevrende ' + a.toLowerCase(), [1]],
     [/^(-?\d+)°, ([^,]+)(.*)$/, (a, b, c) => a + '°, ' + b + c, [2, 3]],
     [/^(.+ · )?(\d+) m, entre (.+?) et (.+?)\. (.+)$/, (p, n, a, b, r) => (p || '') + n + ' m, ' + a + ' ile ' + b + ' arasında. ' + r, [1, 5]],
