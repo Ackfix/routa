@@ -521,7 +521,7 @@ const laneSvg = (dir) => { const r = LANE_ROT[dir] == null ? 0 : LANE_ROT[dir]; 
 let laneEl = null, laneKey = '';
 setInterval(() => {
   const N = S.nav, box = $('navBanner');
-  if (!laneEl && box) { laneEl = el('<div class="lanebar" id="laneBar" hidden aria-label="Voies à suivre"></div>'); box.insertBefore(laneEl, $('navThen')); }
+  if (!laneEl && box) { laneEl = el('<div class="lanebar" id="laneBar" hidden aria-label="' + TRX('Voies à suivre') + '"></div>'); box.insertBefore(laneEl, $('navThen')); }
   if (!laneEl) return;
   if (!N || !N.R || !N.R.lanes) { laneEl.hidden = true; laneKey = ''; return; }
   const along = N.along || 0;
@@ -861,7 +861,7 @@ function checkFriendsNear() {
     const last = friendSeen.get(d.id) || 0;
     if (m <= 2000 && Date.now() - last > 30 * 60000) {
       friendSeen.set(d.id, Date.now());
-      toast('<b>' + esc(d.pseudo || 'Un ami') + '</b> est à ' + fmtDist(m) + ' de toi', { action: 'Voir', onAction: () => A.openDriver && A.openDriver(d.id), ms: 7000 });
+      toast(TRX('{n} est à {d} de toi', { n: '<b>' + esc(d.pseudo || TRX('Un ami')) + '</b>', d: fmtDist(m) }), { action: TRX('Voir'), onAction: () => A.openDriver && A.openDriver(d.id), ms: 7000 });
     }
   });
 }
@@ -936,7 +936,7 @@ async function openOffline() {
             const s = await RMAP.regionStatus();
             if (s && s.exists) {
               const pc = s.total ? Math.min(100, Math.round(s.done / s.total * 100)) : 0;
-              p.textContent = s.complete ? 'Carte enregistrée sur ce téléphone.' : 'Téléchargement… ' + pc + ' %';
+              p.textContent = s.complete ? 'Carte enregistrée sur ce téléphone.' : TRX('Téléchargement…') + ' ' + pc + ' %';
               if (s.complete) { b.disabled = false; return; }
             }
           } catch (e) { /* */ }
@@ -944,7 +944,7 @@ async function openOffline() {
         };
         tick();
       } else {
-        await downloadWeb(S.pos.lat, S.pos.lon, (d, t, by) => { p.textContent = 'Téléchargement… ' + Math.round(d / t * 100) + ' % · ' + mb(by); });
+        await downloadWeb(S.pos.lat, S.pos.lon, (d, t, by) => { p.textContent = TRX('Téléchargement…') + ' ' + Math.round(d / t * 100) + ' % · ' + mb(by); });
         p.textContent = 'Carte enregistrée sur ce téléphone.'; b.disabled = false;
       }
     } catch (e) { p.textContent = 'Le téléchargement n\'a pas abouti. Vérifie ta connexion et réessaie.'; b.disabled = false; }
@@ -955,6 +955,7 @@ X.openOffline = openOffline;
 
 /* ======================= Mode pro : temps de conduite et de repos (OTR 1 / OTR 2) ======================= */
 /* Aide pour les chauffeurs professionnels. Ne remplace ni le tachygraphe ni le livret de travail. */
+const TRX = (s, v) => { let o = (window.ROUTA_I18N && ROUTA_I18N.t) ? ROUTA_I18N.t(s) : s; if (v) Object.keys(v).forEach((k) => { o = o.split('{' + k + '}').join(v[k]); }); return o; };
 const PRO = Object.assign({ on: false, regime: null, auto: true, segs: [] }, store.get('routa.pro', {}));
 const H = 3600000, MIN = 60000;
 const PRO_RULES = {
@@ -1002,12 +1003,12 @@ function proStats() {
 const hm = (ms) => { const m = Math.max(0, Math.round(ms / MIN)); return Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0'); };
 
 /* petit compteur sur la carte */
-const proChip = el('<button class="prochip" id="proChip" hidden aria-label="Temps de conduite"><span class="pcdot"></span><span class="pctxt"></span></button>');
+const proChip = el('<button class="prochip" id="proChip" hidden aria-label="' + TRX('Temps de conduite') + '"><span class="pcdot"></span><span class="pctxt"></span></button>');
 document.body.appendChild(proChip);
 proChip.onclick = () => openPro();
 let stopSince = 0;
 const proWarned = {};
-function proWarn(key, msg) { if (proWarned[key]) return; proWarned[key] = true; vibrate([80, 60, 80]); toast(msg, { action: 'Parkings proches', onAction: () => A.openK && A.openK('parking'), ms: 10000 }); }
+function proWarn(key, msg) { if (proWarned[key]) return; proWarned[key] = true; vibrate([80, 60, 80]); toast(msg, { action: TRX('Parkings proches'), onAction: () => A.openK && A.openK('parking'), ms: 10000 }); }
 function proTick(force) {
   if (!PRO.on) { proChip.hidden = true; return; }
   const kmh = (S.speed || 0) * 3.6, now = Date.now();
@@ -1024,13 +1025,13 @@ function proTick(force) {
   proChip.classList.toggle('over', left <= 0);
   const k = Math.floor(st.shiftStart / MIN);
   if (st.cont < 10 * MIN) { delete proWarned.c30; delete proWarned.c0; }
-  if (left <= 30 * MIN && left > 0) proWarn('c30', 'Pause obligatoire dans <b>' + hm(left) + '</b> (45 min après 4 h 30 de conduite).');
-  if (left <= 0) proWarn('c0', '<b>Pause obligatoire</b> : 4 h 30 de conduite atteintes. Arrête-toi 45 minutes.');
-  if (R.day - st.day <= 30 * MIN) proWarn('d' + k, 'Plus que <b>' + hm(R.day - st.day) + '</b> de conduite aujourd\'hui (limite ' + hm(R.day) + ').');
-  if (R.week - st.week <= 2 * H) proWarn('w' + Math.floor(now / (7 * 24 * H)), 'Plus que <b>' + hm(R.week - st.week) + '</b> de conduite cette semaine.');
+  if (left <= 30 * MIN && left > 0) proWarn('c30', TRX('Pause obligatoire dans {t} (45 min après 4 h 30 de conduite).', { t: '<b>' + hm(left) + '</b>' }));
+  if (left <= 0) proWarn('c0', '<b>' + TRX('Pause obligatoire : 4 h 30 de conduite atteintes. Arrête-toi 45 minutes.') + '</b>');
+  if (R.day - st.day <= 30 * MIN) proWarn('d' + k, TRX('Plus que {t} de conduite aujourd\'hui (limite {l}).', { t: '<b>' + hm(R.day - st.day) + '</b>', l: hm(R.day) }));
+  if (R.week - st.week <= 2 * H) proWarn('w' + Math.floor(now / (7 * 24 * H)), TRX('Plus que {t} de conduite cette semaine.', { t: '<b>' + hm(R.week - st.week) + '</b>' }));
   const v = A.veh ? A.veh() : {};
   const h = new Date().getHours(), sunday = new Date().getDay() === 0;
-  if (v.isHgv && kmh > 8 && (h >= 22 || h < 5 || sunday)) proWarn('ban' + new Date().toDateString() + (h >= 22 || h < 5 ? 'n' : 's'), 'Poids lourd : la circulation est interdite en Suisse la nuit (22 h – 5 h) et le dimanche, sauf autorisation.');
+  if (v.isHgv && kmh > 8 && (h >= 22 || h < 5 || sunday)) proWarn('ban' + new Date().toDateString() + (h >= 22 || h < 5 ? 'n' : 's'), TRX('Poids lourd : la circulation est interdite en Suisse la nuit (22 h – 5 h) et le dimanche, sauf autorisation.'));
   if (force && S.sheetView === 'pro') openPro();
 }
 setInterval(() => proTick(false), 5000);
@@ -1042,18 +1043,18 @@ function openPro() {
   const body = openSheet('Temps de conduite (pro)',
     '<label class="switch" for="proOn"><span><b>Activer le mode pro</b><br><span class="muted small">Compteur de conduite et de pauses sur la carte</span></span><input type="checkbox" id="proOn"' + (PRO.on ? ' checked' : '') + '></label>' +
     '<div class="seg" id="proReg">' + Object.keys(PRO_RULES).map((k) => '<button data-r="' + k + '" class="' + (k === reg ? 'on' : '') + '">' + PRO_RULES[k].label + '</button>').join('') + '</div>' +
-    '<p class="muted small">' + esc(R.sub) + '</p>' +
+    '<p class="muted small">' + esc(TRX(R.sub)) + '</p>' +
     (PRO.on ? (
       '<div class="proacts">' + Object.keys(ACT).map((a) => '<button data-a="' + a + '" class="' + (cur && cur.a === a ? 'on' : '') + '">' + ACT[a] + '</button>').join('') + '</div>' +
       '<label class="switch" for="proAuto"><span><b>Détection automatique</b><br><span class="muted small">Conduite dès 8 km/h, pause après 3 min à l\'arrêt</span></span><input type="checkbox" id="proAuto"' + (PRO.auto ? ' checked' : '') + '></label>' +
-      '<div class="procard"><div class="prorow"><b>Conduite continue</b><span>' + hm(st.cont) + ' / 4 h 30</span></div>' + bar(st.cont, R.cont) + '<span class="muted small">Puis pause de 45 min (ou 15 + 30 min' + (reg === 'otr2' ? ', ou 30 min / 2 × 20 min si elle est prise plus tôt' : '') + ').</span></div>' +
+      '<div class="procard"><div class="prorow"><b>Conduite continue</b><span>' + hm(st.cont) + ' / 4 h 30</span></div>' + bar(st.cont, R.cont) + '<span class="muted small">' + (reg === 'otr2' ? TRX('Puis pause de 45 min (ou 15 + 30 min, ou 30 min / 2 × 20 min si elle est prise plus tôt).') : TRX('Puis pause de 45 min (ou 15 + 30 min).')) + '</span></div>' +
       '<div class="procard"><div class="prorow"><b>Conduite aujourd\'hui</b><span>' + hm(st.day) + ' / ' + hm(R.day) + '</span></div>' + bar(st.day, R.day) + (R.dayExt ? '<span class="muted small">10 h possibles deux fois par semaine.</span>' : '') + '</div>' +
       '<div class="procard"><div class="prorow"><b>Conduite cette semaine</b><span>' + hm(st.week) + ' / ' + hm(R.week) + '</span></div>' + bar(st.week, R.week) +
-        (R.twoWeeks ? '<span class="muted small">Sur deux semaines : ' + hm(st.two) + ' / ' + hm(R.twoWeeks) + '</span>' : '') + '</div>' +
-      (st.restBy ? '<div class="procard"><b>Repos journalier</b><span class="muted small">11 h de repos à commencer au plus tard vers ' + fmtClock(new Date(st.restBy)) + ' (9 h possibles trois fois par semaine).</span></div>' : '') +
+        (R.twoWeeks ? '<span class="muted small">' + TRX('Sur deux semaines : {t}', { t: hm(st.two) + ' / ' + hm(R.twoWeeks) }) + '</span>' : '') + '</div>' +
+      (st.restBy ? '<div class="procard"><b>' + TRX('Repos journalier') + '</b><span class="muted small">' + TRX('11 h de repos à commencer au plus tard vers {t} (9 h possibles trois fois par semaine).', { t: fmtClock(new Date(st.restBy)) }) + '</span></div>' : '') +
       '<div class="row wrap"><button class="btn soft grow" id="proPark">Parkings proches</button><button class="btn soft grow" id="proLog">Relevé 14 jours</button></div>'
     ) : '') +
-    '<p class="muted small">Aide au respect de l\'' + (reg === 'otr1' ? 'OTR 1 (RS 822.221)' : 'OTR 2 (RS 822.222)') + '. Ne remplace ni le tachygraphe ni le livret de travail : en cas de contrôle, seuls ceux-ci font foi.</p>', 'pro');
+    '<p class="muted small">' + TRX('Aide au respect de l\'{r}. Ne remplace ni le tachygraphe ni le livret de travail : en cas de contrôle, seuls ceux-ci font foi.', { r: reg === 'otr1' ? 'OTR 1 (RS 822.221)' : 'OTR 2 (RS 822.222)' }) + '</p>', 'pro');
   body.querySelector('#proOn').onchange = (e) => { PRO.on = e.target.checked; if (!PRO.on) proSet(null); proSave(); proTick(); openPro(); };
   body.querySelectorAll('#proReg button').forEach((b) => { b.onclick = () => { PRO.regime = b.dataset.r; proSave(); proTick(); openPro(); }; });
   body.querySelectorAll('.proacts button').forEach((b) => { b.onclick = () => { PRO.auto = b.dataset.a === 'drive' ? PRO.auto : false; proSet(b.dataset.a); openPro(); }; });
@@ -1070,7 +1071,7 @@ function proLogText() {
   return Object.keys(days).map((k) => {
     const list = days[k];
     const drive = list.filter((s) => s.a === 'drive').reduce((t, s) => t + segDur(s), 0);
-    return k + ' – conduite ' + hm(drive) + '\n' + list.map((s) => '  ' + fmtClock(new Date(s.s)) + '–' + (s.e ? fmtClock(new Date(s.e)) : '…') + ' ' + ACT[s.a]).join('\n');
+    return k + ' – ' + TRX('Conduite') + ' ' + hm(drive) + '\n' + list.map((s) => '  ' + fmtClock(new Date(s.s)) + '–' + (s.e ? fmtClock(new Date(s.e)) : '…') + ' ' + TRX(ACT[s.a])).join('\n');
   }).reverse().join('\n\n');
 }
 function openProLog() {
@@ -1079,7 +1080,7 @@ function openProLog() {
     (t ? '<pre class="prolog">' + esc(t) + '</pre><button class="btn block" id="proShare">Partager le relevé</button>' : '<div class="empty">Aucune activité enregistrée.</div>') +
     '<p class="muted small">Relevé indicatif tenu par ROUTA, gardé uniquement sur ce téléphone.</p>', 'prolog');
   const b = body.querySelector('#proShare');
-  if (b) b.onclick = async () => { try { if (navigator.share) await navigator.share({ title: 'Relevé de conduite', text: t }); else { await navigator.clipboard.writeText(t); toast('Relevé copié.'); } } catch (e) { /* annulé */ } };
+  if (b) b.onclick = async () => { try { if (navigator.share) await navigator.share({ title: TRX('Relevé de conduite'), text: t }); else { await navigator.clipboard.writeText(t); toast(TRX('Relevé copié.')); } } catch (e) { /* annulé */ } };
 }
 X.openPro = openPro;
 
@@ -1115,9 +1116,9 @@ async function lowCheck() {
   }
   let best = null;
   lowList.forEach((x) => {
-    const why = (x.h && d.height && x.h < d.height + 0.05) ? ['Hauteur limitée à ' + nb(x.h) + ' m', 'ton véhicule : ' + nb(d.height) + ' m']
-      : (x.w && d.width && x.w < d.width) ? ['Largeur limitée à ' + nb(x.w) + ' m', 'ton véhicule : ' + nb(d.width) + ' m']
-      : (x.t && d.weight && x.t < d.weight) ? ['Poids limité à ' + nb(x.t) + ' t', 'ton véhicule : ' + nb(d.weight) + ' t'] : null;
+    const why = (x.h && d.height && x.h < d.height + 0.05) ? [TRX('Hauteur limitée à {v} m', { v: nb(x.h) }), TRX('ton véhicule : {v}', { v: nb(d.height) + ' m' })]
+      : (x.w && d.width && x.w < d.width) ? [TRX('Largeur limitée à {v} m', { v: nb(x.w) }), TRX('ton véhicule : {v}', { v: nb(d.width) + ' m' })]
+      : (x.t && d.weight && x.t < d.weight) ? [TRX('Poids limité à {v} t', { v: nb(x.t) }), TRX('ton véhicule : {v}', { v: nb(d.weight) + ' t' })] : null;
     if (!why) return;
     const m = dist(S.pos, x); if (m > 800 || m < 10) return;
     if (S.heading != null && (S.speed || 0) > 2 && adiff(S.heading, brg(S.pos, x)) > 55) return;
@@ -1126,7 +1127,7 @@ async function lowCheck() {
   if (!best) { lowChip.hidden = true; return; }
   lowChip.innerHTML = '<b>' + esc(best.why[0]) + '</b><span>' + fmtDist(Math.round(best.m / 10) * 10) + (best.x.name ? ' · ' + esc(best.x.name) : '') + ' · ' + esc(best.why[1]) + '</span>';
   lowChip.hidden = false;
-  if (!lowWarned[best.x.id]) { lowWarned[best.x.id] = true; vibrate([120, 80, 120]); toast('<b>Attention</b> : ' + esc(best.why[0]) + ' dans ' + fmtDist(Math.round(best.m / 10) * 10) + ' (' + esc(best.why[1]) + ').', { ms: 9000 }); }
+  if (!lowWarned[best.x.id]) { lowWarned[best.x.id] = true; vibrate([120, 80, 120]); toast(TRX('Attention : {w} dans {d} ({v}).', { w: esc(best.why[0]), d: fmtDist(Math.round(best.m / 10) * 10), v: esc(best.why[1]) }), { ms: 9000 }); }
 }
 setInterval(lowCheck, 4000);
 
