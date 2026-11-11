@@ -382,3 +382,8 @@ body.night .speedbox.over .speedunit{color:#fff}
 .mk-poi.wc{background:#0E7C86;color:#fff}
 .mk-poi.wc svg{stroke:#fff}
 .chip[data-open=wc]{color:#5FD3DC}
+/* signature ACKFIX */
+.menusig{display:block;text-align:center;margin:2px auto 14px;color:var(--muted);font-size:12px;line-height:1.5;text-decoration:none;opacity:.85}
+.menusig b{color:var(--fg);letter-spacing:.04em}
+.menusig span{font-size:11px}
+.ackico{flex:none;width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,#FFC93C,#FF8A3D);color:#0E1116;font:800 13px var(--display);display:inline-grid;place-items:center}
