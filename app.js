@@ -666,7 +666,7 @@ function startGps() {
     pushPresence(false);
   }, (err) => {
     S.watchId = null;
-    if (err.code === 1) toast("Position refusée. Autorise la localisation pour ce site dans les réglages du téléphone (Réglages › Safari › Position sur iPhone), puis recharge la page.", { ms: 9000 });
+    if (err.code === 1) toast(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() ? "Position refusée. Autorise la position pour ROUTA dans les réglages du téléphone (Réglages › ROUTA › Position), puis rouvre l'app." : "Position refusée. Autorise la localisation pour ce site dans les réglages du téléphone (Réglages › Safari › Position sur iPhone), puis recharge la page.", { ms: 9000 });
     else toast("Position GPS introuvable pour le moment. On réessaie…");
     if (err.code !== 1) setTimeout(startGps, 5000);
   }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
