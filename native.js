@@ -46,7 +46,6 @@
     const c = map.getCenter();
     const D = N.diag = { start: '…', style: 0, cam: 0, sent: 0, err: '' };
     RM.start({ styleURL: typeof o.style === 'string' ? o.style : '', lng: c.lng, lat: c.lat, zoom: map.getZoom() }).then(() => { D.start = 'ok'; }).catch((e) => { D.start = 'ERR'; fail(e); });
-    diagPanel(D);
 
     /* caméra : page -> iPhone */
     const oj = map.jumpTo.bind(map), oe = map.easeTo.bind(map), of = map.flyTo.bind(map);
