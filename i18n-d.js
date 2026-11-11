@@ -1,5 +1,15 @@
 /* ROUTA – traductions (3/3) : nouveautés 0.9 (amis, convoi, rassemblements, carnet, parking, cols, menu…) */
 window.ROUTA_I18N_ROWS = (window.ROUTA_I18N_ROWS || []).concat([
+["Noms des rues", "Street names", "Sokak adları"],
+["Les grands axes et les villes restent toujours affichés.", "Main roads and towns always stay visible.", "Ana yollar ve şehirler her zaman görünür kalır."],
+["ROUTA par", "ROUTA by", "ROUTA ·"],
+["· Informatique, simplement.", "· IT, made simple.", "· Bilişim, basitçe."],
+["Dépannage PC et Mac dans tout le Canton de Vaud", "PC and Mac repair everywhere in the Canton of Vaud", "Vaud Kantonu genelinde PC ve Mac onarımı"],
+["Dépannage PC et Mac · tout le Canton de Vaud", "PC and Mac repair · whole Canton of Vaud", "PC ve Mac onarımı · tüm Vaud Kantonu"],
+["Informatique, simplement.", "IT, made simple.", "Bilişim, basitçe."],
+["Dépannage, réparation et maintenance PC et Mac, PC sur mesure. On récupère ton ordinateur et on te le ramène, partout dans le Canton de Vaud.", "PC and Mac troubleshooting, repair and maintenance, custom-built PCs. We pick up your computer and bring it back, anywhere in the Canton of Vaud.", "PC ve Mac arıza giderme, onarım ve bakım, özel PC. Bilgisayarını alıp geri getiriyoruz, Vaud Kantonu'nun her yerinde."],
+["Voir ackfix.com", "Visit ackfix.com", "ackfix.com'a git"],
+["ROUTA est développé par ACKFIX.", "ROUTA is developed by ACKFIX.", "ROUTA, ACKFIX tarafından geliştirilmiştir."],
 ["Transports publics", "Public transport", "Toplu taşıma"],
 ["Arrêts de bus, tram, métro et gares. Touche un arrêt pour voir les lignes et les prochains départs.", "Bus, tram and metro stops and stations. Tap a stop to see its lines and next departures.", "Otobüs, tramvay, metro durakları ve istasyonlar. Hatları ve sonraki kalkışları görmek için bir durağa dokun."],
 ["WC", "Toilets", "Tuvalet"],
