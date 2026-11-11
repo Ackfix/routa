@@ -68,21 +68,11 @@ jobs:
           VC=$((100 + GITHUB_RUN_NUMBER))
           sed -i "s/versionCode 1$/versionCode $VC/; s/versionName \"1.0\"/versionName \"0.9.$GITHUB_RUN_NUMBER\"/" app/build.gradle
           grep -E "versionCode|versionName" app/build.gradle
-          if ! command -v convert > /dev/null; then sudo rm -f /var/lib/man-db/auto-update; sudo DEBIAN_FRONTEND=noninteractive timeout 600 apt-get install -y -qq --no-install-recommends imagemagick > /dev/null; fi
           ICON=$GITHUB_WORKSPACE/icons/icon-512.png
           R=app/src/main/res
-          for d in mdpi:48:108 hdpi:72:162 xhdpi:96:216 xxhdpi:144:324 xxxhdpi:192:432; do
-            n=${d%%:*}; rest=${d#*:}; s=${rest%%:*}; f=${rest#*:}
-            mkdir -p $R/mipmap-$n
-            convert $ICON -resize ${s}x${s} $R/mipmap-$n/ic_launcher.png
-            convert $ICON -resize ${s}x${s} \( +clone -alpha extract -fill black -colorize 100 -fill white -draw "circle $((s/2)),$((s/2)) $((s/2)),0" \) -alpha off -compose CopyOpacity -composite $R/mipmap-$n/ic_launcher_round.png
-            convert $ICON -resize ${f}x${f} $R/mipmap-$n/ic_launcher_foreground.png
-          done
+          (cd /tmp && mkdir -p ic && cd ic && npm init -y > /dev/null && npm install --no-audit --no-fund sharp@0.33.5 > /dev/null)
+          NODE_PATH=/tmp/ic/node_modules node $GITHUB_WORKSPACE/android/icons.js $ICON $R
           if [ -f $R/values/ic_launcher_background.xml ]; then sed -i 's/#[0-9A-Fa-f]\{6\}/#0E1116/' $R/values/ic_launcher_background.xml; fi
-          find $R -name 'splash.png' | while read p; do
-            sz=$(identify -format '%wx%h' "$p"); w=${sz%x*}; h=${sz#*x}; m=$(( w < h ? w : h )); i=$(( m * 30 / 100 ))
-            convert -size ${w}x${h} xc:'#0E1116' \( $ICON -resize ${i}x${i} \) -gravity center -composite "$p"
-          done
           sed -i 's#<item name="android:background">@drawable/splash</item>#<item name="android:background">@drawable/splash</item>\n        <item name="android:windowBackground">@drawable/splash</item>#' $R/values/styles.xml || true
 
       - name: Construire le fichier pour Google Play (AAB)
