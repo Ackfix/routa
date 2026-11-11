@@ -373,3 +373,9 @@ body.night .speedbox{background:#F4F6FA;color:#0E1116;box-shadow:0 0 0 2px rgba(
 body.night .speedbox .speedunit{color:#4A5568;font-weight:600}
 body.night .speedbox.over{background:#E5484D;color:#fff}
 body.night .speedbox.over .speedunit{color:#fff}
+/* 0.9.15 santé */
+.mk-poi.hospital{background:#E5484D;color:#fff}
+.mk-poi.pharmacy{background:#16A05A;color:#fff}
+.mk-poi.hospital svg,.mk-poi.pharmacy svg{stroke:#fff;stroke-width:2.6}
+.chip[data-open=hospital]{color:#FF8F94}
+.chip[data-open=pharmacy]{color:#5BD99A}
