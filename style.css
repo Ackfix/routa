@@ -454,3 +454,7 @@ body.navigating .prochip { bottom: calc(var(--navH, 150px) + 180px); }
 .lowchip b { font-size: 16px; }
 .lowchip span { font-size: 13px; opacity: .92; }
 body:not(.navigating) .lowchip { top: calc(var(--sat) + 74px); }
+
+/* taille des boutons et de l'affichage (réglage) */
+:root { --ui: 1; }
+.fabs-right, .fab-report, .fab-search, .fab-menu, .speedbox, .limitsign, .limitnext, .navbanner, .navbar, .prochip { zoom: var(--ui); }
