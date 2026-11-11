@@ -1604,8 +1604,8 @@ function setupEssentials() {
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 function medigoBlock() {
   const url = IS_IOS ? 'https://apps.apple.com/ch/app/urgences-vaud/id1091227650' : 'https://medigo.ch/';
-  return '<div class="banner">' + ic('clock') + '<span><b>Affluence aux urgences</b><br>Le temps d\'attente en direct des urgences vaudoises est disponible dans l\'app Medigo.</span></div>' +
-    '<a class="btn soft block" target="_blank" rel="noopener" href="' + url + '">' + ic('clock') + 'Voir l\'affluence avec Medigo</a>';
+  return '<div class="banner">' + ic('clock') + '<span><b>Horaires et affluence en temps réel</b><br>Les horaires à jour et le temps d\'attente en direct des urgences vaudoises sont dans l\'app Medigo, plus fiable que nos horaires.</span></div>' +
+    '<a class="btn soft block" target="_blank" rel="noopener" href="' + url + '">' + ic('clock') + 'Voir les horaires et l\'affluence sur Medigo</a>';
 }
 function setupPlaces() {
   setupTransit();
