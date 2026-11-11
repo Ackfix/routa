@@ -368,3 +368,8 @@ html, body { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .dep .to{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dep .tm{flex:none;text-align:right;display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
 .dep .late{color:#FF8F94;font-weight:700}
+/* 0.9.14 compteur bien visible la nuit */
+body.night .speedbox{background:#F4F6FA;color:#0E1116;box-shadow:0 0 0 2px rgba(255,255,255,.25),0 6px 18px rgba(0,0,0,.55)}
+body.night .speedbox .speedunit{color:#4A5568;font-weight:600}
+body.night .speedbox.over{background:#E5484D;color:#fff}
+body.night .speedbox.over .speedunit{color:#fff}
