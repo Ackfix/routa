@@ -1,5 +1,8 @@
 /* ROUTA – traductions (3/3) : nouveautés 0.9 (amis, convoi, rassemblements, carnet, parking, cols, menu…) */
 window.ROUTA_I18N_ROWS = (window.ROUTA_I18N_ROWS || []).concat([
+["Horaires et affluence en temps réel", "Real-time hours and crowding", "Gerçek zamanlı saatler ve yoğunluk"],
+["Les horaires à jour et le temps d'attente en direct des urgences vaudoises sont dans l'app Medigo, plus fiable que nos horaires.", "Up-to-date hours and live waiting times for emergency rooms in Vaud are in the Medigo app, more reliable than our hours.", "Vaud acil servislerinin güncel saatleri ve canlı bekleme süreleri Medigo uygulamasında, bizim saatlerimizden daha güvenilir."],
+["Voir les horaires et l'affluence sur Medigo", "See hours and crowding in Medigo", "Saatleri ve yoğunluğu Medigo'da gör"],
 ["Hôpital le plus proche", "Nearest hospital", "En yakın hastane"],
 ["Aucune pharmacie ouverte trouvée", "No open pharmacy found", "Açık eczane bulunamadı"],
 ["Pour la pharmacie de garde, appelle la Centrale des médecins de garde :", "For the on-duty pharmacy, call the on-call doctors line:", "Nöbetçi eczane için nöbetçi doktor hattını ara:"],
