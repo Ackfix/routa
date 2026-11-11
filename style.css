@@ -379,3 +379,6 @@ body.night .speedbox.over .speedunit{color:#fff}
 .mk-poi.hospital svg,.mk-poi.pharmacy svg{stroke:#fff;stroke-width:2.6}
 .chip[data-open=hospital]{color:#FF8F94}
 .chip[data-open=pharmacy]{color:#5BD99A}
+.mk-poi.wc{background:#0E7C86;color:#fff}
+.mk-poi.wc svg{stroke:#fff}
+.chip[data-open=wc]{color:#5FD3DC}
