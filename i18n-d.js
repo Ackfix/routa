@@ -1,5 +1,7 @@
 /* ROUTA – traductions (3/3) : nouveautés 0.9 (amis, convoi, rassemblements, carnet, parking, cols, menu…) */
 window.ROUTA_I18N_ROWS = (window.ROUTA_I18N_ROWS || []).concat([
+["Transports publics", "Public transport", "Toplu taşıma"],
+["Arrêts de bus, tram, métro et gares. Touche un arrêt pour voir les lignes et les prochains départs.", "Bus, tram and metro stops and stations. Tap a stop to see its lines and next departures.", "Otobüs, tramvay, metro durakları ve istasyonlar. Hatları ve sonraki kalkışları görmek için bir durağa dokun."],
 ["WC", "Toilets", "Tuvalet"],
 ["WC public", "Public toilet", "Umumi tuvalet"],
 ["Gratuits", "Free", "Ücretsiz"],
