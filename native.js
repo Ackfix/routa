@@ -1,3 +1,51 @@
+/* ROUTA – position GPS par l'iPhone (une seule autorisation, celle d'iOS). Sur le web et Android, rien ne change. */
+(function () {
+  'use strict';
+  const C = window.Capacitor;
+  const G = C && C.Plugins && C.Plugins.RoutaGeo;
+  if (!G || !C.getPlatform || C.getPlatform() !== 'ios' || !navigator.geolocation) return;
+  const geo = navigator.geolocation;
+  const orig = { w: geo.watchPosition.bind(geo), c: geo.clearWatch.bind(geo), g: geo.getCurrentPosition.bind(geo) };
+  const watchers = new Map();
+  let seq = 0, last = null, started = false, failed = false;
+  const pos = (k) => ({ coords: { latitude: k.lat, longitude: k.lon, accuracy: k.acc, altitude: k.alt, altitudeAccuracy: null, speed: k.speed >= 0 ? k.speed : null, heading: k.heading >= 0 ? k.heading : null }, timestamp: k.t || Date.now() });
+  const denied = { code: 1, message: 'denied', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 };
+  function begin() {
+    if (started) return; started = true;
+    G.addListener('position', (k) => {
+      if (!k || !isFinite(k.lat) || !isFinite(k.lon)) return;
+      last = pos(k);
+      watchers.forEach((w) => { if (!w.native) { try { w.ok(last); } catch (e) { console.warn(e); } } });
+    });
+    G.addListener('error', (k) => {
+      if (!k || k.code !== 1) return;
+      const list = [...watchers.values()]; watchers.clear();
+      list.forEach((w) => { if (w.err) { try { w.err(denied); } catch (e) { console.warn(e); } } });
+    });
+    Promise.resolve().then(() => G.start()).catch(() => {
+      failed = true;
+      watchers.forEach((w) => { if (w.native == null) w.native = orig.w(w.ok, w.err, w.opt); });
+    });
+  }
+  geo.watchPosition = function (ok, err, opt) {
+    const id = ++seq, w = { ok, err, opt, native: null };
+    watchers.set(id, w);
+    if (failed) w.native = orig.w(ok, err, opt);
+    else { begin(); if (last) setTimeout(() => { if (watchers.has(id)) ok(last); }, 0); }
+    return id;
+  };
+  geo.clearWatch = function (id) {
+    const w = watchers.get(id);
+    if (w && w.native != null) orig.c(w.native);
+    watchers.delete(id);
+  };
+  geo.getCurrentPosition = function (ok, err, opt) {
+    if (failed) return orig.g(ok, err, opt);
+    if (last && Date.now() - last.timestamp < 15000) { setTimeout(() => ok(last), 0); return; }
+    const id = geo.watchPosition((p) => { geo.clearWatch(id); ok(p); }, (e) => { geo.clearWatch(id); if (err) err(e); }, opt);
+  };
+})();
+
 /* ROUTA – carte native iPhone.
    Dans l'app iPhone, la carte est dessinée par l'iPhone (MapLibre natif) sous l'interface web.
    La carte web reste en coulisses pour la logique (positions, clics, lieux) mais ne dessine plus rien.
