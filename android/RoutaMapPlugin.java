@@ -114,6 +114,7 @@ public class RoutaMapPlugin extends Plugin {
                     mapView.onStart();
                     mapView.onResume();
                     ViewGroup parent = (ViewGroup) web.getParent();
+                    parent.setBackgroundColor(Color.rgb(14, 17, 22));
                     parent.addView(mapView, 0, new ViewGroup.MarginLayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
                     web.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> syncBounds(web));
                     syncBounds(web);
@@ -376,11 +377,14 @@ public class RoutaMapPlugin extends Plugin {
         });
     }
 
-    private void syncBounds(WebView web) {
-        if (mapView == null || web.getWidth() == 0) return;
-        ViewGroup.LayoutParams lp = mapView.getLayoutParams();
-        if (lp.width != web.getWidth() || lp.height != web.getHeight()) { lp.width = web.getWidth(); lp.height = web.getHeight(); mapView.setLayoutParams(lp); }
-        mapView.setX(web.getX()); mapView.setY(web.getY());
+    private void syncBounds(final WebView web) {
+        // appliqué après la mise en page : sinon le changement de taille est ignoré (ex. clavier refermé) et le bas de la carte reste vide
+        web.post(() -> {
+            if (mapView == null || web.getWidth() == 0) return;
+            ViewGroup.LayoutParams lp = mapView.getLayoutParams();
+            if (lp.width != web.getWidth() || lp.height != web.getHeight()) { lp.width = web.getWidth(); lp.height = web.getHeight(); mapView.setLayoutParams(lp); mapView.requestLayout(); }
+            mapView.setX(web.getX()); mapView.setY(web.getY());
+        });
     }
 
     private double cssX(float px) {
