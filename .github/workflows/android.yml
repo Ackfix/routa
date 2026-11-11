@@ -68,7 +68,7 @@ jobs:
           VC=$((100 + GITHUB_RUN_NUMBER))
           sed -i "s/versionCode 1$/versionCode $VC/; s/versionName \"1.0\"/versionName \"0.9.$GITHUB_RUN_NUMBER\"/" app/build.gradle
           grep -E "versionCode|versionName" app/build.gradle
-          sudo apt-get install -y -qq imagemagick > /dev/null
+          if ! command -v convert > /dev/null; then sudo rm -f /var/lib/man-db/auto-update; sudo DEBIAN_FRONTEND=noninteractive timeout 600 apt-get install -y -qq --no-install-recommends imagemagick > /dev/null; fi
           ICON=$GITHUB_WORKSPACE/icons/icon-512.png
           R=app/src/main/res
           for d in mdpi:48:108 hdpi:72:162 xhdpi:96:216 xxhdpi:144:324 xxxhdpi:192:432; do
