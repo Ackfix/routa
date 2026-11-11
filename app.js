@@ -1813,7 +1813,7 @@ async function openPlace(f) {
   const pr = f.properties || {}; const g = f.geometry.coordinates;
   const sub = pr.subclass || pr.class || '';
   const label = SUB_FR[sub] || SUB_FR[pr.class] || (sub ? sub.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) : 'Lieu');
-  const name = pr['name:fr'] || pr.name || pr['name:latin'] || label;
+  const name = pr['name:' + I18N.lang] || pr.name || pr['name:latin'] || I18N.t(label);
   const kind = FOOD_CLS.test(pr.class) || FOOD_CLS.test(sub) ? 'food' : pr.class === 'fuel' ? 'fuel' : pr.class === 'parking' ? 'parking' : (SHOP_CLS.test(pr.class) || SHOP_CLS.test(sub)) ? 'shops' : 'place';
   const p = { id: 'map/' + name.toLowerCase().replace(/\s+/g, ' ').trim() + '@' + g[1].toFixed(4) + ',' + g[0].toFixed(4), name, lat: g[1], lon: g[0], details: label };
   openSheet(name, '<p class="muted">Chargement…</p>', 'place');
