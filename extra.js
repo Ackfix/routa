@@ -558,7 +558,7 @@ setInterval(() => {
   const d = j < L.length ? N.R.cum[j] - (N.along || 0) : Infinity;
   const nx = j < L.length ? cap(L[j]) : null;
   if (nx && d > 0 && d < 800) {
-    box.hidden = false; box.querySelector('.ln-sign').textContent = nx; box.querySelector('.ln-dist').textContent = 'dans ' + fmtDist(Math.round(d / 10) * 10);
+    box.hidden = false; box.querySelector('.ln-sign').textContent = nx; box.querySelector('.ln-dist').textContent = TRX('dans {d}', { d: fmtDist(Math.round(d / 10) * 10) });
     if (ccur && nx < ccur && d < 350 && limSaidFor !== j && S.settings.speedAlert) { limSaidFor = j; say('Limitation à ' + nx + ' dans ' + (d < 100 ? 'quelques mètres' : Math.round(d / 50) * 50 + ' mètres')); }
   } else box.hidden = true;
 }, 1000);
