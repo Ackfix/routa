@@ -343,13 +343,22 @@ window.ROUTA_I18N_SUB = ["Suisse", "France", "Italie", "Allemagne", "Autriche", 
 (function () {
   const DATA = { en: {}, tr: {}, sub: (window.ROUTA_I18N_SUB || []).concat(window.ROUTA_I18N_SUB_EXTRA || []) };
   (window.ROUTA_I18N_ROWS || []).forEach((r) => { DATA.en[r[0]] = r[1]; DATA.tr[r[0]] = r[2]; });
-  const LANGS = { fr: 'Français', en: 'English', tr: 'Türkçe' };
+  const XL = window.ROUTA_I18N_L || {};
+  const KEYS = []; { const seen = new Set(); (window.ROUTA_I18N_ROWS || []).forEach((r) => { if (!seen.has(r[0])) { seen.add(r[0]); KEYS.push(r[0]); } }); }
+  const hk = (n) => { const x = KEYS.slice(0, n).join('\u0001'); let h = 0; for (let i = 0; i < x.length; i++) h = (h * 31 + x.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+  Object.keys(XL).forEach((k) => {
+    const x = XL[k]; const d = {};
+    if (x.v && KEYS.length >= x.n && hk(x.n) === x.h) { for (let i = 0; i < x.n; i++) if (x.v[i]) d[KEYS[i]] = x.v[i]; DATA[k] = d; }
+    else DATA[k] = DATA.en;
+  });
+  const LANGS = { fr: 'Français', en: 'English', de: 'Deutsch', it: 'Italiano', pt: 'Português', es: 'Español', sq: 'Shqip', sr: 'Srpski', tr: 'Türkçe' };
   let lang = null;
   try { lang = localStorage.getItem('routa.lang'); } catch (e) { /* */ }
-  if (!LANGS[lang]) { const n = (navigator.language || 'fr').slice(0, 2).toLowerCase(); lang = n === 'tr' ? 'tr' : n === 'en' ? 'en' : 'fr'; }
-  const SPEECH = { fr: 'fr-FR', en: 'en-GB', tr: 'tr-TR' };
+  if (!LANGS[lang]) { let n = (navigator.language || 'fr').slice(0, 2).toLowerCase(); if (/^(hr|bs|sh|me)$/.test(n)) n = 'sr'; lang = LANGS[n] ? n : 'fr'; }
+  if (lang !== 'fr' && lang !== 'en' && lang !== 'tr' && !XL[lang]) lang = 'fr';
+  const SPEECH = { fr: 'fr-FR', en: 'en-GB', tr: 'tr-TR', de: 'de-DE', it: 'it-IT', pt: 'pt-PT', es: 'es-ES', sq: 'sq-AL', sr: 'sr-RS' };
   const I = window.ROUTA_I18N = {
-    lang, langs: LANGS, speech: SPEECH[lang], valhalla: { fr: 'fr-FR', en: 'en-GB', tr: 'tr-TR' }[lang],
+    lang, langs: LANGS, speech: SPEECH[lang], valhalla: { fr: 'fr-FR', en: 'en-GB', tr: 'tr-TR', de: 'de-DE', it: 'it-IT', pt: 'pt-PT', es: 'es-ES', sq: 'en-GB', sr: 'en-GB' }[lang],
     t: (s) => s, step: null,
     setLang(l) { try { localStorage.setItem('routa.lang', l); } catch (e) { /* */ } location.reload(); }
   };
@@ -369,8 +378,8 @@ window.ROUTA_I18N_SUB = ["Suisse", "France", "Italie", "Allemagne", "Autriche", 
     if (l != null) return s.charAt(0) === s.charAt(0).toLowerCase() ? l.charAt(0).toLowerCase() + l.slice(1) : cap(l);
     return null;
   }
-  const num = (g) => g.replace(' virgule ', lang === 'tr' ? ',' : '.');
-  const P = ((window.ROUTA_I18N_PX || {})[lang] || []).concat({
+  const num = (g) => g.replace(' virgule ', lang === 'en' ? '.' : ',');
+  const P = ((window.ROUTA_I18N_PX || {})[lang] || []).concat((XL[lang] && XL[lang].px) || [], {
     en: [
       [/^Dans (.+?), (.+)$/, (a, b) => 'In ' + num(a) + ', ' + b, [2]],
       [/^C'est parti\. (.+)\. Puis, (.+)$/, (a, b) => "Let's go. " + a + '. Then, ' + b, [1, 2]],
@@ -427,7 +436,8 @@ window.ROUTA_I18N_SUB = ["Suisse", "France", "Italie", "Allemagne", "Autriche", 
     tr: { left: 'sola', right: 'sağa', 'slight left': 'hafif sola', 'slight right': 'hafif sağa', 'sharp left': 'keskin sola', 'sharp right': 'keskin sağa', straight: 'düz', uturn: 'U dönüşü' }
   }[lang];
   const ORD = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth'];
-  I.step = function (s) {
+  if (XL[lang] && XL[lang].step) { I.step = (s) => XL[lang].step(s); I.dir = XL[lang].dir; }
+  else I.step = function (s) {
     const m = s.maneuver || {}; const ty = m.type; const mod = m.modifier || '';
     const name = s.name || s.ref || '';
     const d = DIR[mod] || '';
