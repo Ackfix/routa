@@ -411,3 +411,21 @@ body:not(.navigating) .hazchip, #alertNear:not([hidden]) ~ .hazchip { display: n
 .mk-me i { width: 40px; height: 40px; border-radius: 20px; border-width: 3.5px; }
 .mk-me svg { width: 20px; height: 20px; }
 #navBanner:has(#laneBar:not([hidden])) ~ .hazchip { top: calc(var(--sat) + 196px); }
+
+/* Mode pro : temps de conduite */
+.prochip { position: fixed; z-index: 16; left: max(12px, var(--sal)); top: calc(var(--sat) + 74px); display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border: 0; border-radius: 999px; background: rgba(20,23,29,.9); color: #F4F6FA; font: 600 13px var(--font); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+.prochip .pcdot { width: 9px; height: 9px; border-radius: 50%; background: #3DD68C; }
+.prochip.warn .pcdot { background: var(--alert); }
+.prochip.over { background: #8A1F24; }
+.prochip.over .pcdot { background: #fff; }
+body.navigating .prochip { top: auto; bottom: calc(var(--sab) + 236px); }
+.proacts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0; }
+.proacts button { padding: 10px 4px; border: 0; border-radius: 12px; background: var(--surface2, rgba(255,255,255,.06)); color: var(--fg); font: 600 13px var(--font); }
+.proacts button.on { background: var(--info); color: #fff; }
+.procard { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; margin: 8px 0; border-radius: 14px; background: var(--surface2, rgba(255,255,255,.05)); }
+.prorow { display: flex; justify-content: space-between; gap: 10px; }
+.probar { height: 8px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; }
+.probar i { display: block; height: 100%; background: #3DD68C; }
+.probar i.warn { background: var(--alert); }
+.probar i.over { background: #E5484D; }
+.prolog { white-space: pre-wrap; font: 13px/1.5 ui-monospace, Menlo, monospace; background: rgba(255,255,255,.04); padding: 12px; border-radius: 12px; max-height: 50vh; overflow: auto; }
