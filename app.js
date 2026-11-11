@@ -446,7 +446,7 @@ function openMapView() {
     '<h3>Type de carte</h3>' + seg('mvType', [['plan', 'Plan'], ['sat', 'Satellite']], S.settings.mapType) +
     '<label class="switch" for="mvTraffic"><span><b>Trafic en direct</b><br><span class="muted small">Vert fluide, orange ralenti, rouge bouchon. Accidents et travaux en zoomant.</span></span><input id="mvTraffic" type="checkbox"' + (S.settings.traffic && CFG.tomtomKey ? ' checked' : '') + (CFG.tomtomKey ? '' : ' disabled') + '></label>' +
     (CFG.tomtomKey ? '' : '<p class="muted small">Trafic en direct bientôt disponible.</p>') +
-    '<label class="switch" for="mvTransit"><span><b>Arrêts de bus et de tram</b><br><span class="muted small">Touche un arrêt pour voir les lignes et les prochains départs.</span></span><input id="mvTransit" type="checkbox"' + (S.settings.showTransit ? ' checked' : '') + '></label>' +
+    '<label class="switch" for="mvTransit"><span><b>Transports publics</b><br><span class="muted small">Arrêts de bus, tram, métro et gares. Touche un arrêt pour voir les lignes et les prochains départs.</span></span><input id="mvTransit" type="checkbox"' + (S.settings.showTransit ? ' checked' : '') + '></label>' +
     '<label class="switch" for="mvPlaces"><span>Afficher les établissements (restos, magasins…) en zoomant</span><input id="mvPlaces" type="checkbox"' + (S.settings.showPlaces ? ' checked' : '') + '></label>' +
     '<h3>Couleurs</h3>' + seg('mvNight', [['auto', 'Auto'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
     '<h3>Pendant la navigation</h3>' + seg('mvNav', [['route', 'Dans le sens de la route'], ['north', 'Nord en haut']], S.settings.navNorth ? 'north' : 'route') +
@@ -1500,7 +1500,7 @@ const SUB_FR = { restaurant: 'Restaurant', fast_food: 'Fast-food', cafe: 'Café'
 const FOOD_CLS = /^(restaurant|fast_food|cafe|bar|beer|pub|ice_cream|food_court|biergarten)$/;
 const SHOP_CLS = /^(shop|grocery|bakery|butcher|alcohol_shop|clothing_store|jewelry|furniture|hardware|car|bicycle|books|florist|supermarket|convenience|electronics|mobile_phone|shoes|toys|sports|pet|garden_centre|department_store|mall|doityourself|optician|deli|kiosk|gift|variety_store|computer|chemist|beauty|hairdresser|laundry|tobacco)$/;
 /* Arrêts de bus et de tram : masqués par défaut, prochains départs au toucher */
-const TRANSIT_STOP = ['any', ['==', ['get', 'class'], 'bus'], ['==', ['get', 'subclass'], 'bus_stop'], ['==', ['get', 'subclass'], 'bus_station'], ['==', ['get', 'subclass'], 'tram_stop']];
+const TRANSIT_STOP = ['any', ['==', ['get', 'class'], 'bus'], ['==', ['get', 'class'], 'railway'], ['==', ['get', 'class'], 'rail'], ['==', ['get', 'class'], 'ferry_terminal'], ['==', ['get', 'subclass'], 'bus_stop'], ['==', ['get', 'subclass'], 'bus_station'], ['==', ['get', 'subclass'], 'tram_stop'], ['==', ['get', 'subclass'], 'subway'], ['==', ['get', 'subclass'], 'station'], ['==', ['get', 'subclass'], 'halt']];
 function setupTransit() {
   try {
     POI_LAYERS.forEach((id) => { if (!map.getLayer(id)) return; const f = map.getFilter(id); map.setFilter(id, f ? ['all', f, ['!', TRANSIT_STOP]] : ['!', TRANSIT_STOP]); });
