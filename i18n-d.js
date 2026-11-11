@@ -1,5 +1,9 @@
 /* ROUTA – traductions (3/3) : nouveautés 0.9 (amis, convoi, rassemblements, carnet, parking, cols, menu…) */
 window.ROUTA_I18N_ROWS = (window.ROUTA_I18N_ROWS || []).concat([
+["Hôpital le plus proche", "Nearest hospital", "En yakın hastane"],
+["Aucune pharmacie ouverte trouvée", "No open pharmacy found", "Açık eczane bulunamadı"],
+["Pour la pharmacie de garde, appelle la Centrale des médecins de garde :", "For the on-duty pharmacy, call the on-call doctors line:", "Nöbetçi eczane için nöbetçi doktor hattını ara:"],
+["(Vaud).", "(Vaud).", "(Vaud)."],
 ["Hôpitaux", "Hospitals", "Hastaneler"],
 ["Pharmacies", "Pharmacies", "Eczaneler"],
 ["Le plus proche ouvert", "Nearest open", "En yakın açık"],
