@@ -848,7 +848,7 @@ const runSearch = debounce(async (text) => {
 function showResults(items, msg) {
   const box = $('results');
   if (!items.length) { box.innerHTML = '<div class="result"><span class="muted">' + esc(msg || 'Aucun résultat.') + '</span></div>'; box.hidden = false; return; }
-  box.innerHTML = items.map((it, i) => '<button class="result" data-i="' + i + '">' + (it.ackfix ? '<span class="ackico">A</span>' : ic(it.fav ? 'star' : it.spot ? 'spot' : it.recent ? 'clock' : 'pin')) + '<span class="grow"><b>' + esc(it.name) + '</b><small>' + esc(it.sub || '') + (S.pos && !it.nodist ? ' · ' + fmtDist(dist(S.pos, it)) : '') + '</small></span></button>').join('');
+  box.innerHTML = items.map((it, i) => '<button class="result" data-i="' + i + '">' + (it.ackfix ? '<span class="ackico">A</span>' : ic(it.fav ? 'star' : it.spot ? 'spot' : it.recent ? 'clock' : 'pin')) + '<span class="grow"><b>' + esc(it.name) + '</b><small>' + esc(it.sub || '') + (S.pos && !it.nodist ? (it.sub ? ' · ' : '') + fmtDist(dist(S.pos, it)) : '') + '</small></span></button>').join('');
   box.hidden = false;
   box.querySelectorAll('.result').forEach((b) => { b.onclick = () => { const it = items[+b.dataset.i]; hideResults(); q.blur(); if (it.ackfix) { openAckfix(); return; } if (S.pickSlot) { const k = S.pickSlot; q.value = ''; saveSlot(k, it); return; } chooseDestination(it); }; });
 }
@@ -2413,7 +2413,7 @@ function openMenu() {
     ['Ma voiture', [
       ['vehicle', ic(v.icon), 'Véhicule · ' + v.label],
       X.open && ['carnet', XI.book || ic('info'), 'Carnet d\'entretien'],
-      X.open && ['parked', XI.park || ic('parking'), 'Stationnement']
+      X.open && ['parked', XI.park || ic('parking'), 'Parking']
     ]]
   ];
   const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + t[1] + '<span>' + t[2] + '</span></button>';
