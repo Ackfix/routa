@@ -399,3 +399,15 @@ html.web.pwa #map { height: calc(100lvh + var(--sab)); }
 .hazchip { position: fixed; z-index: 24; left: 50%; transform: translateX(-50%); top: calc(var(--sat) + 132px); display: inline-flex; align-items: center; gap: 8px; max-width: calc(100% - 32px); padding: 7px 14px; border-radius: 999px; background: rgba(20,23,29,.88); color: #F4F6FA; font-size: 13px; font-weight: 600; box-shadow: 0 6px 18px rgba(0,0,0,.35); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hazchip .hzdot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--alert); }
 body:not(.navigating) .hazchip, #alertNear:not([hidden]) ~ .hazchip { display: none; }
+
+/* Voies à suivre */
+.lanebar { display: flex; justify-content: center; gap: 4px; margin: 6px 0 0; padding: 8px 10px; border-radius: 16px; background: #102A4A; box-shadow: 0 8px 20px rgba(0,0,0,.35); }
+.lanebar .lane { width: 38px; height: 42px; border-radius: 10px; display: grid; place-items: center; background: rgba(255,255,255,.06); }
+.lanebar .lane svg { width: 28px; height: 28px; fill: none; stroke: rgba(255,255,255,.32); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.lanebar .lane.on { background: rgba(77,163,255,.28); }
+.lanebar .lane.on svg { stroke: #fff; }
+/* Ma voiture un peu plus grande sur la carte */
+.mk-me { width: 62px; height: 62px; border-radius: 31px; }
+.mk-me i { width: 40px; height: 40px; border-radius: 20px; border-width: 3.5px; }
+.mk-me svg { width: 20px; height: 20px; }
+#navBanner:has(#laneBar:not([hidden])) ~ .hazchip { top: calc(var(--sat) + 196px); }
