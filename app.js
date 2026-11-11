@@ -64,6 +64,8 @@ const P = {
   fuel: '<path d="M4 21V5a2 2 0 012-2h7a2 2 0 012 2v16"/><path d="M3 21h13"/><path d="M15 9h2a2 2 0 012 2v5a1.5 1.5 0 003 0V8l-3-3"/><path d="M7 7h5v4H7z"/>',
   charge: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
   parking: '<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M10 17V7h3.5a3 3 0 010 6H10"/>',
+  hospital: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 7.5v9M7.5 12h9"/>',
+  pharmacy: '<circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/>',
   spot: '<path d="M3 20l6-10 4 6 3-4 5 8z"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
   msg: '<path d="M4 5h16v11H9l-5 4z"/>',
@@ -764,7 +766,30 @@ async function fetchJson(url, ms) {
   const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), ms || 6000);
   try { const r = await fetch(url, { signal: ac.signal }); if (!r.ok) throw new Error('http ' + r.status); return await r.json(); } finally { clearTimeout(tm); }
 }
+const KEY_PLACES = /^(hospital|clinic|pharmacy|police|fire_station|doctors)$/;
+async function nomiImportant(text, c) {
+  if (Date.now() - (GEO.nomiAt || 0) < 1100) return [];
+  GEO.nomiAt = Date.now();
+  try {
+    const vb = [c.lon - 1.5, c.lat + 1, c.lon + 1.5, c.lat - 1].map((x) => x.toFixed(3)).join(',');
+    const j = await fetchJson(NOMI + '/search?format=jsonv2&addressdetails=1&limit=5&bounded=1&accept-language=' + I18N.lang + '&viewbox=' + vb + '&q=' + encodeURIComponent(text), 4000);
+    return (j || []).filter((x) => KEY_PLACES.test(x.type)).map((x) => {
+      const a = x.address || {};
+      const city = a.city || a.town || a.village || a.municipality || '';
+      const street = [a.road, a.house_number].filter(Boolean).join(' ');
+      const kind = I18N.t(SUB_FR[x.type] || '');
+      return { name: x.name || (x.display_name || '').split(',')[0], sub: [kind, street, [a.postcode, city].filter(Boolean).join(' ')].filter(Boolean).join(' · '), lat: +x.lat, lon: +x.lon, key: true };
+    });
+  } catch (e) { return []; }
+}
 async function geoSearch(text, c) {
+  const imp = nomiImportant(text, c);
+  const base = await geoSearchBase(text, c).catch(() => []);
+  const top = await imp;
+  if (!top.length) return base;
+  return top.concat(base.filter((b) => !top.some((t) => dist(t, b) < 150))).slice(0, 8);
+}
+async function geoSearchBase(text, c) {
   if (Date.now() > GEO.photonOffUntil) {
     try {
       const params = new URLSearchParams({ q: text, limit: '7', lang: I18N.lang === 'fr' ? 'fr' : 'en', lat: c.lat.toFixed(4), lon: c.lon.toFixed(4) });
@@ -773,7 +798,8 @@ async function geoSearch(text, c) {
         const p = f.properties || {};
         const line1 = p.name || [p.street, p.housenumber].filter(Boolean).join(' ') || p.city || 'Lieu';
         const line2 = [p.name ? [p.street, p.housenumber].filter(Boolean).join(' ') : '', [p.postcode, p.city].filter(Boolean).join(' '), p.country].filter(Boolean).join(', ');
-        return { name: line1, sub: line2, lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] };
+        const kind = SUB_FR[p.osm_value] && p.osm_key !== 'place' && p.osm_key !== 'highway' ? I18N.t(SUB_FR[p.osm_value]) : (p.osm_key === 'highway' && p.osm_value === 'bus_stop' ? I18N.t('Arrêt de bus') : '');
+        return { name: line1, sub: [kind, line2].filter(Boolean).join(' · '), lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] };
       });
     } catch (e) { GEO.photonOffUntil = Date.now() + 10 * 60000; }
   }
@@ -1140,11 +1166,13 @@ const OVERPASS_FILTER = {
   parking: ['["amenity"="parking"]["access"!~"^(private|no|customers|permissive_no)$"]'],
   food: ['["amenity"~"^(restaurant|fast_food|cafe)$"]'],
   shops: ['["shop"~"^(supermarket|convenience|bakery|kiosk|butcher|deli|mall|department_store|car_parts|car_repair|tyres|hardware|doityourself)$"]'],
+  hospital: ['["amenity"="hospital"]'],
+  pharmacy: ['["amenity"="pharmacy"]'],
   truckstop: ['["amenity"="parking"]["hgv"~"^(yes|designated)$"]', '["highway"~"^(rest_area|services)$"]', '["amenity"="fuel"]["hgv"~"^(yes|designated)$"]']
 };
-const KIND_LABEL = { fuel: 'Essence', charge: 'Recharge', parking: 'Parking', food: 'Restos', shops: 'Magasins', truckstop: 'Aires poids lourds', place: 'Lieu' };
-const KIND_COLOR = { fuel: 'var(--alert)', charge: 'var(--ok)', parking: 'var(--info)', food: '#FF9DA1', shops: '#C9A2FF', truckstop: '#7FE0C2', place: '#F2F4F7' };
-const KIND_RADIUS = { fuel: 6000, charge: 6000, parking: 2500, food: 2000, shops: 2500, truckstop: 20000 };
+const KIND_LABEL = { hospital: 'Hôpitaux', pharmacy: 'Pharmacies', fuel: 'Essence', charge: 'Recharge', parking: 'Parking', food: 'Restos', shops: 'Magasins', truckstop: 'Aires poids lourds', place: 'Lieu' };
+const KIND_COLOR = { hospital: '#E5484D', pharmacy: '#16A05A', fuel: 'var(--alert)', charge: 'var(--ok)', parking: 'var(--info)', food: '#FF9DA1', shops: '#C9A2FF', truckstop: '#7FE0C2', place: '#F2F4F7' };
+const KIND_RADIUS = { hospital: 30000, pharmacy: 5000, fuel: 6000, charge: 6000, parking: 2500, food: 2000, shops: 2500, truckstop: 20000 };
 const RATED = { food: 1, shops: 1, truckstop: 1, fuel: 1, parking: 1, charge: 1, place: 1 };
 const SHOP_FR = { supermarket: 'Supermarché', convenience: 'Épicerie', bakery: 'Boulangerie', kiosk: 'Kiosque', butcher: 'Boucherie', deli: 'Traiteur', mall: 'Centre commercial', department_store: 'Grand magasin', car_parts: 'Pièces auto', car_repair: 'Garage', tyres: 'Pneus', hardware: 'Quincaillerie', doityourself: 'Bricolage' };
 const CUISINE_FR = { pizza: 'Pizza', burger: 'Burger', kebab: 'Kebab', italian: 'Italien', turkish: 'Turc', chinese: 'Chinois', japanese: 'Japonais', sushi: 'Sushi', indian: 'Indien', thai: 'Thaï', french: 'Français', swiss: 'Suisse', regional: 'Régional', asian: 'Asiatique', mexican: 'Mexicain', lebanese: 'Libanais', portuguese: 'Portugais', spanish: 'Espagnol', greek: 'Grec', vietnamese: 'Vietnamien', chicken: 'Poulet', sandwich: 'Sandwichs', coffee_shop: 'Café', ice_cream: 'Glaces', steak_house: 'Grill', seafood: 'Fruits de mer', vegetarian: 'Végétarien', vegan: 'Végan' };
@@ -1153,7 +1181,7 @@ function parseOsm(e, kind) {
   const lat = e.lat != null ? e.lat : e.center && e.center.lat;
   const lon = e.lon != null ? e.lon : e.center && e.center.lon;
   const DEF = { fuel: 'Station-service', charge: 'Borne de recharge', parking: 'Parking', food: 'Restaurant', shops: SHOP_FR[t.shop] || 'Magasin', truckstop: t.highway === 'services' ? 'Aire de service' : t.highway === 'rest_area' ? 'Aire de repos' : t.amenity === 'fuel' ? 'Station poids lourds' : 'Parking poids lourds' };
-  let name = t.name || t.brand || t.operator || DEF[kind];
+  let name = t.name || t.brand || t.operator || DEF[kind] || (kind === 'hospital' ? 'Hôpital' : kind === 'pharmacy' ? 'Pharmacie' : 'Lieu');
   if (t.brand && t.name && !t.name.toLowerCase().includes(t.brand.toLowerCase())) name = t.brand + ' · ' + t.name;
   const details = [];
   if (kind === 'fuel') {
@@ -1183,6 +1211,10 @@ function parseOsm(e, kind) {
     if (t.shower === 'yes') details.push('Douches');
     if (t.fee === 'no') details.push('Gratuit'); else if (t.fee === 'yes') details.push('Payant');
     if (t['fuel:adblue'] === 'yes') details.push('AdBlue');
+  } else if (kind === 'hospital') {
+    if (t.emergency === 'yes') details.push('Urgences');
+  } else if (kind === 'pharmacy') {
+    if (t.opening_hours === '24/7') details.push('24 h/24');
   } else if (kind === 'charge') {
     const sockets = [];
     if (t['socket:type2_combo']) sockets.push('CCS');
@@ -1275,8 +1307,36 @@ async function openPoiList(kind) {
   if (RATED[kind]) await attachRatings(list);
   renderPoiList(kind, list, c);
 }
+/* Hôpitaux et pharmacies : le plus proche ouvert en premier */
+function healthStatus(p, kind) {
+  const t = p.tags || {};
+  if (kind === 'hospital' && t.emergency === 'yes') return { open: true, txt: 'Urgences 24 h/24' };
+  return ohStatus(ohParse(p.hours));
+}
+function renderHealthList(kind, list) {
+  list.forEach((p) => { p.st = healthStatus(p, kind); p.rank = p.st ? (p.st.open ? 0 : 2) : 1; if (kind === 'hospital' && (p.tags || {}).emergency === 'yes') p.rank -= 0.5; });
+  const sorted = list.slice().sort((a, b) => a.rank - b.rank || a.dist - b.dist).slice(0, 40);
+  showPois(sorted, kind);
+  const body = $('sheetBody');
+  let html = '';
+  const best = sorted.find((p) => p.st && p.st.open) || sorted[0];
+  if (best) {
+    html += '<div class="banner">' + ic(kind) + '<span><b>' + (best.st && best.st.open ? 'Le plus proche ouvert' : 'Le plus proche') + '</b><br>' + esc(best.name) + ' · ' + fmtDist(best.dist) + (best.st ? ' · ' + esc(best.st.txt) : '') + '</span></div>';
+    html += '<button class="btn block" id="hGo">' + ic('nav') + 'Y aller</button>';
+  }
+  if (kind === 'hospital') html += medigoBlock();
+  if (!sorted.length) html += '<div class="empty">Rien trouvé dans ce coin. Déplace la carte et réessaie.</div>';
+  html += sorted.map((p, i) => '<button class="card tap" data-i="' + i + '"><div class="ico" style="background:' + KIND_COLOR[kind] + '">' + ic(kind) + '</div><div class="grow"><b>' + esc(p.name) + '</b><div class="sub">' +
+    (p.st ? '<span class="' + (p.st.open ? 'oh-open' : 'oh-closed') + '">' + esc(p.st.txt) + '</span>' : esc(p.details || 'Horaires inconnus')) + '</div></div><div class="val"><small>' + fmtDist(p.dist) + '</small></div></button>').join('');
+  html += '<p class="muted small">Lieux et horaires : OpenStreetMap, parfois pas à jour. En cas d\'urgence vitale : 144.</p>';
+  body.innerHTML = html;
+  const g = body.querySelector('#hGo'); if (g) g.onclick = () => { closeSheet(); chooseDestination({ name: best.name, sub: KIND_LABEL[kind], lat: best.lat, lon: best.lon }); };
+  body.querySelectorAll('.card').forEach((b) => { b.onclick = () => openPoi(sorted[+b.dataset.i], kind); });
+  S.lastPoiList = { kind, list };
+}
 function renderPoiList(kind, list, c) {
   if (S.sheetView !== 'poi-' + kind) return;
+  if (kind === 'hospital' || kind === 'pharmacy') { renderHealthList(kind, list); return; }
   let sorted = list.slice();
   if (kind === 'fuel' && poiSort === 'cheap') sorted.sort((a, b) => (a.mainPrice == null) - (b.mainPrice == null) || (a.mainPrice || 0) - (b.mainPrice || 0) || a.dist - b.dist);
   else if (kind !== 'fuel' && poiSort === 'best') sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0) || b.ratingCount - a.ratingCount || a.dist - b.dist);
@@ -1394,6 +1454,7 @@ function openPoi(p, kind) {
   html += '<button class="btn block" id="poiGo">' + ic('nav') + 'Y aller</button>';
   html += '<button class="btn soft block" id="poiFav">' + ic('star') + (favAt(p, 25) ? 'Dans tes favoris' : 'Enregistrer en favori') + '</button>';
   const body = openSheet(p.name, html, 'poi');
+  if (kind === 'hospital') body.insertAdjacentHTML('afterbegin', medigoBlock());
   const rb = body.querySelector('#poiRate'); if (rb) rb.onclick = () => openRateForm(p, kind);
   body.querySelector('#poiGo').onclick = () => { closeSheet(); chooseDestination({ name: p.name, sub: KIND_LABEL[kind], lat: p.lat, lon: p.lon }); };
   body.querySelector('#poiFav').onclick = () => addFav({ name: p.name, addr: p.addr || '', lat: p.lat, lon: p.lon });
@@ -1476,8 +1537,57 @@ async function openStop(f) {
     const iv = setInterval(async () => { if (token !== S.stopTok || S.sheetView !== 'poistop' || $('sheetWrap').hidden || !(await load())) clearInterval(iv); }, 30000);
   }
 }
+/* Lieux essentiels (hôpitaux, pharmacies, police) : toujours visibles et faciles à reconnaître */
+const ESS = [
+  { id: 'hosp', f: ['all', ['==', ['get', 'class'], 'hospital'], ['==', ['get', 'subclass'], 'hospital']], min: 11, lab: 13, fill: '#E5484D', ring: '#FFFFFF', glyph: '+', txt: '#C62828', big: 1.25 },
+  { id: 'police', f: ['==', ['get', 'class'], 'police'], min: 13, lab: 15, fill: '#FFFFFF', ring: '#1E4FD8', icon: 'police', txt: '#1E4FD8' },
+  { id: 'pharm', f: ['==', ['get', 'class'], 'pharmacy'], min: 14, lab: 16, fill: '#16A05A', ring: '#FFFFFF', glyph: '+', txt: '#0F7A43' }
+];
+const ESS_ANY = ['any'].concat(ESS.map((k) => k.f));
+const ESS_DOTS = ESS.map((k) => 'ess-' + k.id);
+function setupEssentials() {
+  try {
+    if (!map.getSource('openmaptiles')) return;
+    POI_LAYERS.concat(['poi_transit']).forEach((id) => { if (!map.getLayer(id)) return; const f = map.getFilter(id); map.setFilter(id, f ? ['all', f, ['!', ESS_ANY]] : ['!', ESS_ANY]); });
+    const before = map.getLayer('route-casing') ? 'route-casing' : undefined;
+    const pt = ['match', ['geometry-type'], ['Point', 'MultiPoint'], true, false];
+    ESS.forEach((k) => {
+      const filt = ['all', pt, k.f];
+      map.addLayer({ id: 'ess-' + k.id, type: 'circle', source: 'openmaptiles', 'source-layer': 'poi', minzoom: k.min, filter: filt,
+        paint: { 'circle-color': k.fill, 'circle-radius': ['interpolate', ['linear'], ['zoom'], k.min, 7 * (k.big || 1), 15, 11 * (k.big || 1), 18, 15 * (k.big || 1)], 'circle-stroke-color': k.ring, 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], k.min, k.icon ? 2.5 : 1.5, 16, k.icon ? 4 : 3] } }, before);
+      map.addLayer(k.icon
+        ? { id: 'ess-' + k.id + '-g', type: 'symbol', source: 'openmaptiles', 'source-layer': 'poi', minzoom: k.min, filter: filt,
+          layout: { 'icon-image': k.icon, 'icon-size': ['interpolate', ['linear'], ['zoom'], k.min, 0.6, 15, 0.95, 18, 1.3], 'icon-allow-overlap': true, 'icon-ignore-placement': true } }
+        : { id: 'ess-' + k.id + '-g', type: 'symbol', source: 'openmaptiles', 'source-layer': 'poi', minzoom: k.min, filter: filt,
+          layout: { 'text-field': k.glyph, 'text-font': ['Noto Sans Bold'], 'text-size': ['interpolate', ['linear'], ['zoom'], k.min, 13 * (k.big || 1), 15, 19 * (k.big || 1), 18, 26 * (k.big || 1)], 'text-allow-overlap': true, 'text-ignore-placement': true, 'text-offset': [0, -0.05] },
+          paint: { 'text-color': '#FFFFFF' } }, before);
+      map.addLayer({ id: 'ess-' + k.id + '-n', type: 'symbol', source: 'openmaptiles', 'source-layer': 'poi', minzoom: k.lab, filter: filt,
+        layout: { 'text-field': ['coalesce', ['get', 'name:fr'], ['get', 'name']], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-anchor': 'top', 'text-offset': [0, 1.2], 'text-max-width': 9, 'text-optional': true },
+        paint: { 'text-color': k.txt, 'text-halo-color': '#FFFFFF', 'text-halo-width': 1.6 } }, before);
+    });
+  } catch (e) { console.warn('lieux essentiels', e); }
+  map.on('click', (e) => {
+    if (e._routaDone || S.placing || S.nav) return;
+    const layers = ESS_DOTS.filter((id) => map.getLayer(id));
+    if (!layers.length) return;
+    const pad = 26;
+    const fs = map.queryRenderedFeatures([[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]], { layers });
+    if (!fs.length) return;
+    let best = fs[0], bd = Infinity;
+    fs.forEach((f) => { const g = f.geometry && f.geometry.coordinates; if (!g) return; const p = map.project(g); const d = Math.hypot(p.x - e.point.x, p.y - e.point.y); if (d < bd) { bd = d; best = f; } });
+    e._routaDone = true;
+    openPlace(best);
+  });
+}
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function medigoBlock() {
+  const url = IS_IOS ? 'https://apps.apple.com/ch/app/urgences-vaud/id1091227650' : 'https://medigo.ch/';
+  return '<div class="banner">' + ic('clock') + '<span><b>Affluence aux urgences</b><br>Le temps d\'attente en direct des urgences vaudoises est disponible dans l\'app Medigo.</span></div>' +
+    '<a class="btn soft block" target="_blank" rel="noopener" href="' + url + '">' + ic('clock') + 'Voir l\'affluence avec Medigo</a>';
+}
 function setupPlaces() {
   setupTransit();
+  setupEssentials();
   try { map.setLayerZoomRange('poi_r1', 15, 24); map.setLayerZoomRange('poi_r7', 16, 24); map.setLayerZoomRange('poi_r20', 17, 24); } catch (e) { /* style différent */ }
   POI_LAYERS.forEach((id) => { try { if (map.getLayer(id)) map.setLayoutProperty(id, 'icon-size', 1.4); } catch (e) { /* */ } });
   applyPlaces();
@@ -1521,7 +1631,10 @@ async function openPlace(f) {
   if (tags) p.tags = tags;
   p.addr = addr;
   if (addr) p.details = label + ' · ' + addr;
-  if (S.sheetView === 'place') openPoi(p, kind);
+  if (S.sheetView === 'place') {
+    openPoi(p, kind);
+    if (pr.class === 'hospital') { const b = $('sheetBody'); if (b) b.insertAdjacentHTML('afterbegin', medigoBlock()); }
+  }
 }
 function openRateForm(p, kind) {
   const mine = (p.reviews || []).find((r) => r.created_by === S.me.id);
