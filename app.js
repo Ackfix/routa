@@ -659,7 +659,7 @@ function startGps() {
     speedLimitTick();
     countryTick(false);
     if (first) { first = false; map.jumpTo({ center: [now.lon, now.lat], zoom: 14.5 }); pushPresence(true); }
-    else if (S.follow) followCam();
+    else if (S.follow) { if (!S.nav) followCam(); }
     else if ((S.nav || (S.speed || 0) * 3.6 > 25) && Date.now() - (S.lastTouch || 0) > 12000) { S.follow = true; $('btnLocate').classList.add('active'); followCam(); }
     if (S.nav) navUpdate();
     checkNearAlerts();
@@ -734,7 +734,8 @@ function followCam() {
   const c = map.getCenter(), lc = S.lastCam;
   if (!moving && lc && !lc.moving && Math.abs(map.getPitch() - pitch) < 1 && Math.abs(map.getZoom() - zoom) < 0.05 && dist({ lat: c.lat, lon: c.lng }, v) < 3) return;
   S.lastCam = { moving };
-  map.easeTo({ center: [v.lon, v.lat], bearing, pitch, zoom, duration: 1000, easing: (t) => t, offset: [0, off], essential: true });
+  const turn = Math.abs(((bearing - map.getBearing()) % 360 + 540) % 360 - 180);
+  map.easeTo({ center: [v.lon, v.lat], bearing, pitch, zoom, duration: turn > 40 ? 600 : 1000, easing: (t) => t, offset: [0, off], essential: true });
 }
 setInterval(() => { if (S.follow && S.pos && !document.hidden) followCam(); }, 1500);
 
