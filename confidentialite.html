@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ROUTA · Confidentialité</title>
+<meta name="theme-color" content="#0E1116">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0E1116; --card:#171B22; --card2:#1F2530; --line:#2B3241; --fg:#F2F4F7; --muted:#A3ACB9; --accent:#FF8A3D; --alert:#FFC24D; --ok:#3DDC97; --info:#8EC5FF; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 Inter, system-ui, -apple-system, sans-serif; }
+main { max-width: 720px; margin: 0 auto; padding: calc(env(safe-area-inset-top, 0px) + 20px) max(18px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 60px) max(18px, env(safe-area-inset-left, 0px)); }
+.back { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 22px; background: var(--card); color: var(--fg); text-decoration: none; font-weight: 600; }
+h1 { font: 700 32px/1.15 "Space Grotesk", Inter, sans-serif; margin: 22px 0 6px; text-wrap: balance; }
+h2 { font: 700 22px "Space Grotesk", Inter, sans-serif; margin: 36px 0 10px; text-wrap: balance; }
+h3 { font-size: 17px; margin: 18px 0 4px; }
+.lead { color: var(--muted); margin: 0; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
+nav.toc a { height: 40px; padding: 0 14px; border-radius: 20px; background: var(--card); color: var(--fg); text-decoration: none; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; }
+section.card { background: var(--card); border-radius: 18px; padding: 6px 18px 16px; margin: 12px 0; }
+ol, ul { padding-left: 22px; margin: 8px 0; }
+li { margin: 7px 0; }
+b { font-weight: 600; }
+.tip { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--card2); font-size: 15px; }
+.warn { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: #2A2312; border-left: 4px solid var(--alert); font-size: 15px; }
+.key { display: inline-block; padding: 0 8px; border-radius: 6px; background: var(--card2); border: 1px solid var(--line); font-size: 14px; white-space: nowrap; }
+details { background: var(--card); border-radius: 14px; margin: 10px 0; padding: 0 16px; }
+summary { cursor: pointer; padding: 14px 0; font-weight: 600; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; float: right; color: var(--muted); font-weight: 700; }
+details[open] summary::after { content: "–"; }
+details p { margin: 0 0 14px; color: #D9DEE5; }
+a { color: var(--info); }
+a:focus-visible, summary:focus-visible { outline: 3px solid var(--info); outline-offset: 2px; }
+</style>
+<style>
+.lang { display: none; } html[data-l="fr"] .lang.fr, html[data-l="en"] .lang.en, html[data-l="tr"] .lang.tr, html[data-l="de"] .lang.de, html[data-l="it"] .lang.it, html[data-l="pt"] .lang.pt, html[data-l="es"] .lang.es, html[data-l="sq"] .lang.sq, html[data-l="sr"] .lang.sr { display: block; }
+.langbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; } .langbar button { height: 36px; padding: 0 14px; border-radius: 18px; border: 0; background: var(--card); color: var(--fg); font: 600 14px Inter, sans-serif; }
+.langbar button.on { background: var(--accent); color: #0E1116; }
+</style>
+<script>
+(function () { var l = 'fr'; try { l = localStorage.getItem('routa.lang') || ''; } catch (e) {} if (!/^(fr|en|tr|de|it|pt|es|sq|sr)$/.test(l)) { var n = (navigator.language || 'fr').slice(0, 2).toLowerCase(); if (/^(hr|bs|sh|me)$/.test(n)) n = 'sr'; l = /^(en|tr|de|it|pt|es|sq|sr)$/.test(n) ? n : 'fr'; } document.documentElement.setAttribute('data-l', l); document.documentElement.lang = l; })();
+function setL(l) { try { localStorage.setItem('routa.lang', l); } catch (e) {} document.documentElement.setAttribute('data-l', l); document.documentElement.lang = l; document.querySelectorAll('.langbar button').forEach(function (b) { b.classList.toggle('on', b.dataset.l === l); }); }
+</script>
+</head>
+<body>
+<main>
+<div class="langbar"><button data-l="fr" onclick="setL('fr')">Français</button><button data-l="en" onclick="setL('en')">English</button><button data-l="de" onclick="setL('de')">Deutsch</button><button data-l="it" onclick="setL('it')">Italiano</button><button data-l="pt" onclick="setL('pt')">Português</button><button data-l="es" onclick="setL('es')">Español</button><button data-l="sq" onclick="setL('sq')">Shqip</button><button data-l="sr" onclick="setL('sr')">Srpski</button><button data-l="tr" onclick="setL('tr')">Türkçe</button></div>
+
+<div class="lang fr">
+<a class="back" href="./">‹ Retour à la carte</a>
+<h1>Confidentialité et règles d'utilisation</h1>
+<p class="lead">Version du 11 novembre 2026.</p>
+<h2>Qui est responsable</h2>
+<section class="card"><p>ROUTA est édité par <b>ACKFIX</b>, Canton de Vaud, Suisse. Contact : <a href="mailto:admin@ackfix.com">admin@ackfix.com</a>.</p></section>
+<h2>Ce que ROUTA enregistre</h2>
+<section class="card"><ul>
+<li><b>Uniquement sur ton téléphone :</b> favoris, carnet d'entretien, voiture garée, réglages.</li>
+<li><b>Sur la base partagée (mode en ligne) :</b> un identifiant aléatoire, ton pseudo, ta voiture, ta couleur, ton code ami et ta liste d'amis ; ta position, ta direction et ta vitesse pendant que l'app est ouverte (rien en mode invisible) ; les alertes, spots, notes, prix, rassemblements et messages rapides que tu publies.</li>
+<li>ROUTA ne demande <b>ni nom réel, ni e-mail, ni numéro de téléphone</b>.</li>
+</ul></section>
+<h2>Qui voit quoi</h2>
+<section class="card"><ul>
+<li>Tes amis voient ta position exacte. Les autres voient seulement une zone d'environ 1 km. En mode invisible, personne ne te voit.</li>
+<li>Un lien « Partager ma position » ne fonctionne que jusqu'à l'heure choisie.</li>
+<li>Les alertes disparaissent après 2 heures (24 heures pour les travaux).</li>
+</ul></section>
+<h2>Services utilisés</h2>
+<section class="card"><p>Pour afficher la carte, calculer les trajets, le trafic, la météo et les horaires, ton téléphone envoie la zone ou l'adresse concernée à ces services : OpenFreeMap, OSRM, FOSSGIS (Valhalla), komoot (Photon), OpenStreetMap (Nominatim, Overpass), TomTom, Open-Meteo, transport.opendata.ch, ParkenDD, swisstopo, EOX et Amazon Web Services (relief). La base partagée est hébergée par Supabase. Certains de ces services sont situés hors de Suisse (Union européenne, États-Unis).</p></section>
+<h2>Tes droits</h2>
+<section class="card"><p>Tu peux consulter, corriger ou effacer tes données à tout moment : <span class="key">Menu › Mon profil › Supprimer mes données</span>, ou en nous écrivant.</p></section>
+<h2>Règles d'utilisation</h2>
+<section class="card"><ul>
+<li><b>Contrôles de police et radars :</b> les signaler publiquement est interdit en Suisse (art. 98a LCR). ROUTA ne le permet pas et bloque ces mentions.</li>
+<li><b>Au volant :</b> ne manipule pas ton téléphone (art. 31 LCR et art. 3 OCR). Utilise la voix, demande à un passager ou arrête-toi.</li>
+<li>Les limitations, itinéraires et infos sont indicatifs : la signalisation et les ordres de la police font toujours foi.</li>
+<li>Convois et rassemblements doivent respecter la loi : pas de courses ni d'excès de vitesse.</li>
+<li>Pas de contenu illégal, insultant ou trompeur. ACKFIX peut supprimer un contenu ou un profil.</li>
+<li>ROUTA est un prototype gratuit, fourni sans garantie. Le droit suisse s'applique.</li>
+</ul></section>
+</div>
+
+<div class="lang en">
+<a class="back" href="./">‹ Back to the map</a>
+<h1>Privacy and terms of use</h1>
+<p class="lead">Version of 11 November 2026.</p>
+<h2>Who is responsible</h2>
+<section class="card"><p>ROUTA is published by <b>ACKFIX</b>, Canton of Vaud, Switzerland. Contact: <a href="mailto:admin@ackfix.com">admin@ackfix.com</a>.</p></section>
+<h2>What ROUTA stores</h2>
+<section class="card"><ul>
+<li><b>Only on your phone:</b> favourites, maintenance log, parked car, settings.</li>
+<li><b>In the shared database (online mode):</b> a random ID, your nickname, your car, your colour, your friend code and friends list; your position, heading and speed while the app is open (nothing in invisible mode); the alerts, spots, ratings, prices, meet-ups and quick messages you post.</li>
+<li>ROUTA never asks for <b>your real name, email or phone number</b>.</li>
+</ul></section>
+<h2>Who sees what</h2>
+<section class="card"><ul>
+<li>Your friends see your exact position. Others only see an area of about 1 km. In invisible mode, nobody sees you.</li>
+<li>A “Share my location” link only works until the time you chose.</li>
+<li>Alerts disappear after 2 hours (24 hours for roadworks).</li>
+</ul></section>
+<h2>Services used</h2>
+<section class="card"><p>To show the map, calculate routes, traffic, weather and timetables, your phone sends the relevant area or address to these services: OpenFreeMap, OSRM, FOSSGIS (Valhalla), komoot (Photon), OpenStreetMap (Nominatim, Overpass), TomTom, Open-Meteo, transport.opendata.ch, ParkenDD, swisstopo, EOX and Amazon Web Services (terrain). The shared database is hosted by Supabase. Some of these services are located outside Switzerland (European Union, United States).</p></section>
+<h2>Your rights</h2>
+<section class="card"><p>You can view, correct or delete your data at any time: <span class="key">Menu › My profile › Delete my data</span>, or by writing to us.</p></section>
+<h2>Rules of use</h2>
+<section class="card"><ul>
+<li><b>Police checks and speed cameras:</b> reporting them publicly is illegal in Switzerland (art. 98a SVG/LCR). ROUTA does not allow it and blocks such mentions.</li>
+<li><b>While driving:</b> do not handle your phone (art. 31 SVG/LCR and art. 3 VRV/OCR). Use your voice, ask a passenger or stop.</li>
+<li>Speed limits, routes and information are indicative: road signs and police instructions always take precedence.</li>
+<li>Convoys and meet-ups must respect the law: no racing or speeding.</li>
+<li>No illegal, insulting or misleading content. ACKFIX may remove content or a profile.</li>
+<li>ROUTA is a free prototype, provided without warranty. Swiss law applies.</li>
+</ul></section>
+</div>
+
+<div class="lang de">
+<a class="back" href="./">‹ Zurück zur Karte</a>
+<h1>Datenschutz und Nutzungsregeln</h1>
+<p class="lead">Fassung vom 11. November 2026.</p>
+<h2>Verantwortlich</h2>
+<section class="card"><p>ROUTA wird von <b>ACKFIX</b>, Kanton Waadt, Schweiz, herausgegeben. Kontakt: <a href="mailto:admin@ackfix.com">admin@ackfix.com</a>.</p></section>
+<h2>Was ROUTA speichert</h2>
+<section class="card"><ul>
+<li><b>Nur auf deinem Handy:</b> Favoriten, Serviceheft, geparktes Auto, Einstellungen.</li>
+<li><b>In der gemeinsamen Datenbank (Online-Modus):</b> eine zufällige Kennung, dein Spitzname, dein Auto, deine Farbe, dein Freundescode und deine Freundesliste; deine Position, Fahrtrichtung und Geschwindigkeit, solange die App offen ist (nichts im Unsichtbar-Modus); die Warnungen, Spots, Bewertungen, Preise, Treffen und Kurznachrichten, die du veröffentlichst.</li>
+<li>ROUTA verlangt <b>weder deinen echten Namen noch E-Mail oder Telefonnummer</b>.</li>
+</ul></section>
+<h2>Wer was sieht</h2>
+<section class="card"><ul>
+<li>Deine Freunde sehen deine genaue Position. Andere sehen nur eine Zone von etwa 1 km. Im Unsichtbar-Modus sieht dich niemand.</li>
+<li>Ein Link «Meinen Standort teilen» funktioniert nur bis zur gewählten Uhrzeit.</li>
+<li>Warnungen verschwinden nach 2 Stunden (Baustellen nach 24 Stunden).</li>
+</ul></section>
+<h2>Genutzte Dienste</h2>
+<section class="card"><p>Um die Karte, Routen, Verkehr, Wetter und Fahrpläne anzuzeigen, sendet dein Handy das betreffende Gebiet oder die Adresse an diese Dienste: OpenFreeMap, OSRM, FOSSGIS (Valhalla), komoot (Photon), OpenStreetMap (Nominatim, Overpass), TomTom, Open-Meteo, transport.opendata.ch, ParkenDD, swisstopo, EOX und Amazon Web Services (Relief). Die gemeinsame Datenbank wird von Supabase gehostet. Einige dieser Dienste befinden sich ausserhalb der Schweiz (Europäische Union, USA).</p></section>
+<h2>Deine Rechte</h2>
+<section class="card"><p>Du kannst deine Daten jederzeit einsehen, berichtigen oder löschen: <span class="key">Menü › Mein Profil › Meine Daten löschen</span>, oder schreib uns.</p></section>
+<h2>Nutzungsregeln</h2>
+<section class="card"><ul>
+<li><b>Polizeikontrollen und Radare:</b> Sie öffentlich zu melden ist in der Schweiz verboten (Art. 98a SVG). ROUTA erlaubt es nicht und blockiert solche Hinweise.</li>
+<li><b>Am Steuer:</b> Bediene dein Handy nicht (Art. 31 SVG und Art. 3 VRV). Nutze die Sprache, frag einen Beifahrer oder halte an.</li>
+<li>Tempolimits, Routen und Infos sind unverbindlich: Signalisation und Anweisungen der Polizei gehen immer vor.</li>
+<li>Konvois und Treffen müssen das Gesetz einhalten: keine Rennen und keine Geschwindigkeitsübertretungen.</li>
+<li>Keine illegalen, beleidigenden oder irreführenden Inhalte. ACKFIX kann Inhalte oder Profile entfernen.</li>
+<li>ROUTA ist ein kostenloser Prototyp ohne Gewähr. Es gilt Schweizer Recht.</li>
+</ul></section>
+</div>
+
+<div class="lang it">
+<a class="back" href="./">‹ Torna alla mappa</a>
+<h1>Privacy e regole d'uso</h1>
+<p class="lead">Versione dell'11 novembre 2026.</p>
+<h2>Chi è responsabile</h2>
+<section class="card"><p>ROUTA è pubblicata da <b>ACKFIX</b>, Canton Vaud, Svizzera. Contatto: <a href="mailto:admin@ackfix.com">admin@ackfix.com</a>.</p></section>
+<h2>Cosa registra ROUTA</h2>
+<section class="card"><ul>
+<li><b>Solo sul tuo telefono:</b> preferiti, libretto di manutenzione, auto parcheggiata, impostazioni.</li>
+<li><b>Nel database condiviso (modalità online):</b> un identificativo casuale, il tuo nickname, la tua auto, il tuo colore, il tuo codice amico e la lista degli amici; la tua posizione, direzione e velocità mentre l'app è aperta (niente in modalità invisibile); le segnalazioni, gli spot, le valutazioni, i prezzi, i raduni e i messaggi rapidi che pubblichi.</li>
+<li>ROUTA non chiede <b>né il tuo vero nome, né e-mail, né numero di telefono</b>.</li>
+</ul></section>
+<h2>Chi vede cosa</h2>
+<section class="card"><ul>
+<li>I tuoi amici vedono la tua posizione esatta. Gli altri vedono solo una zona di circa 1 km. In modalità invisibile nessuno ti vede.</li>
+<li>Un link «Condividi la mia posizione» funziona solo fino all'ora scelta.</li>
+<li>Le segnalazioni scompaiono dopo 2 ore (24 ore per i lavori).</li>
+</ul></section>
+<h2>Servizi utilizzati</h2>
+<section class="card"><p>Per mostrare la mappa, calcolare percorsi, traffico, meteo e orari, il tuo telefono invia la zona o l'indirizzo interessato a questi servizi: OpenFreeMap, OSRM, FOSSGIS (Valhalla), komoot (Photon), OpenStreetMap (Nominatim, Overpass), TomTom, Open-Meteo, transport.opendata.ch, ParkenDD, swisstopo, EOX e Amazon Web Services (rilievo). Il database condiviso è ospitato da Supabase. Alcuni di questi servizi si trovano fuori dalla Svizzera (Unione europea, Stati Uniti).</p></section>
+<h2>I tuoi diritti</h2>
+<section class="card"><p>Puoi consultare, correggere o cancellare i tuoi dati in qualsiasi momento: <span class="key">Menu › Il mio profilo › Elimina i miei dati</span>, oppure scrivendoci.</p></section>
+<h2>Regole d'uso</h2>
+<section class="card"><ul>
+<li><b>Controlli di polizia e radar:</b> segnalarli pubblicamente è vietato in Svizzera (art. 98a LCStr). ROUTA non lo permette e blocca questi riferimenti.</li>
+<li><b>Alla guida:</b> non usare il telefono (art. 31 LCStr e art. 3 ONC). Usa la voce, chiedi a un passeggero o fermati.</li>
+<li>Limiti, percorsi e informazioni sono indicativi: fanno sempre fede la segnaletica e le istruzioni della polizia.</li>
+<li>Convogli e raduni devono rispettare la legge: niente gare né eccessi di velocità.</li>
+<li>Nessun contenuto illegale, offensivo o ingannevole. ACKFIX può eliminare contenuti o profili.</li>
+<li>ROUTA è un prototipo gratuito, fornito senza garanzia. Si applica il diritto svizzero.</li>
+</ul></section>
+</div>
+
+<div class="lang pt">
+<a class="back" href="./">‹ Voltar ao mapa</a>
+<h1>Privacidade e regras de utilização</h1>
+<p class="lead">Versão de 11 de novembro de 2026.</p>
+<h2>Quem é o responsável</h2>
+<section class="card"><p>O ROUTA é publicado pela <b>ACKFIX</b>, Cantão de Vaud, Suíça. Contacto: <a href="mailto:admin@ackfix.com">admin@ackfix.com</a>.</p></section>
+<h2>O que o ROUTA guarda</h2>
+<section class="card"><ul>
+<li><b>Só no teu telemóvel:</b> favoritos, caderneta de manutenção, carro estacionado, definições.</li>
+<li><b>Na base partilhada (modo online):</b> um identificador aleatório, a tua alcunha, o teu carro, a tua cor, o teu código de amigo e a lista de amigos; a tua posição, direção e velocidade enquanto a app está aberta (nada no modo invisível); os alertas, spots, avaliações, preços, encontros e mensagens rápidas que publicas.</li>
+<li>O ROUTA não pede <b>nem o teu nome real, nem e-mail, nem número de telefone</b>.</li>
+</ul></section>
+<h2>Quem vê o quê</h2>
+<section class="card"><ul>
+<li>Os teus amigos veem a tua posição exata. Os outros só veem uma zona de cerca de 1 km. No modo invisível, ninguém te vê.</li>
+<li>Um link «Partilhar a minha localização» só funciona até à hora escolhida.</li>
+<li>Os alertas desaparecem após 2 horas (24 horas para obras).</li>
+</ul></section>
+<h2>Serviços utilizados</h2>
+<section class="card"><p>Para mostrar o mapa, calcular percursos, trânsito, meteorologia e horários, o teu telemóvel envia a zona ou a morada em causa a estes serviços: OpenFreeMap, OSRM, FOSSGIS (Valhalla), komoot (Photon), OpenStreetMap (Nominatim, Overpass), TomTom, Open-Meteo, transport.opendata.ch, ParkenDD, swisstopo, EOX e Amazon Web Services (relevo). A base partilhada está alojada na Supabase. Alguns destes serviços estão fora da Suíça (União Europeia, Estados Unidos).</p></section>
+<h2>Os teus direitos</h2>
+<section class="card"><p>Podes consultar, corrigir ou apagar os teus dados a qualquer momento: <span class="key">Menu › O meu perfil › Apagar os meus dados</span>, ou escrevendo-nos.</p></section>
+<h2>Regras de utilização</h2>
+<section class="card"><ul>
+<li><b>Controlos policiais e radares:</b> assinalá-los publicamente é proibido na Suíça (art. 98a LCR). O ROUTA não o permite e bloqueia essas menções.</li>
+<li><b>Ao volante:</b> não mexas no telemóvel (art. 31 LCR e art. 3 OCR). Usa a voz, pede a um passageiro ou para o carro.</li>
+<li>Limites, percursos e informações são indicativos: a sinalização e as ordens da polícia prevalecem sempre.</li>
+<li>Comboios e encontros devem respeitar a lei: sem corridas nem excessos de velocidade.</li>
+<li>Sem conteúdos ilegais, insultuosos ou enganosos. A ACKFIX pode remover conteúdos ou perfis.</li>
+<li>O ROUTA é um protótipo gratuito, fornecido sem garantia. Aplica-se o direito suíço.</li>
+</ul></section>
+</div>
+
+<div class="lang es">
+<a class="back" href="./">‹ Volver al mapa</a>
+<h1>Privacidad y normas de uso</h1>
+<p class="lead">Versión del 11 de noviembre de 2026.</p>
+<h2>Quién es el responsable</h2>
+<section class="card"><p>ROUTA está publicada por <b>ACKFIX</b>, Cantón de Vaud, Suiza. Contacto: <a href="mailto:admin@ackfix.com">admin@ackfix.com</a>.</p></section>
+<h2>Qué guarda ROUTA</h2>
+<section class="card"><ul>
+<li><b>Solo en tu móvil:</b> favoritos, libro de mantenimiento, coche aparcado, ajustes.</li>
+<li><b>En la base compartida (modo en línea):</b> un identificador aleatorio, tu apodo, tu coche, tu color, tu código de amigo y tu lista de amigos; tu posición, dirección y velocidad mientras la app está abierta (nada en modo invisible); las alertas, spots, valoraciones, precios, quedadas y mensajes rápidos que publicas.</li>
+<li>ROUTA no pide <b>ni tu nombre real, ni e-mail, ni número de teléfono</b>.</li>
+</ul></section>
+<h2>Quién ve qué</h2>
+<section class="card"><ul>
+<li>Tus amigos ven tu posición exacta. Los demás solo ven una zona de aproximadamente 1 km. En modo invisible, nadie te ve.</li>
+<li>Un enlace «Compartir mi ubicación» solo funciona hasta la hora elegida.</li>
+<li>Las alertas desaparecen tras 2 horas (24 horas para obras).</li>
+</ul></section>
+<h2>Servicios utilizados</h2>
+<section class="card"><p>Para mostrar el mapa, calcular rutas, tráfico, tiempo y horarios, tu móvil envía la zona o la dirección correspondiente a estos servicios: OpenFreeMap, OSRM, FOSSGIS (Valhalla), komoot (Photon), OpenStreetMap (Nominatim, Overpass), TomTom, Open-Meteo, transport.opendata.ch, ParkenDD, swisstopo, EOX y Amazon Web Services (relieve). La base compartida está alojada en Supabase. Algunos de estos servicios están fuera de Suiza (Unión Europea, Estados Unidos).</p></section>
+<h2>Tus derechos</h2>
+<section class="card"><p>Puedes consultar, corregir o borrar tus datos en cualquier momento: <span class="key">Menú › Mi perfil › Borrar mis datos</span>, o escribiéndonos.</p></section>
+<h2>Normas de uso</h2>
+<section class="card"><ul>
+<li><b>Controles policiales y radares:</b> avisar de ellos públicamente está prohibido en Suiza (art. 98a LCR). ROUTA no lo permite y bloquea esas menciones.</li>
+<li><b>Al volante:</b> no toques el móvil (art. 31 LCR y art. 3 OCR). Usa la voz, pide ayuda a un pasajero o detente.</li>
+<li>Los límites, rutas e informaciones son orientativos: la señalización y las órdenes de la policía siempre prevalecen.</li>
+<li>Convoyes y quedadas deben respetar la ley: nada de carreras ni excesos de velocidad.</li>
+<li>Nada de contenido ilegal, ofensivo o engañoso. ACKFIX puede eliminar contenidos o perfiles.</li>
+<li>ROUTA es un prototipo gratuito, ofrecido sin garantía. Se aplica el derecho suizo.</li>
+</ul></section>
+</div>
+
+<div class="lang sq">
+<a class="back" href="./">‹ Kthehu te harta</a>
+<h1>Privatësia dhe rregullat e përdorimit</h1>
+<p class="lead">Versioni i 11 nëntorit 2026.</p>
+<h2>Kush është përgjegjës</h2>
+<section class="card"><p>ROUTA publikohet nga <b>ACKFIX</b>, Kantoni i Vaud, Zvicër. Kontakt: <a href="mailto:admin@ackfix.com">admin@ackfix.com</a>.</p></section>
+<h2>Çfarë ruan ROUTA</h2>
+<section class="card"><ul>
+<li><b>Vetëm në telefonin tënd:</b> të preferuarat, libreza e mirëmbajtjes, makina e parkuar, cilësimet.</li>
+<li><b>Në bazën e përbashkët (modaliteti online):</b> një identifikues i rastësishëm, pseudonimi yt, makina, ngjyra, kodi i mikut dhe lista e miqve; pozicioni, drejtimi dhe shpejtësia jote sa kohë që aplikacioni është i hapur (asgjë në modalitetin e padukshëm); sinjalizimet, spotet, vlerësimet, çmimet, takimet dhe mesazhet e shpejta që publikon.</li>
+<li>ROUTA nuk kërkon <b>as emrin tënd të vërtetë, as e-mail, as numër telefoni</b>.</li>
+</ul></section>
+<h2>Kush sheh çfarë</h2>
+<section class="card"><ul>
+<li>Miqtë e tu shohin pozicionin tënd të saktë. Të tjerët shohin vetëm një zonë rreth 1 km. Në modalitetin e padukshëm askush nuk të sheh.</li>
+<li>Një lidhje «Ndaj vendndodhjen time» funksionon vetëm deri në orën e zgjedhur.</li>
+<li>Sinjalizimet zhduken pas 2 orësh (24 orë për punimet).</li>
+</ul></section>
+<h2>Shërbimet e përdorura</h2>
+<section class="card"><p>Për të shfaqur hartën, për të llogaritur rrugët, trafikun, motin dhe oraret, telefoni yt dërgon zonën ose adresën përkatëse te këto shërbime: OpenFreeMap, OSRM, FOSSGIS (Valhalla), komoot (Photon), OpenStreetMap (Nominatim, Overpass), TomTom, Open-Meteo, transport.opendata.ch, ParkenDD, swisstopo, EOX dhe Amazon Web Services (relievi). Baza e përbashkët strehohet nga Supabase. Disa nga këto shërbime ndodhen jashtë Zvicrës (Bashkimi Evropian, Shtetet e Bashkuara).</p></section>
+<h2>Të drejtat e tua</h2>
+<section class="card"><p>Mund t'i shohësh, korrigjosh ose fshish të dhënat e tua në çdo kohë: <span class="key">Menu › Profili im › Fshi të dhënat e mia</span>, ose duke na shkruar.</p></section>
+<h2>Rregullat e përdorimit</h2>
+<section class="card"><ul>
+<li><b>Kontrollet e policisë dhe radarët:</b> sinjalizimi publik i tyre është i ndaluar në Zvicër (neni 98a LCR). ROUTA nuk e lejon dhe i bllokon këto përmendje.</li>
+<li><b>Në timon:</b> mos e përdor telefonin (neni 31 LCR dhe neni 3 OCR). Përdor zërin, kërkoji një pasagjeri ose ndalo.</li>
+<li>Kufijtë, rrugët dhe informacionet janë orientuese: sinjalistika dhe urdhrat e policisë kanë gjithmonë përparësi.</li>
+<li>Kolonat dhe takimet duhet të respektojnë ligjin: pa gara dhe pa tejkalime shpejtësie.</li>
+<li>Asnjë përmbajtje e paligjshme, fyese ose mashtruese. ACKFIX mund të fshijë përmbajtje ose profile.</li>
+<li>ROUTA është një prototip falas, pa garanci. Zbatohet ligji zviceran.</li>
+</ul></section>
+</div>
+
+<div class="lang sr">
+<a class="back" href="./">‹ Nazad na mapu</a>
+<h1>Privatnost i pravila korišćenja</h1>
+<p class="lead">Verzija od 11. novembra 2026.</p>
+<h2>Ko je odgovoran</h2>
+<section class="card"><p>ROUTA objavljuje <b>ACKFIX</b>, kanton Vo, Švajcarska. Kontakt: <a href="mailto:admin@ackfix.com">admin@ackfix.com</a>.</p></section>
+<h2>Šta ROUTA čuva</h2>
+<section class="card"><ul>
+<li><b>Samo na tvom telefonu:</b> omiljeno, servisna knjižica, parkirani auto, podešavanja.</li>
+<li><b>U zajedničkoj bazi (onlajn režim):</b> nasumični identifikator, tvoj nadimak, auto, boja, kod prijatelja i lista prijatelja; tvoja lokacija, smer i brzina dok je aplikacija otvorena (ništa u nevidljivom režimu); upozorenja, spotovi, ocene, cene, okupljanja i brze poruke koje objaviš.</li>
+<li>ROUTA ne traži <b>ni pravo ime, ni e-mail, ni broj telefona</b>.</li>
+</ul></section>
+<h2>Ko šta vidi</h2>
+<section class="card"><ul>
+<li>Prijatelji vide tvoju tačnu lokaciju. Ostali vide samo zonu od oko 1 km. U nevidljivom režimu niko te ne vidi.</li>
+<li>Link „Podeli moju lokaciju“ radi samo do izabranog vremena.</li>
+<li>Upozorenja nestaju posle 2 sata (24 sata za radove).</li>
+</ul></section>
+<h2>Korišćeni servisi</h2>
+<section class="card"><p>Da bi prikazao mapu i izračunao rute, saobraćaj, vreme i red vožnje, tvoj telefon šalje odgovarajuću zonu ili adresu ovim servisima: OpenFreeMap, OSRM, FOSSGIS (Valhalla), komoot (Photon), OpenStreetMap (Nominatim, Overpass), TomTom, Open-Meteo, transport.opendata.ch, ParkenDD, swisstopo, EOX i Amazon Web Services (reljef). Zajedničku bazu hostuje Supabase. Neki od ovih servisa nalaze se van Švajcarske (Evropska unija, SAD).</p></section>
+<h2>Tvoja prava</h2>
+<section class="card"><p>Svoje podatke možeš da pogledaš, ispraviš ili obrišeš u bilo kom trenutku: <span class="key">Meni › Moj profil › Obriši moje podatke</span>, ili nam piši.</p></section>
+<h2>Pravila korišćenja</h2>
+<section class="card"><ul>
+<li><b>Policijske kontrole i radari:</b> javno upozoravanje na njih zabranjeno je u Švajcarskoj (čl. 98a LCR). ROUTA to ne dozvoljava i blokira takve pomene.</li>
+<li><b>Za volanom:</b> ne koristi telefon (čl. 31 LCR i čl. 3 OCR). Koristi glas, zamoli suvozača ili stani.</li>
+<li>Ograničenja, rute i informacije su okvirne: signalizacija i naređenja policije uvek imaju prednost.</li>
+<li>Konvoji i okupljanja moraju poštovati zakon: bez trka i prekoračenja brzine.</li>
+<li>Bez nezakonitog, uvredljivog ili obmanjujućeg sadržaja. ACKFIX može da ukloni sadržaj ili profil.</li>
+<li>ROUTA je besplatan prototip, bez garancije. Primenjuje se švajcarsko pravo.</li>
+</ul></section>
+</div>
+
+<div class="lang tr">
+<a class="back" href="./">‹ Haritaya dön</a>
+<h1>Gizlilik ve kullanım kuralları</h1>
+<p class="lead">11 Kasım 2026 tarihli sürüm.</p>
+<h2>Sorumlu kim</h2>
+<section class="card"><p>ROUTA, <b>ACKFIX</b> (Vaud Kantonu, İsviçre) tarafından yayınlanır. İletişim: <a href="mailto:admin@ackfix.com">admin@ackfix.com</a>.</p></section>
+<h2>ROUTA neleri kaydeder</h2>
+<section class="card"><ul>
+<li><b>Yalnızca telefonunda:</b> favoriler, bakım defteri, park edilen araç, ayarlar.</li>
+<li><b>Ortak veritabanında (çevrimiçi mod):</b> rastgele bir kimlik, takma adın, araban, rengin, arkadaş kodun ve arkadaş listen; uygulama açıkken konumun, yönün ve hızın (görünmez modda hiçbiri); yayınladığın uyarılar, spotlar, puanlar, fiyatlar, buluşmalar ve hızlı mesajlar.</li>
+<li>ROUTA <b>gerçek adını, e-postanı veya telefon numaranı</b> istemez.</li>
+</ul></section>
+<h2>Kim neyi görür</h2>
+<section class="card"><ul>
+<li>Arkadaşların tam konumunu görür. Diğerleri yalnızca yaklaşık 1 km'lik bir bölge görür. Görünmez modda kimse seni görmez.</li>
+<li>«Konumumu paylaş» bağlantısı yalnızca seçtiğin saate kadar çalışır.</li>
+<li>Uyarılar 2 saat sonra kaybolur (yol çalışmaları için 24 saat).</li>
+</ul></section>
+<h2>Kullanılan hizmetler</h2>
+<section class="card"><p>Haritayı göstermek, rota, trafik, hava durumu ve sefer saatlerini hesaplamak için telefonun ilgili bölgeyi veya adresi şu hizmetlere gönderir: OpenFreeMap, OSRM, FOSSGIS (Valhalla), komoot (Photon), OpenStreetMap (Nominatim, Overpass), TomTom, Open-Meteo, transport.opendata.ch, ParkenDD, swisstopo, EOX ve Amazon Web Services (rölyef). Ortak veritabanı Supabase'de barındırılır. Bu hizmetlerin bazıları İsviçre dışındadır (Avrupa Birliği, ABD).</p></section>
+<h2>Hakların</h2>
+<section class="card"><p>Verilerini istediğin zaman görebilir, düzeltebilir veya silebilirsin: <span class="key">Menü › Profilim › Verilerimi sil</span> ya da bize yazarak.</p></section>
+<h2>Kullanım kuralları</h2>
+<section class="card"><ul>
+<li><b>Polis kontrolleri ve radarlar:</b> bunları herkese açık şekilde bildirmek İsviçre'de yasaktır (LCR md. 98a). ROUTA buna izin vermez ve bu ifadeleri engeller.</li>
+<li><b>Sürüş sırasında:</b> telefonu elleme (LCR md. 31 ve OCR md. 3). Sesli komut kullan, bir yolcudan iste ya da dur.</li>
+<li>Hız sınırları, rotalar ve bilgiler yol gösterici niteliktedir: trafik işaretleri ve polis talimatları her zaman önceliklidir.</li>
+<li>Konvoylar ve buluşmalar yasalara uymalıdır: yarış ve hız ihlali yok.</li>
+<li>Yasa dışı, hakaret içeren veya yanıltıcı içerik yasaktır. ACKFIX içerik veya profil silebilir.</li>
+<li>ROUTA ücretsiz bir prototiptir, garanti verilmez. İsviçre hukuku geçerlidir.</li>
+</ul></section>
+</div>
+
+
+<script>document.querySelectorAll('.langbar button').forEach(function (b) { b.classList.toggle('on', b.dataset.l === document.documentElement.getAttribute('data-l')); });</script>
+</main>
+</body>
+</html>
