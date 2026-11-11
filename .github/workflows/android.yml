@@ -1,0 +1,85 @@
+name: Android (ROUTA)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Créer le projet Android
+        run: |
+          set -e
+          mkdir -p /tmp/app/www
+          cp index.html /tmp/app/www/index.html
+          cd /tmp/app
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund @capacitor/core@8.6.0 @capacitor/android@8.6.0 @capacitor/cli@8.6.0
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.ackfix.routa",
+            "appName": "ROUTA",
+            "webDir": "www",
+            "server": { "url": "https://routa.ackfix.com", "cleartext": false },
+            "android": { "backgroundColor": "#0E1116" },
+            "loggingBehavior": "none"
+          }
+          EOF
+          npx cap add android
+
+      - name: Permissions, version et icônes
+        run: |
+          set -e
+          cd /tmp/app/android
+          M=app/src/main/AndroidManifest.xml
+          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.VIBRATE" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="false" />#' $M
+          grep -q ACCESS_FINE_LOCATION $M
+          VC=$((100 + GITHUB_RUN_NUMBER))
+          sed -i "s/versionCode 1$/versionCode $VC/; s/versionName \"1.0\"/versionName \"0.9.$GITHUB_RUN_NUMBER\"/" app/build.gradle
+          grep -E "versionCode|versionName" app/build.gradle
+          sudo apt-get install -y -qq imagemagick > /dev/null
+          ICON=$GITHUB_WORKSPACE/icons/icon-512.png
+          R=app/src/main/res
+          for d in mdpi:48:108 hdpi:72:162 xhdpi:96:216 xxhdpi:144:324 xxxhdpi:192:432; do
+            n=${d%%:*}; rest=${d#*:}; s=${rest%%:*}; f=${rest#*:}
+            mkdir -p $R/mipmap-$n
+            convert $ICON -resize ${s}x${s} $R/mipmap-$n/ic_launcher.png
+            convert $ICON -resize ${s}x${s} \( +clone -alpha extract -fill black -colorize 100 -fill white -draw "circle $((s/2)),$((s/2)) $((s/2)),0" \) -alpha off -compose CopyOpacity -composite $R/mipmap-$n/ic_launcher_round.png
+            convert $ICON -resize ${f}x${f} $R/mipmap-$n/ic_launcher_foreground.png
+          done
+          if [ -f $R/values/ic_launcher_background.xml ]; then sed -i 's/#[0-9A-Fa-f]\{6\}/#0E1116/' $R/values/ic_launcher_background.xml; fi
+          find $R -name 'splash.png' | while read p; do
+            sz=$(identify -format '%wx%h' "$p"); w=${sz%x*}; h=${sz#*x}; m=$(( w < h ? w : h )); i=$(( m * 30 / 100 ))
+            convert -size ${w}x${h} xc:'#0E1116' \( $ICON -resize ${i}x${i} \) -gravity center -composite "$p"
+          done
+          sed -i 's#<item name="android:background">@drawable/splash</item>#<item name="android:background">@drawable/splash</item>\n        <item name="android:windowBackground">@drawable/splash</item>#' $R/values/styles.xml || true
+
+      - name: Construire le fichier pour Google Play (AAB)
+        run: |
+          cd /tmp/app/android
+          chmod +x gradlew
+          ./gradlew --no-daemon bundleRelease
+          mkdir -p $GITHUB_WORKSPACE/out
+          cp app/build/outputs/bundle/release/app-release.aab $GITHUB_WORKSPACE/out/routa-unsigned.aab
+          ls -la $GITHUB_WORKSPACE/out
+
+      - name: Publier le fichier (non signé)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-build --yes --cleanup-tag || true
+          gh release create android-build out/routa-unsigned.aab --title "Android build ${{ github.run_number }}" --notes "Fichier Android non signé (signature faite sur le Mac)." --prerelease
