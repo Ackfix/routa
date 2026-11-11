@@ -41,6 +41,23 @@ jobs:
           EOF
           npx cap add android
 
+      - name: Carte native (MapLibre)
+        run: |
+          set -e
+          cd /tmp/app/android
+          D=app/src/main/java/com/ackfix/routa
+          mkdir -p $D
+          cp $GITHUB_WORKSPACE/android/RoutaMapPlugin.java $D/RoutaMapPlugin.java
+          cp $GITHUB_WORKSPACE/android/MainActivity.java $D/MainActivity.java
+          python3 - <<'PY'
+          p='app/build.gradle'
+          s=open(p).read()
+          i=s.index('dependencies {')+len('dependencies {')
+          s=s[:i]+"\n    implementation 'org.maplibre.gl:android-sdk:11.8.0'\n    implementation 'com.squareup.okhttp3:okhttp:4.12.0'"+s[i:]
+          open(p,'w').write(s)
+          PY
+          grep -n "maplibre" app/build.gradle
+
       - name: Permissions, version et icônes
         run: |
           set -e
