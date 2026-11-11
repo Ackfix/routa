@@ -446,14 +446,23 @@ X.route = async (from, to) => {
   if (X.via.length && X.viaFor !== keyOf(to)) { X.via = []; X.viaFor = null; }
   const vias = X.via.filter((v) => !v.done && dist(from, v) > 120);
   const locs = [from].concat(vias, [to]).map((p) => p.lat.toFixed(6) + ',' + p.lon.toFixed(6)).join(':');
-  const key = locs + '|' + JSON.stringify(X.opts);
+  const key = locs + '|' + JSON.stringify(X.opts) + '|' + JSON.stringify(A.veh ? [A.veh().type, A.veh().dims, A.veh().hazmat] : '');
   let routes;
   if (routeCache && routeCache.key === key && Date.now() - routeCache.at < 90000) routes = routeCache.routes;
   else {
     const avoid = [];
     if (X.opts.tolls) avoid.push('tollRoads');
     if (X.opts.motorways) avoid.push('motorways');
-    let url = tt('/routing/1/calculateRoute/' + locs + '/json', { traffic: 'true', travelMode: 'car', routeType: 'fastest', instructionsType: 'coded', language: LANG, computeTravelTimeFor: 'all', maxAlternatives: vias.length ? '0' : '2', routeRepresentation: 'polyline' });
+    const vv = A.veh ? A.veh() : {}, vd = vv.dims || {};
+    const vp = {};
+    if (vv.heavy) {
+      vp.travelMode = vv.costing === 'bus' ? 'bus' : 'truck';
+      if (vd.height) vp.vehicleHeight = vd.height; if (vd.width) vp.vehicleWidth = vd.width; if (vd.length) vp.vehicleLength = vd.length;
+      if (vd.weight) vp.vehicleWeight = Math.round(vd.weight * 1000);
+      vp.vehicleCommercial = vv.type === 'camping' ? 'false' : 'true';
+      if (vv.hazmat) vp.vehicleLoadType = 'otherHazmatGeneral';
+    }
+    let url = tt('/routing/1/calculateRoute/' + locs + '/json', Object.assign({ traffic: 'true', travelMode: 'car', routeType: 'fastest', instructionsType: 'coded', language: LANG, computeTravelTimeFor: 'all', maxAlternatives: vias.length ? '0' : '2', routeRepresentation: 'polyline' }, vp));
     avoid.forEach((a) => { url += '&avoid=' + a; });
     url += '&sectionType=speedLimit&sectionType=lanes';
     if (X.opts.vignette) url += '&avoidVignette=CHE,AUT,SVN,HUN,CZE,SVK,BGR,ROU,MDA';
@@ -949,11 +958,11 @@ X.openOffline = openOffline;
 const PRO = Object.assign({ on: false, regime: null, auto: true, segs: [] }, store.get('routa.pro', {}));
 const H = 3600000, MIN = 60000;
 const PRO_RULES = {
-  otr1: { label: 'OTR 1', sub: 'Poids lourds (> 3,5 t) et cars (> 8 places)', cont: 4.5 * H, day: 9 * H, dayExt: 10 * H, week: 56 * H, twoWeeks: 90 * H, rest: 11 * H, restRed: 9 * H, split1: 15 * MIN },
-  otr2: { label: 'OTR 2', sub: 'Taxis, VTC et transport professionnel de personnes', cont: 4.5 * H, day: 9 * H, dayExt: null, week: 45 * H, twoWeeks: null, rest: 11 * H, restRed: 9 * H, split1: 20 * MIN }
+  otr1: { label: 'OTR 1', sub: 'Transport de marchandises de plus de 3,5 t, et transport de personnes avec plus de 8 places assises sans compter le conducteur (dès 9 places avec lui)', cont: 4.5 * H, day: 9 * H, dayExt: 10 * H, week: 56 * H, twoWeeks: 90 * H, rest: 11 * H, restRed: 9 * H, split1: 15 * MIN },
+  otr2: { label: 'OTR 2', sub: 'Transport professionnel de personnes en voiture légère ou de tourisme (taxis, VTC, limousines) : 8 places passagers au maximum', cont: 4.5 * H, day: 9 * H, dayExt: null, week: 45 * H, twoWeeks: null, rest: 11 * H, restRed: 9 * H, split1: 20 * MIN }
 };
 const ACT = { drive: 'Conduite', break: 'Pause', work: 'Autre travail', rest: 'Repos' };
-function proRegime() { if (PRO.regime) return PRO.regime; const t = (A.veh ? A.veh().type : 'voiture'); return (t === 'camion' || t === 'bus') ? 'otr1' : 'otr2'; }
+function proRegime() { if (PRO.regime) return PRO.regime; const t = (A.veh ? A.veh().type : 'voiture'); return (t === 'camion' || t === 'bus' || t === 'minibus') ? 'otr1' : 'otr2'; }
 function proSave() { const cut = Date.now() - 15 * 24 * H; PRO.segs = PRO.segs.filter((s) => !s.e || s.e > cut); store.set('routa.pro', PRO); }
 function proCur() { const s = PRO.segs[PRO.segs.length - 1]; return s && !s.e ? s : null; }
 function proSet(a, at) {
@@ -1073,6 +1082,53 @@ function openProLog() {
   if (b) b.onclick = async () => { try { if (navigator.share) await navigator.share({ title: 'Relevé de conduite', text: t }); else { await navigator.clipboard.writeText(t); toast('Relevé copié.'); } } catch (e) { /* annulé */ } };
 }
 X.openPro = openPro;
+
+/* ======================= Ponts, tunnels et passages limités (hauteur, largeur, poids) ======================= */
+const parseDim = (v) => {
+  if (!v) return null; v = String(v).trim().toLowerCase();
+  if (/default|none|unsigned|^no$|below/.test(v)) return null;
+  let m = v.match(/^(\d+(?:[.,]\d+)?)\s*(m|t|st)?$/); if (m) return parseFloat(m[1].replace(',', '.'));
+  m = v.match(/^(\d+)\s*'\s*(\d+)?/); if (m) return (+m[1]) * 0.3048 + (+(m[2] || 0)) * 0.0254;
+  return null;
+};
+const brg = (a, b) => { const r = Math.PI / 180, y = Math.sin((b.lon - a.lon) * r) * Math.cos(b.lat * r), x2 = Math.cos(a.lat * r) * Math.sin(b.lat * r) - Math.sin(a.lat * r) * Math.cos(b.lat * r) * Math.cos((b.lon - a.lon) * r); return (Math.atan2(y, x2) / r + 360) % 360; };
+const adiff = (p, q) => { const d = Math.abs(p - q) % 360; return d > 180 ? 360 - d : d; };
+const lowChip = el('<div class="lowchip" id="lowChip" hidden role="alert"></div>');
+document.body.appendChild(lowChip);
+let lowBusy = false, lowAt = 0, lowPos = null, lowList = [];
+const lowWarned = {};
+const nb = (n) => String(Math.round(n * 100) / 100).replace('.', ',');
+async function lowCheck() {
+  const v = A.veh ? A.veh() : null;
+  if (!v || !v.heavy || !S.pos || !A.overpass) { lowChip.hidden = true; return; }
+  const d = v.dims || {};
+  if (!lowBusy && (!lowPos || dist(lowPos, S.pos) > 700) && Date.now() - lowAt > 20000) {
+    lowBusy = true; lowAt = Date.now(); lowPos = S.pos;
+    try {
+      const q = '[out:json][timeout:20];way(around:1500,' + S.pos.lat.toFixed(5) + ',' + S.pos.lon.toFixed(5) + ')[highway][highway!~"^(service|footway|cycleway|path|track|pedestrian|steps|bridleway|construction|proposed)$"][~"^(maxheight|maxheight:physical|maxwidth|maxwidth:physical|maxweight)$"~"."];out tags center 300;';
+      const els = await A.overpass(q, true);
+      lowList = els.filter((e) => e.center).map((e) => ({
+        id: e.id, lat: e.center.lat, lon: e.center.lon, name: e.tags.name || e.tags.ref || '',
+        h: parseDim(e.tags['maxheight:physical'] || e.tags.maxheight), w: parseDim(e.tags['maxwidth:physical'] || e.tags.maxwidth), t: parseDim(e.tags.maxweight)
+      }));
+    } catch (e) { /* réseau */ } finally { lowBusy = false; }
+  }
+  let best = null;
+  lowList.forEach((x) => {
+    const why = (x.h && d.height && x.h < d.height + 0.05) ? ['Hauteur limitée à ' + nb(x.h) + ' m', 'ton véhicule : ' + nb(d.height) + ' m']
+      : (x.w && d.width && x.w < d.width) ? ['Largeur limitée à ' + nb(x.w) + ' m', 'ton véhicule : ' + nb(d.width) + ' m']
+      : (x.t && d.weight && x.t < d.weight) ? ['Poids limité à ' + nb(x.t) + ' t', 'ton véhicule : ' + nb(d.weight) + ' t'] : null;
+    if (!why) return;
+    const m = dist(S.pos, x); if (m > 800 || m < 10) return;
+    if (S.heading != null && (S.speed || 0) > 2 && adiff(S.heading, brg(S.pos, x)) > 55) return;
+    if (!best || m < best.m) best = { x, m, why };
+  });
+  if (!best) { lowChip.hidden = true; return; }
+  lowChip.innerHTML = '<b>' + esc(best.why[0]) + '</b><span>' + fmtDist(Math.round(best.m / 10) * 10) + (best.x.name ? ' · ' + esc(best.x.name) : '') + ' · ' + esc(best.why[1]) + '</span>';
+  lowChip.hidden = false;
+  if (!lowWarned[best.x.id]) { lowWarned[best.x.id] = true; vibrate([120, 80, 120]); toast('<b>Attention</b> : ' + esc(best.why[0]) + ' dans ' + fmtDist(Math.round(best.m / 10) * 10) + ' (' + esc(best.why[1]) + ').', { ms: 9000 }); }
+}
+setInterval(lowCheck, 4000);
 
 /* ======================= Hauteur réelle de la barre de navigation ======================= */
 /* La vitesse, les panneaux et les boutons se placent toujours au-dessus, quelle que soit la taille du téléphone */
