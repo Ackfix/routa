@@ -186,6 +186,19 @@ const DB = {
       }
     }
   },
+  /* Secret propre à cet appareil : lui seul peut modifier ou effacer sa fiche conducteur */
+  secret() {
+    let s = store.get('routa.secret', null);
+    if (!s) { const b = new Uint8Array(24); crypto.getRandomValues(b); s = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join(''); store.set('routa.secret', s); }
+    return s;
+  },
+  /* Conducteurs autour : le serveur ne donne la position exacte qu'aux amis et au convoi */
+  async liveDrivers() {
+    if (!this.sb || !S.me) return;
+    const { data, error } = await this.sb.rpc('drivers_live', { me: S.me.id, s: this.secret() });
+    if (error || !Array.isArray(data)) return;
+    S.drivers.clear(); data.forEach((r) => S.drivers.set(r.id, r));
+  },
   local(k) { return store.get('routa.local.' + k, []); },
   saveLocal(k, v) { store.set('routa.local.' + k, v); },
 
@@ -197,7 +210,7 @@ const DB = {
     }
     const since = new Date(Date.now() - 10 * 60000).toISOString();
     const [d, a, s, m] = await Promise.all([
-      this.sb.from('drivers').select('*').gte('updated_at', since).limit(500),
+      this.sb.rpc('drivers_live', { me: S.me.id, s: this.secret() }),
       this.sb.from('alerts').select('*').gt('expires_at', new Date().toISOString()).limit(1000),
       this.sb.from('spots').select('*').limit(1000),
       this.sb.from('messages').select('*').or('to_id.eq.' + S.me.id + ',from_id.eq.' + S.me.id).order('created_at', { ascending: false }).limit(200)
@@ -210,11 +223,8 @@ const DB = {
 
   subscribe() {
     if (!this.sb) return;
+    setInterval(async () => { if (document.hidden) return; await this.liveDrivers(); renderDrivers(); }, 5000);
     this.sb.channel('routa-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, (p) => {
-        if (p.eventType === 'DELETE') S.drivers.delete(p.old.id); else S.drivers.set(p.new.id, p.new);
-        renderDrivers();
-      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'alerts' }, (p) => {
         if (p.eventType === 'DELETE') S.alerts.delete(p.old.id); else S.alerts.set(p.new.id, p.new);
         renderAlerts();
@@ -229,7 +239,7 @@ const DB = {
 
   async presence(row) {
     if (!this.sb) return;
-    const { error } = await this.sb.from('drivers').upsert(row);
+    const { error } = await this.sb.rpc('driver_upsert', { p: row, s: this.secret() });
     if (error) console.warn(error);
   },
   async addAlert(a) {
@@ -294,8 +304,8 @@ const DB = {
   },
   async findByCode(code) {
     if (!this.sb) return null;
-    const { data } = await this.sb.from('drivers').select('id,pseudo,car,color').eq('code', code).limit(1);
-    return data && data[0];
+    const { data } = await this.sb.rpc('driver_by_code', { c: code });
+    return Array.isArray(data) && data[0];
   },
   async prices(ids) {
     if (!this.sb || !ids.length) return [];
@@ -2414,9 +2424,9 @@ function openProfile() {
 async function wipeMyData() {
   const id = S.me && S.me.id;
   if (DB.sb && id) {
-    const jobs = [['alerts', 'created_by'], ['spots', 'created_by'], ['place_ratings', 'created_by'], ['fuel_prices', 'created_by'], ['event_rsvp', 'driver_id'], ['events', 'created_by'], ['messages', 'from_id'], ['messages', 'to_id'], ['drivers', 'id']];
+    const jobs = [['alerts', 'created_by'], ['spots', 'created_by'], ['place_ratings', 'created_by'], ['fuel_prices', 'created_by'], ['event_rsvp', 'driver_id'], ['events', 'created_by'], ['messages', 'from_id'], ['messages', 'to_id']];
     for (const [t, c] of jobs) { try { await DB.sb.from(t).delete().eq(c, id); } catch (e) { /* */ } }
-    try { await DB.sb.from('drivers').upsert({ id, code: null, pseudo: '', car: null, visibility: 'invisible', friends: [], lat: null, lon: null, heading: null, speed: null, updated_at: new Date(0).toISOString() }); await DB.sb.from('drivers').delete().eq('id', id); } catch (e) { /* */ }
+    try { await DB.sb.rpc('driver_delete', { did: id, s: DB.secret() }); } catch (e) { /* */ }
   }
   try { Object.keys(localStorage).filter((k) => /^routa\./.test(k) && k !== 'routa.lang').forEach((k) => localStorage.removeItem(k)); } catch (e) { /* */ }
   toast('Tes données ont été supprimées.');
