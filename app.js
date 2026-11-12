@@ -133,6 +133,7 @@ const VEHICLES = {
   electrique: { label: 'Électrique', icon: 'ev', ev: true },
   hybride: { label: 'Hybride', icon: 'ev', ev: true },
   camping: { label: 'Camping-car', icon: 'camper', heavy: true, costing: 'truck', dims: { height: 3.2, width: 2.3, length: 7.5, weight: 3.5 } },
+  remorque: { label: 'Voiture + caravane ou remorque', icon: 'camper', heavy: true, costing: 'auto', dims: { height: 2.6, width: 2.5, length: 12, weight: 3.5 } },
   minibus: { label: 'Minibus', icon: 'minibus', heavy: true, costing: 'bus', dims: { height: 2.9, width: 2.1, length: 7, weight: 5 } },
   bus: { label: 'Car / bus', icon: 'bus', heavy: true, costing: 'bus', dims: { height: 3.8, width: 2.55, length: 13.5, weight: 19 } },
   camion: { label: 'Poids lourd', icon: 'truck', heavy: true, costing: 'truck', hgv: true, dims: { height: 4, width: 2.55, length: 16.5, weight: 40 } }
@@ -2306,7 +2307,8 @@ async function countryTick(force) {
   const prev = S.country; S.country = cc; store.set('routa.country', cc); updateCountryChip();
   const k = CTRY[cc];
   if (prev && k) {
-    toast('Bienvenue ' + esc(k.in) + ' · urgences <b>' + esc(k.main) + '</b> · ' + esc(k.toll.label), { action: 'Infos', onAction: () => openCountry(cc, 'route'), ms: 10000 });
+    const lim = (k.lim || []).join(' / ') + (/mph/.test((k.lim || [''])[0]) ? '' : ' km/h');
+    toast('Bienvenue ' + esc(k.in) + ' · urgences <b>' + esc(k.main) + '</b> · ' + esc(k.toll.label) + '<br><span class="small">' + esc(I18N.t('Limites : {l}').split('{l}').join(lim)) + (k.alc ? ' · ' + esc(I18N.t('alcool')) + ' ' + esc(k.alc) : '') + '</span>' + (k.must && k.must.length ? '<br><span class="small">' + esc(I18N.t('Obligatoire')) + ' : ' + k.must.map((m) => esc(I18N.t(m))).join(', ') + '</span>' : ''), { action: 'Infos', onAction: () => openCountry(cc, 'route'), ms: 15000 });
     say('Bienvenue ' + k.in + '. ' + (k.toll.type === 'vignette' ? 'Attention, vignette obligatoire.' : ''));
   }
 }
