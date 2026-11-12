@@ -50,11 +50,11 @@
     const v = S.speed;
     if (document.hidden || v == null || !S.pos) { if (cur && now - (cur.le || now) > 15 * 60000) finish(); lastT = 0; return; }
     const dt = lastT ? (now - lastT) / 1000 : 0; lastT = now;
-    if (!cur && v > 3) { cur = { s: now, le: now, km: 0, mv: 0, max: 0, br: 0, ac: 0, sp: 0, lim: 0, nm: '' }; lastP = { lat: S.pos.lat, lon: S.pos.lon }; lastV = v; stopSince = 0; return; }
+    if (!cur && v > 3) { cur = { s: now, le: now, km: 0, mv: 0, max: 0, br: 0, ac: 0, sp: 0, lim: 0, nm: '', p0: { lat: +S.pos.lat.toFixed(3), lon: +S.pos.lon.toFixed(3) } }; lastP = { lat: S.pos.lat, lon: S.pos.lon }; lastV = v; stopSince = 0; return; }
     if (!cur) return;
     if (dt > 0 && dt < 10) {
       if (v > 1.5) {
-        cur.mv += dt; cur.le = now; stopSince = 0;
+        cur.mv += dt; cur.le = now; stopSince = 0; cur.p1 = { lat: +S.pos.lat.toFixed(3), lon: +S.pos.lon.toFixed(3) };
         const d = dist(lastP, S.pos);
         if (d < 600) cur.km += d / 1000;
         cur.max = Math.max(cur.max, v * 3.6);
@@ -120,7 +120,7 @@
     const body = openSheet(T('Suivi de conduite'), html, 'drive');
     body.querySelectorAll('[data-p]').forEach((b) => { b.onclick = () => openDrive(b.dataset.p); });
     body.querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => openTrip(+b.dataset.t); });
-    const st = body.querySelector('#drStory'); if (st) st.onclick = () => story(agg, label);
+    const st = body.querySelector('#drStory'); if (st) st.onclick = () => story(agg, label, { list: all.filter((d) => d.s > Date.now() - PER.find((x) => x[0] === per)[2]) });
     const c = body.querySelector('#drCons'), pr = body.querySelector('#drPrice');
     const sv = () => { const a = parseFloat(String(c.value).replace(',', '.')), b = parseFloat(String(pr.value).replace(',', '.')); if (a > 1 && a < 80) CFGD.cons = a; if (b > 0.3 && b < 6) CFGD.price = b; saveCfg(); };
     c.onchange = () => { sv(); openDrive(); }; pr.onchange = () => { sv(); openDrive(); };
@@ -130,68 +130,140 @@
     const all = loadDrives(); const d = all[i]; if (!d) return;
     const a = aggregate([d]);
     const day = new Date(d.s).toLocaleDateString(LANG(), { day: 'numeric', month: 'long', year: 'numeric' });
-    const hm = (t) => new Date(t).toLocaleTimeString(LANG(), { hour: '2-digit', minute: '2-digit' });
     const body = openSheet(T('Détails du trajet'),
       '<h3 style="margin:0">' + esc(day) + '</h3><p class="muted small" style="margin:2px 0 8px">' + esc(d.nm || T('Trajet')) + ' · ' + esc(hm(d.s)) + ' → ' + esc(hm(d.e || d.le)) + '</p>' +
       statsHtml(a, d.nm || T('Ce trajet')) +
       '<div class="card"><div class="grow"><b>' + esc(T('Carburant')) + '</b><div class="sub">' + nf(a.litres, 1) + ' l · ' + curr() + ' ' + nf(priceL(), 2) + '/l · ' + esc(T('{c} l/100 km', { c: nf(CFGD.cons, 1) })) + '</div></div><b>' + curr() + ' ' + nf(a.cost) + '</b></div>' +
       '<button class="btn primary block" id="trStory">' + esc(T('Partager en story')) + '</button>' +
       '<div class="row"><button class="btn ghost grow" id="trBack">' + esc(T('Retour')) + '</button><button class="btn ghost grow" id="trDel">' + esc(T('Supprimer ce trajet')) + '</button></div>', 'drive');
-    body.querySelector('#trStory').onclick = () => story(a, day + (d.nm ? ' · ' + d.nm : ''));
+    body.querySelector('#trStory').onclick = () => story(a, day + (d.nm ? ' · ' + d.nm : ''), { trip: d, idx: i });
     body.querySelector('#trBack').onclick = () => openDrive('trips');
     let arm = 0;
     body.querySelector('#trDel').onclick = (e) => { if (Date.now() - arm > 4000) { arm = Date.now(); e.target.textContent = T('Touche encore pour supprimer'); return; } all.splice(i, 1); saveDrives(all); openDrive('trips'); };
   }
 
-  /* ---------- story 1080 × 1920 aux couleurs de ROUTA ---------- */
+  /* ---------- story 1080 × 1920 aux couleurs de ROUTA (contenu au choix) ---------- */
   function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
   function fit(c, txt, maxW, size, weight) { let s = size; do { c.font = weight + ' ' + s + 'px Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'; s -= 2; } while (c.measureText(txt).width > maxW && s > 18); }
   function loadImg(src) { return new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; }); }
-  async function story(a, label) {
+  const hm = (t) => new Date(t).toLocaleTimeString(LANG(), { hour: '2-digit', minute: '2-digit' });
+  /* ville d'un point (gardée dans le trajet pour ne pas redemander) */
+  async function cityOf(p) {
+    if (!p) return '';
+    const lg = /^(fr|de|it)$/.test(LANG()) ? LANG() : 'en';
+    try {
+      const r = await fetch((CFG.searchUrl || 'https://photon.komoot.io/api/').replace(/api\/?$/, 'reverse') + '?lat=' + p.lat + '&lon=' + p.lon + '&lang=' + lg);
+      const j = await r.json(); const q = (j.features && j.features[0] && j.features[0].properties) || {};
+      const c = q.city || q.town || q.village || q.county || ''; if (c) return c;
+    } catch (e) { /* */ }
+    try {
+      const r = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&accept-language=' + LANG() + '&lat=' + p.lat + '&lon=' + p.lon);
+      const j = await r.json(); const a = j.address || {};
+      return a.city || a.town || a.village || a.municipality || '';
+    } catch (e) { return ''; }
+  }
+  async function citiesFor(list) {
+    const all = loadDrives(); let changed = false;
+    const todo = list.filter((d) => (d.p0 && d.c0 == null) || (d.p1 && d.c1 == null)).slice(-12);
+    await Promise.all(todo.map(async (d) => {
+      if (d.p0 && d.c0 == null) d.c0 = await cityOf(d.p0);
+      if (d.p1 && d.c1 == null) d.c1 = await cityOf(d.p1);
+      const k = all.findIndex((x) => x.s === d.s); if (k >= 0) { all[k].c0 = d.c0; all[k].c1 = d.c1; changed = true; }
+    }));
+    if (changed) saveDrives(all);
+    if (list.length === 1) { const d = list[0]; return [d.c0, d.c1].filter(Boolean).filter((x, i, arr) => arr.indexOf(x) === i).join(' → '); }
+    const u = []; list.forEach((d) => [d.c0, d.c1].forEach((c) => { if (c && u.indexOf(c) < 0) u.push(c); }));
+    return u.length > 3 ? u.slice(0, 3).join(' · ') + ' +' + (u.length - 3) : u.join(' · ');
+  }
+  const SOPT = [
+    ['score', 'Score de conduite', 1], ['label', 'Période', 1], ['cities', 'Villes', 1], ['hours', 'Horaires', 0],
+    ['km', 'Distance', 1], ['time', 'Temps de conduite', 1], ['avg', 'Vitesse moyenne', 1], ['max', 'Vitesse max', 1],
+    ['trips', 'Trajets', 0], ['limits', 'Respect des limites', 1], ['smooth', 'Freinages / accélérations brusques', 0],
+    ['fuel', 'Carburant estimé', 0], ['co2', 'CO₂ estimé', 0]
+  ];
+  const SCFG = Object.assign({}, ...SOPT.map(([k, , on]) => ({ [k]: !!on })), store.get('routa.storycfg', {}));
+  async function drawStory(a, label, ctx, cities) {
     const W = 1080, H = 1920, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const c = cv.getContext('2d');
     c.fillStyle = '#0E1116'; c.fillRect(0, 0, W, H);
     const g = c.createRadialGradient(W * 0.85, 120, 40, W * 0.85, 120, 900); g.addColorStop(0, 'rgba(255,138,61,.35)'); g.addColorStop(1, 'rgba(255,138,61,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H);
     const g2 = c.createRadialGradient(80, H - 200, 20, 80, H - 200, 700); g2.addColorStop(0, 'rgba(79,168,255,.18)'); g2.addColorStop(1, 'rgba(79,168,255,0)'); c.fillStyle = g2; c.fillRect(0, 0, W, H);
+    let y = 230;
+    c.fillStyle = '#FF8A3D'; fit(c, T('Mon suivi de conduite').toUpperCase(), 900, 38, '800'); c.fillText(T('Mon suivi de conduite').toUpperCase(), 90, y);
+    if (SCFG.label && label) { y += 70; c.fillStyle = '#F4F6FA'; fit(c, label, 900, 50, '700'); c.fillText(label, 90, y); }
+    if (SCFG.cities && cities) { y += 62; c.fillStyle = '#9AA3AF'; fit(c, cities, 900, 40, '600'); c.fillText(cities, 90, y); }
+    if (SCFG.hours && ctx.trip) { const t = hm(ctx.trip.s) + ' → ' + hm(ctx.trip.e || ctx.trip.le); y += 58; c.fillStyle = '#9AA3AF'; fit(c, t, 900, 38, '600'); c.fillText(t, 90, y); }
+    y += 60;
+    if (SCFG.score) {
+      const R = 220, cx = W / 2, cy = y + R + 30;
+      c.lineWidth = 34; c.lineCap = 'round'; c.strokeStyle = 'rgba(255,255,255,.08)'; c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.stroke();
+      const sc = a.score == null ? 0 : a.score;
+      const gr = c.createLinearGradient(cx - R, cy - R, cx + R, cy + R); gr.addColorStop(0, '#FFC531'); gr.addColorStop(1, '#FF8A3D');
+      c.strokeStyle = gr; c.beginPath(); c.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * sc / 100); c.stroke();
+      c.textAlign = 'center'; c.fillStyle = '#F4F6FA'; c.font = '800 180px Inter, system-ui, -apple-system, sans-serif'; c.fillText(String(a.score == null ? '–' : sc), cx, cy + 60);
+      c.fillStyle = '#9AA3AF'; fit(c, T('Score de conduite'), 380, 32, '600'); c.fillText(T('Score de conduite'), cx, cy + 115);
+      c.fillStyle = '#FF8A3D'; fit(c, a.score == null ? '' : scoreLabel(sc), 700, 52, '800'); c.fillText(a.score == null ? '' : scoreLabel(sc), cx, cy + R + 100);
+      c.textAlign = 'left';
+      y = cy + R + 160;
+    }
+    const lim = a.lim > 30 ? Math.max(0, 100 - Math.round(a.sp / a.lim * 100)) + ' %' : '–';
+    const cards = [
+      SCFG.km && [nf(a.km, a.km < 100 ? 1 : 0) + ' km', T('Distance')],
+      SCFG.time && [fmtDur(a.mv), T('Temps de conduite')],
+      SCFG.avg && [nf(a.avg) + ' km/h', T('Vitesse moyenne')],
+      SCFG.max && [nf(a.max) + ' km/h', T('Vitesse max')],
+      SCFG.trips && !ctx.trip && [String(a.n), T('Trajets')],
+      SCFG.limits && [lim, T('Respect des limites')],
+      SCFG.smooth && [a.br + ' / ' + a.ac, T('Freinages / accélérations brusques')],
+      SCFG.fuel && [nf(a.litres, 1) + ' l · ' + curr() + ' ' + nf(a.cost), T('Carburant estimé')],
+      SCFG.co2 && [nf(a.litres * 2.3) + ' kg', T('CO₂ estimé')]
+    ].filter(Boolean);
+    if (cards.length) {
+      const bottom = 1660, gap = 28, rows = Math.ceil(cards.length / 2);
+      const ch = Math.max(120, Math.min(200, (bottom - y - (rows - 1) * gap) / rows));
+      const cw = 435;
+      cards.forEach(([v, l], i) => {
+        const last = i === cards.length - 1 && cards.length % 2 === 1;
+        const w = last ? cw * 2 + 30 : cw, x = 90 + (last ? 0 : (i % 2) * (cw + 30)), yy = y + Math.floor(i / 2) * (ch + gap);
+        c.fillStyle = '#171B22'; rr(c, x, yy, w, ch, 36); c.fill();
+        c.strokeStyle = 'rgba(255,255,255,.06)'; c.lineWidth = 2; rr(c, x, yy, w, ch, 36); c.stroke();
+        c.fillStyle = '#F4F6FA'; fit(c, v, w - 70, Math.round(ch * 0.33), '800'); c.fillText(v, x + 36, yy + ch * 0.5);
+        c.fillStyle = '#9AA3AF'; fit(c, l, w - 70, Math.round(ch * 0.16), '600'); c.fillText(l, x + 36, yy + ch * 0.78);
+      });
+    }
     const logo = await loadImg('icons/icon-512.png');
-    if (logo) { c.save(); rr(c, 90, 150, 120, 120, 30); c.clip(); c.drawImage(logo, 90, 150, 120, 120); c.restore(); }
-    c.fillStyle = '#F4F6FA'; fit(c, 'ROUTA', 600, 64, '800'); c.fillText('ROUTA', 240, 228);
-    c.fillStyle = '#FF8A3D'; fit(c, T('Mon suivi de conduite').toUpperCase(), 900, 34, '800'); c.fillText(T('Mon suivi de conduite').toUpperCase(), 90, 380);
-    c.fillStyle = '#9AA3AF'; fit(c, label, 900, 40, '600'); c.fillText(label, 90, 440);
-    /* anneau du score */
-    const cx = W / 2, cy = 760, R = 230;
-    c.lineWidth = 34; c.lineCap = 'round'; c.strokeStyle = 'rgba(255,255,255,.08)'; c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.stroke();
-    const sc = a.score == null ? 0 : a.score;
-    const gr = c.createLinearGradient(cx - R, cy - R, cx + R, cy + R); gr.addColorStop(0, '#FFC531'); gr.addColorStop(1, '#FF8A3D');
-    c.strokeStyle = gr; c.beginPath(); c.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * sc / 100); c.stroke();
-    c.textAlign = 'center'; c.fillStyle = '#F4F6FA'; c.font = '800 190px Inter, system-ui, -apple-system, sans-serif'; c.fillText(String(a.score == null ? '–' : sc), cx, cy + 62);
-    c.fillStyle = '#9AA3AF'; fit(c, T('Score de conduite'), 400, 34, '600'); c.fillText(T('Score de conduite'), cx, cy + 120);
-    c.fillStyle = '#FF8A3D'; fit(c, a.score == null ? '' : scoreLabel(sc), 700, 54, '800'); c.fillText(a.score == null ? '' : scoreLabel(sc), cx, cy + R + 110);
-    c.textAlign = 'left';
-    /* cartes */
-    const cards = [[nf(a.km, a.km < 100 ? 1 : 0) + ' km', T('Distance')], [fmtDur(a.mv), T('Temps de conduite')], [nf(a.avg) + ' km/h', T('Vitesse moyenne')], [nf(a.max) + ' km/h', T('Vitesse max')]];
-    const cw = 435, ch = 190, x0 = 90, y0 = 1180, gap = 30;
-    cards.forEach(([v, l], i) => {
-      const x = x0 + (i % 2) * (cw + gap), y = y0 + Math.floor(i / 2) * (ch + gap);
-      c.fillStyle = '#171B22'; rr(c, x, y, cw, ch, 36); c.fill();
-      c.strokeStyle = 'rgba(255,255,255,.06)'; c.lineWidth = 2; rr(c, x, y, cw, ch, 36); c.stroke();
-      c.fillStyle = '#F4F6FA'; fit(c, v, cw - 70, 64, '800'); c.fillText(v, x + 36, y + 96);
-      c.fillStyle = '#9AA3AF'; fit(c, l, cw - 70, 30, '600'); c.fillText(l, x + 36, y + 148);
-    });
-    c.fillStyle = '#FF8A3D'; rr(c, 90, 1640, W - 180, 120, 60); c.fill();
-    c.fillStyle = '#1A1205'; c.textAlign = 'center'; fit(c, T('Roule avec ROUTA') + ' · routa.ackfix.com', W - 260, 40, '800'); c.fillText(T('Roule avec ROUTA') + ' · routa.ackfix.com', W / 2, 1714);
-    c.textAlign = 'left';
-    const blob = await new Promise((r) => cv.toBlob(r, 'image/png'));
-    const file = blob && new File([blob], 'routa-story.png', { type: 'image/png' });
-    try {
-      if (file && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'ROUTA' }); return; }
-    } catch (e) { if (e && e.name === 'AbortError') return; }
-    const url = cv.toDataURL('image/png');
-    const body = openSheet(T('Ta story'), '<img src="' + url + '" alt="" style="width:100%;border-radius:18px;display:block">' +
-      '<p class="muted small">' + esc(T('Appuie longuement sur l\'image pour l\'enregistrer, puis ajoute-la à ta story Instagram.')) + '</p>' +
-      '<a class="btn primary block" download="routa-story.png" href="' + url + '">' + esc(T('Télécharger l\'image')) + '</a>' +
+    if (logo) { c.save(); c.globalAlpha = 0.95; rr(c, W / 2 - 42, 1740, 84, 84, 22); c.clip(); c.drawImage(logo, W / 2 - 42, 1740, 84, 84); c.restore(); }
+    return cv;
+  }
+  async function story(a, label, ctx) {
+    ctx = ctx || {};
+    const list = ctx.trip ? [ctx.trip] : (ctx.list || []);
+    const hasPos = list.some((d) => d.p0 || d.p1);
+    const opts = SOPT.filter(([k]) => !(k === 'hours' && !ctx.trip) && !(k === 'trips' && ctx.trip) && !(k === 'cities' && !hasPos));
+    let cities = '', blob = null, url = '', ver = 0;
+    const body = openSheet(T('Ta story'),
+      '<div style="text-align:center"><img id="stImg" alt="" style="max-width:100%;max-height:48vh;aspect-ratio:9/16;border-radius:18px;background:#0E1116;display:inline-block"></div>' +
+      '<p class="muted small" style="margin:10px 0 6px">' + esc(T('Touche les éléments pour les afficher ou les cacher.')) + '</p>' +
+      '<div id="stOpts" style="display:flex;flex-wrap:wrap;gap:8px">' + opts.map(([k, l]) => '<button class="btn small soft" data-k="' + k + '" aria-pressed="' + !!SCFG[k] + '" style="min-height:40px">' + esc(T(l)) + '</button>').join('') + '</div>' +
+      '<button class="btn primary block" id="stShare" style="margin-top:14px">' + esc(T('Partager')) + '</button>' +
+      '<a class="btn ghost block" id="stDl" download="routa-story.png">' + esc(T('Télécharger l\'image')) + '</a>' +
       '<button class="btn ghost block" id="stBack">' + esc(T('Retour')) + '</button>', 'drive');
-    body.querySelector('#stBack').onclick = () => openDrive();
+    const img = body.querySelector('#stImg');
+    const paint = (b) => { const on = SCFG[b.dataset.k]; b.setAttribute('aria-pressed', String(!!on)); b.style.background = on ? 'var(--accent)' : ''; b.style.color = on ? '#1A1205' : ''; b.style.borderColor = on ? 'var(--accent)' : ''; };
+    const render = async () => {
+      const v = ++ver; const cv = await drawStory(a, label, ctx, cities); if (v !== ver) return;
+      url = cv.toDataURL('image/png'); img.src = url; body.querySelector('#stDl').href = url;
+      cv.toBlob((b) => { if (v === ver) blob = b; }, 'image/png');
+    };
+    body.querySelectorAll('[data-k]').forEach((b) => { paint(b); b.onclick = () => { SCFG[b.dataset.k] = !SCFG[b.dataset.k]; store.set('routa.storycfg', SCFG); paint(b); render(); }; });
+    body.querySelector('#stBack').onclick = () => (ctx.trip && ctx.idx != null ? openTrip(ctx.idx) : openDrive());
+    body.querySelector('#stShare').onclick = async () => {
+      const file = blob && new File([blob], 'routa-story.png', { type: 'image/png' });
+      try { if (file && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'ROUTA' }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+      toast(T('Appuie longuement sur l\'image pour l\'enregistrer, puis ajoute-la à ta story Instagram.'));
+    };
+    await render();
+    if (hasPos) { cities = await citiesFor(list).catch(() => ''); if (cities && S.sheetView === 'drive') render(); }
   }
 
   /* =========================================================
