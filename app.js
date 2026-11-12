@@ -2590,7 +2590,7 @@ function openMenu() {
     ]],
     ['Ma voiture', [
       ['vehicle', ic(v.icon), 'Véhicule · ' + v.label],
-      X.open && ['carnet', XI.book || ic('info'), 'Carnet d\'entretien'],
+      X.open && ['carnet', XI.book || ic('info'), 'Carnet du véhicule'],
       X.open && ['parked', XI.park || ic('parking'), 'Parking']
     ]],
     ['Pro', [
