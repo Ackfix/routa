@@ -693,7 +693,7 @@ function consumption() {
 function openCarnet() {
   const cons = consumption();
   const spent = carnet.fills.reduce((s, x) => s + (x.price || 0), 0);
-  const body = openSheet('Carnet de la voiture',
+  const body = openSheet('Carnet du véhicule',
     '<h3>Rappels</h3>' + DUE.map(([k, l]) => { const v = carnet.dates[k] || ''; const days = v ? Math.ceil((Date.parse(v) - Date.now()) / 86400000) : null; return '<label class="field" for="cd_' + k + '">' + l + (days != null ? ' <span class="pill ' + (days < 0 ? 'warn' : days <= 30 ? 'warn' : 'ok') + '">' + (days < 0 ? 'dépassé' : 'dans ' + days + ' j') + '</span>' : '') + '<input id="cd_' + k + '" type="date" value="' + esc(v) + '"></label>'; }).join('') +
     '<button class="btn soft block" id="cdIcs">' + IC.event + 'Ajouter les rappels au calendrier</button>' +
     '<h3>Pleins</h3>' +
@@ -800,7 +800,7 @@ X.tiles = () => [
   ['chargers', IC.plug, 'Bornes libres'],
   ['parkfree', IC.park, 'Parkings libres'],
   ['cols', IC.mount, 'Cols et météo'],
-  ['carnet', IC.book, 'Carnet de la voiture'],
+  ['carnet', IC.book, 'Carnet du véhicule'],
   ['parked', IC.car, 'Ma voiture garée']
 ];
 X.icons = IC;
