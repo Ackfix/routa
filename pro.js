@@ -155,6 +155,8 @@
       html += statsHtml(agg, label) + (agg.n ? '<button class="btn primary block" id="drStory">' + esc(T('Partager en story')) + '</button>' : '');
     }
     html += '<button class="btn soft block" id="drRank">' + esc(T('Classement entre amis')) + '</button>';
+    const recOff = monthDrives(-1).length ? -1 : monthDrives(0).length ? 0 : null;
+    if (recOff != null) html += '<button class="btn soft block" id="drRecap">' + esc(T('Récap · {m}', { m: monthName(recOff) })) + '</button>';
     html += '<details class="card" style="display:block"><summary style="cursor:pointer;font-weight:700">' + esc(T('Réglages du calcul de carburant')) + '</summary>' +
       '<div class="row" style="margin-top:10px"><label class="field grow" for="drCons">' + esc(T('Consommation (l/100 km)')) + '<input id="drCons" type="number" inputmode="decimal" step="0.1" min="2" max="60" value="' + CFGD.cons + '"></label>' +
       '<label class="field grow" for="drPrice">' + esc(T('Prix du litre ({c})', { c: curr() })) + '<input id="drPrice" type="number" inputmode="decimal" step="0.01" min="0.5" max="5" value="' + priceL().toFixed(2) + '"></label></div></details>' +
@@ -163,6 +165,7 @@
     body.querySelectorAll('[data-p]').forEach((b) => { b.onclick = () => openDrive(b.dataset.p); });
     body.querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => openTrip(+b.dataset.t); });
     body.querySelector('#drRank').onclick = openRank;
+    const rc = body.querySelector('#drRecap'); if (rc) rc.onclick = () => openRecap(recOff);
     const st = body.querySelector('#drStory'); if (st) st.onclick = () => story(agg, label, { list: all.filter((d) => d.s > Date.now() - PER.find((x) => x[0] === per)[2]) });
     const c = body.querySelector('#drCons'), pr = body.querySelector('#drPrice');
     const sv = () => { const a = parseFloat(String(c.value).replace(',', '.')), b = parseFloat(String(pr.value).replace(',', '.')); if (a > 1 && a < 80) CFGD.cons = a; if (b > 0.3 && b < 6) CFGD.price = b; saveCfg(); };
@@ -222,7 +225,7 @@
     ['score', 'Score de conduite', 1], ['label', 'Période', 1], ['cities', 'Villes', 1], ['hours', 'Horaires', 0], ['map', 'Tracé du trajet', 1],
     ['km', 'Distance', 1], ['time', 'Temps de conduite', 1], ['avg', 'Vitesse moyenne', 1], ['max', 'Vitesse max', 1],
     ['trips', 'Trajets', 0], ['limits', 'Respect des limites', 1], ['smooth', 'Freinages / accélérations brusques', 0],
-    ['fuel', 'Carburant estimé', 0], ['co2', 'CO₂ estimé', 0]
+    ['fuel', 'Carburant estimé', 0], ['co2', 'CO₂ estimé', 0], ['best', 'Meilleur trajet', 1]
   ];
   const SCFG = Object.assign({}, ...SOPT.map(([k, , on]) => ({ [k]: !!on })), store.get('routa.storycfg', {}));
   async function drawStory(a, label, ctx, cities) {
@@ -232,7 +235,7 @@
     const g = c.createRadialGradient(W * 0.85, 120, 40, W * 0.85, 120, 900); g.addColorStop(0, 'rgba(255,138,61,.35)'); g.addColorStop(1, 'rgba(255,138,61,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H);
     const g2 = c.createRadialGradient(80, H - 200, 20, 80, H - 200, 700); g2.addColorStop(0, 'rgba(79,168,255,.18)'); g2.addColorStop(1, 'rgba(79,168,255,0)'); c.fillStyle = g2; c.fillRect(0, 0, W, H);
     let y = 230;
-    c.fillStyle = '#FF8A3D'; fit(c, T('Mon suivi de conduite').toUpperCase(), 900, 38, '800'); c.fillText(T('Mon suivi de conduite').toUpperCase(), 90, y);
+    const ttl = (ctx.title || T('Mon suivi de conduite')).toUpperCase(); c.fillStyle = '#FF8A3D'; fit(c, ttl, 900, 38, '800'); c.fillText(ttl, 90, y);
     if (SCFG.label && label) { y += 70; c.fillStyle = '#F4F6FA'; fit(c, label, 900, 50, '700'); c.fillText(label, 90, y); }
     if (SCFG.cities && cities) { y += 62; c.fillStyle = '#9AA3AF'; fit(c, cities, 900, 40, '600'); c.fillText(cities, 90, y); }
     if (SCFG.hours && ctx.trip) { const t = hm(ctx.trip.s) + ' → ' + hm(ctx.trip.e || ctx.trip.le); y += 58; c.fillStyle = '#9AA3AF'; fit(c, t, 900, 38, '600'); c.fillText(t, 90, y); }
@@ -303,7 +306,8 @@
       SCFG.limits && [lim, T('Respect des limites')],
       SCFG.smooth && [a.br + ' / ' + a.ac, T('Freinages / accélérations brusques')],
       SCFG.fuel && [nf(a.litres, 1) + ' l · ' + curr() + ' ' + nf(a.cost), T('Carburant estimé')],
-      SCFG.co2 && [nf(a.litres * 2.3) + ' kg', T('CO₂ estimé')]
+      SCFG.co2 && [nf(a.litres * 2.3) + ' kg', T('CO₂ estimé')],
+      SCFG.best && ctx.best && [ctx.best.score + ' · ' + (([ctx.best.c0, ctx.best.c1].filter(Boolean).join(' → ')) || ctx.best.nm || new Date(ctx.best.s).toLocaleDateString(LANG(), { day: 'numeric', month: 'short' })), T('Meilleur trajet')]
     ].filter(Boolean);
     if (cards.length) {
       const bottom = tracks.length ? 1690 : 1660, gap = 28, rows = Math.ceil(cards.length / 2);
@@ -327,7 +331,8 @@
     const list = ctx.trip ? [ctx.trip] : (ctx.list || []);
     const hasPos = list.some((d) => d.p0 || d.p1);
     ctx.tracks = list.filter((d) => d.pts && d.pts.length > 1).map((d) => d.pts);
-    const opts = SOPT.filter(([k]) => !(k === 'hours' && !ctx.trip) && !(k === 'trips' && ctx.trip) && !(k === 'cities' && !hasPos) && !(k === 'map' && !ctx.tracks.length));
+    ctx.best = ctx.trip ? null : list.filter((d) => d.km >= 5).sort((x, y) => y.score - x.score || y.km - x.km)[0] || null;
+    const opts = SOPT.filter(([k]) => !(k === 'hours' && !ctx.trip) && !(k === 'trips' && ctx.trip) && !(k === 'cities' && !hasPos) && !(k === 'map' && !ctx.tracks.length) && !(k === 'best' && !ctx.best));
     let cities = '', blob = null, url = '', ver = 0;
     const body = openSheet(T('Ta story'),
       '<div style="text-align:center"><img id="stImg" alt="" style="max-width:100%;max-height:48vh;aspect-ratio:9/16;border-radius:18px;background:#0E1116;display:inline-block"></div>' +
@@ -353,6 +358,22 @@
     await render();
     if (hasPos) { cities = await citiesFor(list).catch(() => ''); if (cities && S.sheetView === 'drive') render(); }
   }
+
+  /* ---------- récap du mois ---------- */
+  function monthRange(off) { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(1); d.setMonth(d.getMonth() + off); const e = new Date(d); e.setMonth(e.getMonth() + 1); return [d, e]; }
+  function monthDrives(off) { const [a, b] = monthRange(off); return loadDrives().filter((d) => d.s >= a.getTime() && d.s < b.getTime()); }
+  function monthName(off) { const n = monthRange(off)[0].toLocaleDateString(LANG(), { month: 'long', year: 'numeric' }); return n.charAt(0).toUpperCase() + n.slice(1); }
+  function openRecap(off) {
+    const list = monthDrives(off);
+    if (!list.length) { toast(T('Pas encore de trajet')); return; }
+    story(aggregate(list), monthName(off), { list, title: T('Mon mois de conduite') });
+  }
+  setTimeout(() => {
+    const key = monthRange(0)[0].toISOString().slice(0, 7);
+    if (store.get('routa.recapSeen', '') === key) return;
+    store.set('routa.recapSeen', key);
+    if (monthDrives(-1).length) toast('<b>' + esc(T('Ton récap est prêt : {m}', { m: monthName(-1) })) + '</b>', { action: T('Voir'), onAction: () => openRecap(-1), ms: 12000 });
+  }, 18000);
 
   /* =========================================================
      2 · TOURNÉE DE LIVRAISONS (meilleur ordre de passage)
