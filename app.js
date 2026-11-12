@@ -2591,10 +2591,13 @@ function openMenu() {
     ['Ma voiture', [
       ['vehicle', ic(v.icon), 'Véhicule · ' + v.label],
       X.open && ['carnet', XI.book || ic('info'), 'Carnet du véhicule'],
-      X.open && ['parked', XI.park || ic('parking'), 'Parking']
+      X.open && ['parked', XI.park || ic('parking'), 'Parking'],
+      XO('drive') && xt('drive')
     ]],
     ['Pro', [
       X.openPro && ['pro', PROI, 'Temps de conduite'],
+      XO('tour') && xt('tour'),
+      XO('bans') && xt('bans'),
       X.openProLog && ['prolog', '<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7M9 7h4"/></svg>', 'Relevé de conduite'],
       ['truckstop', ic('truckstop'), 'Aires poids lourds'],
       ['restrictions', '<svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M6 20V9l6-5 6 5v11"/><path d="M12 9v6M9 12h6"/></svg>', 'Restrictions autour']
