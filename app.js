@@ -2536,6 +2536,7 @@ function openK(k) {
     else if (k === 'feedback') openFeedback();
     else if (k === 'vehicle') openVehicle(S.preview ? (() => { const d = S.preview.dest; return () => chooseDestination(d); })() : null);
     else if (k === 'restrictions') openRestrictions();
+    else if (k === 'prolog' && window.ROUTA_X && ROUTA_X.openProLog) ROUTA_X.openProLog();
     else if (k === 'country') openCountry(S.country, 'sos');
     else if (k === 'favs') openFavs();
     else if (SLOTS[k]) goSlot(k);
@@ -2562,17 +2563,27 @@ function openMenu() {
   const X = window.ROUTA_X || {}; const XI = X.icons || {};
   const fr = X.pendingCount ? X.pendingCount() : 0;
   const v = veh();
+  const XO = (k) => X.open && X.tiles && X.tiles().some((t) => t[0] === k);
+  const xt = (k) => { const t = X.tiles ? X.tiles().find((x) => x[0] === k) : null; return t ? [t[0], t[1], t[2]] : null; };
+  const PROI = '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg>';
   const groups = [
     ['Communauté', [
       ['messages', ic('msg'), 'Bumps' + (n ? ' <span class="badge">' + n + '</span>' : '')],
       X.open && ['friends', XI.users || ic('msg'), 'Amis et conducteurs' + (fr ? ' <span class="badge">' + fr + '</span>' : '')],
+      XO('ranking') && xt('ranking'),
+      XO('shareme') && xt('shareme')
+    ]],
+    ['Sorties et convois', [
       X.open && ['convoy', XI.convoy || ic('car'), X.convoy ? 'Convoi · ' + esc(X.convoy.name) : 'Convoi'],
-      X.open && ['events', XI.event || ic('spot'), 'Rassemblements']
+      X.open && ['events', XI.event || ic('spot'), 'Rassemblements'],
+      ['spots', ic('spot'), 'Spots, routes et cols'],
+      XO('cols') && xt('cols'),
+      XO('voyage') && xt('voyage')
     ]],
     ['Carte et routes', [
       ['favs', ic('star'), 'Favoris'],
-      ['spots', ic('spot'), 'Spots, routes et cols'],
       v.ev && X.open && ['chargers', XI.plug || ic('charge'), 'Bornes libres'],
+      XO('parkfree') && xt('parkfree'),
       ['mapview', '<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>', 'Affichage carte'],
       X.openTrips && ['trips', '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', 'Mes trajets'],
       X.openOffline && ['offline', '<svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>', 'Carte hors connexion']
@@ -2580,8 +2591,13 @@ function openMenu() {
     ['Ma voiture', [
       ['vehicle', ic(v.icon), 'Véhicule · ' + v.label],
       X.open && ['carnet', XI.book || ic('info'), 'Carnet d\'entretien'],
-      X.open && ['parked', XI.park || ic('parking'), 'Parking'],
-      X.openPro && ['pro', '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg>', 'Temps de conduite (pro)']
+      X.open && ['parked', XI.park || ic('parking'), 'Parking']
+    ]],
+    ['Pro', [
+      X.openPro && ['pro', PROI, 'Temps de conduite'],
+      X.openProLog && ['prolog', '<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7M9 7h4"/></svg>', 'Relevé de conduite'],
+      ['truckstop', ic('truckstop'), 'Aires poids lourds'],
+      ['restrictions', '<svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M6 20V9l6-5 6 5v11"/><path d="M12 9v6M9 12h6"/></svg>', 'Restrictions autour']
     ]]
   ];
   const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + t[1] + '<span>' + t[2] + '</span></button>';
@@ -2589,7 +2605,7 @@ function openMenu() {
     '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     '<button class="card tap menusos" data-k="country"><span class="sosdot big">SOS</span><span class="grow"><b>Urgences et infos pays</b><span class="sub">' + ($('ctryLabel').textContent === 'Infos pays' ? 'Numéros d\'urgence, règles, vignettes' : esc($('ctryLabel').textContent)) + '</span></span></button>' +
     '<button class="card tap menufb" data-k="feedback"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg></span><span class="grow"><b>Donner mon avis</b><span class="sub">Un bug, un truc pas clair, une idée : dis-le-nous</span></span></button>' +
-    groups.map(([g, ts]) => { const list = ts.filter(Boolean); return '<h3 class="menuh">' + g + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
+    groups.map(([g, ts]) => { const list = ts.filter(Boolean); if (!list.length) return ''; return '<h3 class="menuh' + (g === 'Pro' ? ' menupro' : '') + '">' + (g === 'Pro' ? '<span class="probadge">PRO</span> ' + esc(I18N.t('Outils pour les professionnels de la route')) : g) + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
     '<div class="menulinks">' + (X.canInstall && X.canInstall() ? '<button data-k="install">Installer l\'app</button>' : '') + '<button data-k="share">Partager ROUTA</button><button data-k="help">Aide</button><button data-k="privacy">Confidentialité</button></div>' +
     '<a class="menusig" href="https://ackfix.com" target="_blank" rel="noopener">ROUTA par <b>ACKFIX</b> · Informatique, simplement.<br><span>Dépannage PC et Mac dans tout le Canton de Vaud</span></a>' +
     langSeg(), 'menu');
