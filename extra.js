@@ -245,7 +245,7 @@ async function joinConvoy(code) {
   if (!DB.sb) { toast('Le convoi demande le mode en ligne.'); return false; }
   const { data } = await DB.sb.from('convoys').select('*').eq('id', code.toUpperCase()).limit(1);
   if (!data || !data[0]) { toast('Convoi introuvable. Vérifie le code.'); return false; }
-  X.convoy = data[0]; saveConvoy(); subscribeConvoy(); await loadConvoyMsgs();
+  X.convoy = data[0]; saveConvoy(); subscribeConvoy(); await new Promise((r) => setTimeout(r, 1500)); await loadConvoyMsgs();
   toast('Tu as rejoint le convoi <b>' + esc(X.convoy.name) + '</b>.'); return true;
 }
 async function createConvoy(name) {
@@ -254,8 +254,9 @@ async function createConvoy(name) {
   if (error) { toast('Le convoi n\'a pas pu être créé. Réessaie.'); return; }
   X.convoy = c; saveConvoy(); subscribeConvoy(); convoyMsgs = [];
   openConvoy();
-  shareLink('ROUTA', 'Rejoins mon convoi « ' + c.name + ' » sur ROUTA :', appUrl() + '?convoi=' + c.id);
+  shareLink('ROUTA', convoyInvite(c), appUrl() + '?convoi=' + c.id);
 }
+function convoyInvite(c) { return TRX('Rejoins mon convoi « {n} » sur ROUTA. Dans l\'app : Menu › Convoi › Rejoindre, code {c}. Ou ouvre ce lien :', { n: c.name, c: c.id }); }
 function leaveConvoy() {
   if (convoyChan && DB.sb) DB.sb.removeChannel(convoyChan); convoyChan = null;
   X.convoy = null; saveConvoy(); closeSheet(); toast('Tu as quitté le convoi.');
@@ -295,7 +296,8 @@ async function openConvoy() {
   const send = async (t) => {
     t = (t || '').trim(); if (!t) return;
     const m = { id: uuid(), from_id: S.me.id, from_name: S.me.pseudo, to_id: 'convoy:' + c.id, kind: 'text', body: t, created_at: nowIso() };
-    const { data, error } = await DB.sb.rpc('message_send', { m, s: DB.secret() });
+    let { data, error } = await DB.sb.rpc('message_send', { m, s: DB.secret() });
+    if (error || data === false) { pushPresence(true); await new Promise((r) => setTimeout(r, 2000)); ({ data, error } = await DB.sb.rpc('message_send', { m, s: DB.secret() })); }
     if (error || data === false) { toast('Message non envoyé. Vérifie ta connexion.'); return; }
     if (!convoyMsgs.some((x) => x.id === m.id)) convoyMsgs.push(m); openConvoy();
   };
@@ -307,7 +309,7 @@ async function openConvoy() {
     await send('Destination : ' + myDest.name); toast('Destination partagée avec le convoi.');
   };
   body.querySelectorAll('[data-q]').forEach((b) => { b.onclick = () => send(b.dataset.q); });
-  body.querySelector('#cvInvite').onclick = () => shareLink('ROUTA', 'Rejoins mon convoi « ' + c.name + ' » sur ROUTA :', appUrl() + '?convoi=' + c.id);
+  body.querySelector('#cvInvite').onclick = () => shareLink('ROUTA', convoyInvite(c), appUrl() + '?convoi=' + c.id);
   body.querySelector('#cvLeave').onclick = leaveConvoy;
   const chat = body.querySelector('.cvchat'); if (chat) chat.scrollTop = chat.scrollHeight;
 }
@@ -459,10 +461,10 @@ X.route = async (from, to) => {
     const vv = A.veh ? A.veh() : {}, vd = vv.dims || {};
     const vp = {};
     if (vv.heavy) {
-      vp.travelMode = vv.costing === 'bus' ? 'bus' : 'truck';
+      vp.travelMode = vv.costing === 'bus' ? 'bus' : vv.costing === 'auto' ? 'car' : 'truck';
       if (vd.height) vp.vehicleHeight = vd.height; if (vd.width) vp.vehicleWidth = vd.width; if (vd.length) vp.vehicleLength = vd.length;
       if (vd.weight) vp.vehicleWeight = Math.round(vd.weight * 1000);
-      vp.vehicleCommercial = vv.type === 'camping' ? 'false' : 'true';
+      vp.vehicleCommercial = (vv.type === 'camping' || vv.type === 'remorque') ? 'false' : 'true';
       if (vv.hazmat) vp.vehicleLoadType = 'otherHazmatGeneral';
     }
     let url = tt('/routing/1/calculateRoute/' + locs + '/json', Object.assign({ traffic: 'true', travelMode: 'car', routeType: 'fastest', instructionsType: 'coded', language: LANG, computeTravelTimeFor: 'all', maxAlternatives: vias.length ? '0' : '2', routeRepresentation: 'polyline' }, vp));
