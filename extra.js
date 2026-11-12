@@ -468,6 +468,7 @@ X.route = async (from, to) => {
       if (vv.hazmat) vp.vehicleLoadType = 'otherHazmatGeneral';
     }
     let url = tt('/routing/1/calculateRoute/' + locs + '/json', Object.assign({ traffic: 'true', travelMode: 'car', routeType: 'fastest', instructionsType: 'coded', language: LANG, computeTravelTimeFor: 'all', maxAlternatives: vias.length ? '0' : '2', routeRepresentation: 'polyline' }, vp));
+    if (X.opts.fun && !vv.heavy) url = url.replace('routeType=fastest', 'routeType=thrilling') + '&hilliness=normal&windingness=high';
     avoid.forEach((a) => { url += '&avoid=' + a; });
     url += '&sectionType=speedLimit&sectionType=lanes';
     if (X.opts.vignette) url += '&avoidVignette=CHE,AUT,SVN,HUN,CZE,SVK,BGR,ROU,MDA';
@@ -503,7 +504,7 @@ X.preview = (R, dest, body) => {
     box.appendChild(el('<h3>Itinéraires</h3>')); box.appendChild(seg);
   }
   if (TT) {
-    const o = el('<div class="avoid"><label><input type="checkbox" data-o="tolls"' + (X.opts.tolls ? ' checked' : '') + '> Éviter péages</label><label><input type="checkbox" data-o="motorways"' + (X.opts.motorways ? ' checked' : '') + '> Éviter autoroutes</label><label><input type="checkbox" data-o="vignette"' + (X.opts.vignette ? ' checked' : '') + '> Sans vignette</label></div>');
+    const o = el('<div class="avoid"><label><input type="checkbox" data-o="tolls"' + (X.opts.tolls ? ' checked' : '') + '> Éviter péages</label><label><input type="checkbox" data-o="motorways"' + (X.opts.motorways ? ' checked' : '') + '> Éviter autoroutes</label><label><input type="checkbox" data-o="vignette"' + (X.opts.vignette ? ' checked' : '') + '> Sans vignette</label>' + (!(A.veh && A.veh().heavy) ? '<label><input type="checkbox" data-o="fun"' + (X.opts.fun ? ' checked' : '') + '> ' + TRX('Route plaisir (virages, sans autoroute)') + '</label>' : '') + '</div>');
     o.querySelectorAll('input').forEach((c) => { c.onchange = () => { X.opts[c.dataset.o] = c.checked; store.set('routa.ropts', X.opts); X.altIdx = 0; chooseDestination(dest); }; });
     box.appendChild(o);
   }
