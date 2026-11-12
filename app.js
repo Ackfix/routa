@@ -2585,7 +2585,6 @@ function openMenu() {
       ['favs', ic('star'), 'Favoris'],
       v.ev && X.open && ['chargers', XI.plug || ic('charge'), 'Bornes libres'],
       XO('parkfree') && xt('parkfree'),
-      XO('webcams') && xt('webcams'),
       ['mapview', '<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>', 'Affichage carte'],
       X.openTrips && ['trips', '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', 'Mes trajets'],
       X.openOffline && ['offline', '<svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>', 'Carte hors connexion']
