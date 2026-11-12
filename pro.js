@@ -44,6 +44,7 @@
     d.e = d.le || Date.now();
     d.score = scoreOf(d);
     const all = loadDrives(); all.push(d); saveDrives(all);
+    pushWeek(true);
   }
   setInterval(() => {
     const now = Date.now();
@@ -100,6 +101,44 @@
         esc(T('Freinages brusques')) + ' : ' + a.br + ' · ' + esc(T('Accélérations brusques')) + ' : ' + a.ac + ' · ' + esc(T('Au-dessus de la limite')) + ' : ' + (a.lim > 30 ? Math.round(a.sp / a.lim * 100) + ' %' : '–') + '</div></div></div>' : '');
   }
 
+  /* ---------- classement de la semaine entre amis ---------- */
+  const weekStart = () => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; };
+  const weekKey = () => { const d = weekStart(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  let lastWeekPush = 0;
+  async function pushWeek(force) {
+    const DB = A.DB; if (!DB || !DB.sb || !S.me || !S.online) return;
+    if (!force && Date.now() - lastWeekPush < 10 * 60000) return;
+    lastWeekPush = Date.now();
+    const a = aggregate(loadDrives().filter((d) => d.s >= weekStart().getTime()));
+    try { await DB.sb.rpc('drive_week_set', { me: S.me.id, s: DB.secret(), w: weekKey(), k: Math.round(a.km * 10) / 10, sc: a.score, nb: a.n }); } catch (e) { /* */ }
+  }
+  setTimeout(() => pushWeek(true), 20000);
+  setInterval(() => pushWeek(false), 10 * 60000);
+  async function openRank() {
+    const DB = A.DB;
+    const body = openSheet(T('Classement entre amis'), '<p class="muted">' + esc(T('Chargement…')) + '</p>', 'rank');
+    let rows = null;
+    if (DB && DB.sb && S.me) {
+      await pushWeek(true);
+      try { const r = await DB.sb.rpc('friends_week', { me: S.me.id, s: DB.secret(), w: weekKey() }); if (!r.error && Array.isArray(r.data)) rows = r.data; } catch (e) { /* */ }
+    }
+    if (S.sheetView !== 'rank') return;
+    const from = weekStart().toLocaleDateString(LANG(), { day: 'numeric', month: 'long' });
+    let html = '<p class="muted small" style="margin-top:0">' + esc(T('Semaine du {d}', { d: from })) + '</p>';
+    if (!rows) html += '<div class="empty">' + esc(T('Le classement n\'est pas disponible pour le moment. Réessaie plus tard.')) + '</div>';
+    else {
+      const ok = rows.filter((r) => r.km >= 10 && r.score != null).sort((a, b) => b.score - a.score || b.km - a.km);
+      const rest = rows.filter((r) => !(r.km >= 10 && r.score != null)).sort((a, b) => b.km - a.km);
+      const row = (r, i) => '<div class="card"' + (r.id === S.me.id ? ' style="border-color:var(--accent)"' : '') + '><b style="width:30px;text-align:center;font-size:18px;color:' + (i === 0 ? 'var(--accent)' : 'var(--muted)') + '">' + (i == null ? '–' : i + 1) + '</b><span style="width:12px;height:12px;border-radius:50%;flex-shrink:0;background:' + esc(r.color || '#888') + '"></span><div class="grow"><b>' + esc(r.id === S.me.id ? T('Moi') : (r.pseudo || T('Conducteur'))) + '</b><div class="sub">' + nf(r.km, 0) + ' km · ' + r.n + ' ' + esc(T('trajets')) + '</div></div><span class="pill">' + (r.score == null ? '–' : r.score) + '</span></div>';
+      html += ok.length ? ok.map((r, i) => row(r, i)).join('') : '<div class="empty">' + esc(T('Personne n\'est encore classé cette semaine.')) + '</div>';
+      if (rest.length) html += '<h3>' + esc(T('Pas encore classés')) + '</h3>' + rest.map((r) => row(r, null)).join('');
+    }
+    html += '<p class="muted small">' + esc(T('Le classement montre ton score et celui des amis qui t\'ont ajouté. Il faut au moins 10 km dans la semaine pour être classé. Seuls le score, les km et le nombre de trajets sont partagés.')) + '</p>' +
+      '<button class="btn ghost block" id="rkBack">' + esc(T('Retour')) + '</button>';
+    body.innerHTML = html;
+    body.querySelector('#rkBack').onclick = () => openDrive();
+  }
+
   function openDrive(view) {
     if (view) per = view;
     const all = loadDrives();
@@ -115,6 +154,7 @@
       label = per === '24h' ? T('Dernières 24 h') : per === '7d' ? T('7 derniers jours') : T('30 derniers jours');
       html += statsHtml(agg, label) + (agg.n ? '<button class="btn primary block" id="drStory">' + esc(T('Partager en story')) + '</button>' : '');
     }
+    html += '<button class="btn soft block" id="drRank">' + esc(T('Classement entre amis')) + '</button>';
     html += '<details class="card" style="display:block"><summary style="cursor:pointer;font-weight:700">' + esc(T('Réglages du calcul de carburant')) + '</summary>' +
       '<div class="row" style="margin-top:10px"><label class="field grow" for="drCons">' + esc(T('Consommation (l/100 km)')) + '<input id="drCons" type="number" inputmode="decimal" step="0.1" min="2" max="60" value="' + CFGD.cons + '"></label>' +
       '<label class="field grow" for="drPrice">' + esc(T('Prix du litre ({c})', { c: curr() })) + '<input id="drPrice" type="number" inputmode="decimal" step="0.01" min="0.5" max="5" value="' + priceL().toFixed(2) + '"></label></div></details>' +
@@ -122,6 +162,7 @@
     const body = openSheet(T('Suivi de conduite'), html, 'drive');
     body.querySelectorAll('[data-p]').forEach((b) => { b.onclick = () => openDrive(b.dataset.p); });
     body.querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => openTrip(+b.dataset.t); });
+    body.querySelector('#drRank').onclick = openRank;
     const st = body.querySelector('#drStory'); if (st) st.onclick = () => story(agg, label, { list: all.filter((d) => d.s > Date.now() - PER.find((x) => x[0] === per)[2]) });
     const c = body.querySelector('#drCons'), pr = body.querySelector('#drPrice');
     const sv = () => { const a = parseFloat(String(c.value).replace(',', '.')), b = parseFloat(String(pr.value).replace(',', '.')); if (a > 1 && a < 80) CFGD.cons = a; if (b > 0.3 && b < 6) CFGD.price = b; saveCfg(); };
