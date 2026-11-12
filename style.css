@@ -481,3 +481,10 @@ body:not(.navigating) .lowchip { top: calc(var(--sat) + 74px); }
 .sheet-body p, .sheet-body .banner span, .sheet-body .sub, .sheet-body b { overflow-wrap: anywhere; }
 .sheet-body img, .sheet-body svg, .sheet-body video { max-width: 100%; }
 .sheet-body .ico, .sheet-body .iconbtn, .sheet-body .btn svg { flex-shrink: 0; }
+/* bouton « Donner mon avis » bien visible dans le menu */
+.menufb{border:1.5px solid var(--accent) !important;background:rgba(255,138,61,.12) !important}
+.menufb .ico{background:var(--accent);color:#1A1205;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;flex-shrink:0}
+.menufb .ico svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.menufb b{color:var(--ink)}
+.menufb{width:100%;display:flex;align-items:center;gap:12px;text-align:left;color:inherit;margin-top:8px}
+.menufb .sub{display:block}
