@@ -1104,6 +1104,7 @@ function openProLog() {
   if (b) b.onclick = async () => { try { if (navigator.share) await navigator.share({ title: TRX('Relevé de conduite'), text: t }); else { await navigator.clipboard.writeText(t); toast(TRX('Relevé copié.')); } } catch (e) { /* annulé */ } };
 }
 X.openPro = openPro;
+X.openProLog = openProLog;
 
 /* ======================= Ponts, tunnels et passages limités (hauteur, largeur, poids) ======================= */
 const parseDim = (v) => {
