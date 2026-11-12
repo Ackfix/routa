@@ -20,7 +20,7 @@
      ========================================================= */
   const DRIVES = 'routa.drives';
   const loadDrives = () => store.get(DRIVES, []);
-  const saveDrives = (d) => store.set(DRIVES, d.slice(-400));
+  const saveDrives = (d) => { d = d.slice(-400); let n = 0; for (let i = d.length - 1; i >= 0; i--) if (d[i].pts && ++n > 60) delete d[i].pts; store.set(DRIVES, d); };
   const CFGD = Object.assign({ cons: 7, price: null }, store.get('routa.drivecfg', {}));
   const saveCfg = () => store.set('routa.drivecfg', CFGD);
   const curr = () => ((S.country || 'CH') === 'CH' ? 'CHF' : 'EUR');
@@ -50,13 +50,15 @@
     const v = S.speed;
     if (document.hidden || v == null || !S.pos) { if (cur && now - (cur.le || now) > 15 * 60000) finish(); lastT = 0; return; }
     const dt = lastT ? (now - lastT) / 1000 : 0; lastT = now;
-    if (!cur && v > 3) { cur = { s: now, le: now, km: 0, mv: 0, max: 0, br: 0, ac: 0, sp: 0, lim: 0, nm: '', p0: { lat: +S.pos.lat.toFixed(3), lon: +S.pos.lon.toFixed(3) } }; lastP = { lat: S.pos.lat, lon: S.pos.lon }; lastV = v; stopSince = 0; return; }
+    if (!cur && v > 3) { cur = { s: now, le: now, km: 0, mv: 0, max: 0, br: 0, ac: 0, sp: 0, lim: 0, nm: '', p0: { lat: +S.pos.lat.toFixed(3), lon: +S.pos.lon.toFixed(3) }, pts: [[+S.pos.lat.toFixed(4), +S.pos.lon.toFixed(4)]] }; lastP = { lat: S.pos.lat, lon: S.pos.lon }; lastV = v; stopSince = 0; return; }
     if (!cur) return;
     if (dt > 0 && dt < 10) {
       if (v > 1.5) {
         cur.mv += dt; cur.le = now; stopSince = 0; cur.p1 = { lat: +S.pos.lat.toFixed(3), lon: +S.pos.lon.toFixed(3) };
         const d = dist(lastP, S.pos);
         if (d < 600) cur.km += d / 1000;
+        const lp = cur.pts && cur.pts[cur.pts.length - 1];
+        if (cur.pts && (!lp || dist({ lat: lp[0], lon: lp[1] }, S.pos) > 60)) { cur.pts.push([+S.pos.lat.toFixed(4), +S.pos.lon.toFixed(4)]); if (cur.pts.length > 400) cur.pts = cur.pts.filter((x, i, a) => i % 2 === 0 || i === a.length - 1); }
         cur.max = Math.max(cur.max, v * 3.6);
         if (S.limit) { cur.lim += dt; if (v * 3.6 > S.limit + 5) cur.sp += dt; }
       } else if (!stopSince) stopSince = now;
@@ -176,7 +178,7 @@
     return u.length > 3 ? u.slice(0, 3).join(' · ') + ' +' + (u.length - 3) : u.join(' · ');
   }
   const SOPT = [
-    ['score', 'Score de conduite', 1], ['label', 'Période', 1], ['cities', 'Villes', 1], ['hours', 'Horaires', 0],
+    ['score', 'Score de conduite', 1], ['label', 'Période', 1], ['cities', 'Villes', 1], ['hours', 'Horaires', 0], ['map', 'Tracé du trajet', 1],
     ['km', 'Distance', 1], ['time', 'Temps de conduite', 1], ['avg', 'Vitesse moyenne', 1], ['max', 'Vitesse max', 1],
     ['trips', 'Trajets', 0], ['limits', 'Respect des limites', 1], ['smooth', 'Freinages / accélérations brusques', 0],
     ['fuel', 'Carburant estimé', 0], ['co2', 'CO₂ estimé', 0]
@@ -194,7 +196,51 @@
     if (SCFG.cities && cities) { y += 62; c.fillStyle = '#9AA3AF'; fit(c, cities, 900, 40, '600'); c.fillText(cities, 90, y); }
     if (SCFG.hours && ctx.trip) { const t = hm(ctx.trip.s) + ' → ' + hm(ctx.trip.e || ctx.trip.le); y += 58; c.fillStyle = '#9AA3AF'; fit(c, t, 900, 38, '600'); c.fillText(t, 90, y); }
     y += 60;
-    if (SCFG.score) {
+    const tracks = SCFG.map ? (ctx.tracks || []) : [];
+    if (tracks.length) {
+      const bx = 90, bw = 900, bh = 620, by = y - 10, pad = 70;
+      c.fillStyle = 'rgba(23,27,34,.9)'; rr(c, bx, by, bw, bh, 40); c.fill();
+      c.strokeStyle = 'rgba(255,255,255,.06)'; c.lineWidth = 2; rr(c, bx, by, bw, bh, 40); c.stroke();
+      c.save(); rr(c, bx, by, bw, bh, 40); c.clip();
+      c.strokeStyle = 'rgba(255,255,255,.035)'; c.lineWidth = 2;
+      for (let gx = bx + 45; gx < bx + bw; gx += 60) { c.beginPath(); c.moveTo(gx, by); c.lineTo(gx, by + bh); c.stroke(); }
+      for (let gy = by + 40; gy < by + bh; gy += 60) { c.beginPath(); c.moveTo(bx, gy); c.lineTo(bx + bw, gy); c.stroke(); }
+      let la0 = 90, la1 = -90, lo0 = 180, lo1 = -180;
+      tracks.forEach((t) => t.forEach(([la, lo]) => { la0 = Math.min(la0, la); la1 = Math.max(la1, la); lo0 = Math.min(lo0, lo); lo1 = Math.max(lo1, lo); }));
+      const kx = Math.cos((la0 + la1) / 2 * Math.PI / 180);
+      const w = Math.max((lo1 - lo0) * kx, 1e-4), h = Math.max(la1 - la0, 1e-4);
+      const sc = Math.min((bw - 2 * pad) / w, (bh - 2 * pad) / h);
+      const ox = bx + (bw - w * sc) / 2, oy = by + (bh - h * sc) / 2;
+      const P = ([la, lo]) => [ox + (lo - lo0) * kx * sc, oy + (la1 - la) * sc];
+      const gl = c.createLinearGradient(bx, by, bx + bw, by + bh); gl.addColorStop(0, '#FFC531'); gl.addColorStop(1, '#FF8A3D');
+      c.lineJoin = 'round'; c.lineCap = 'round';
+      [[22, 'rgba(255,138,61,.18)', 0], [11, gl, 18]].forEach(([lw, st, blur]) => {
+        c.lineWidth = lw; c.strokeStyle = st; c.shadowColor = 'rgba(255,138,61,.55)'; c.shadowBlur = blur;
+        tracks.forEach((t) => { c.beginPath(); t.forEach((pt, i) => { const [x, yy] = P(pt); if (i) c.lineTo(x, yy); else c.moveTo(x, yy); }); c.stroke(); });
+      });
+      c.shadowBlur = 0;
+      if (tracks.length === 1) {
+        const t = tracks[0], [sx, sy] = P(t[0]), [ex, ey] = P(t[t.length - 1]);
+        c.fillStyle = '#F4F6FA'; c.beginPath(); c.arc(sx, sy, 15, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#0E1116'; c.beginPath(); c.arc(sx, sy, 7, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#FF8A3D'; c.beginPath(); c.arc(ex, ey, 19, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = '#F4F6FA'; c.lineWidth = 6; c.beginPath(); c.arc(ex, ey, 19, 0, Math.PI * 2); c.stroke();
+      }
+      c.restore();
+      y = by + bh + 50;
+    }
+    if (SCFG.score && tracks.length) {
+      const R = 92, cx = 90 + R + 8, cy = y + R;
+      c.lineWidth = 20; c.lineCap = 'round'; c.strokeStyle = 'rgba(255,255,255,.08)'; c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.stroke();
+      const sc = a.score == null ? 0 : a.score;
+      const gr = c.createLinearGradient(cx - R, cy - R, cx + R, cy + R); gr.addColorStop(0, '#FFC531'); gr.addColorStop(1, '#FF8A3D');
+      c.strokeStyle = gr; c.beginPath(); c.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * sc / 100); c.stroke();
+      c.textAlign = 'center'; c.fillStyle = '#F4F6FA'; c.font = '800 78px Inter, system-ui, -apple-system, sans-serif'; c.fillText(String(a.score == null ? '–' : sc), cx, cy + 27);
+      c.textAlign = 'left';
+      c.fillStyle = '#9AA3AF'; fit(c, T('Score de conduite'), 560, 36, '600'); c.fillText(T('Score de conduite'), cx + R + 50, cy - 14);
+      c.fillStyle = '#FF8A3D'; fit(c, a.score == null ? '' : scoreLabel(sc), 560, 64, '800'); c.fillText(a.score == null ? '' : scoreLabel(sc), cx + R + 50, cy + 56);
+      y = cy + R + 50;
+    } else if (SCFG.score) {
       const R = 220, cx = W / 2, cy = y + R + 30;
       c.lineWidth = 34; c.lineCap = 'round'; c.strokeStyle = 'rgba(255,255,255,.08)'; c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.stroke();
       const sc = a.score == null ? 0 : a.score;
@@ -219,8 +265,8 @@
       SCFG.co2 && [nf(a.litres * 2.3) + ' kg', T('CO₂ estimé')]
     ].filter(Boolean);
     if (cards.length) {
-      const bottom = 1660, gap = 28, rows = Math.ceil(cards.length / 2);
-      const ch = Math.max(120, Math.min(200, (bottom - y - (rows - 1) * gap) / rows));
+      const bottom = tracks.length ? 1690 : 1660, gap = 28, rows = Math.ceil(cards.length / 2);
+      const ch = Math.max(110, Math.min(200, (bottom - y - (rows - 1) * gap) / rows));
       const cw = 435;
       cards.forEach(([v, l], i) => {
         const last = i === cards.length - 1 && cards.length % 2 === 1;
@@ -239,7 +285,8 @@
     ctx = ctx || {};
     const list = ctx.trip ? [ctx.trip] : (ctx.list || []);
     const hasPos = list.some((d) => d.p0 || d.p1);
-    const opts = SOPT.filter(([k]) => !(k === 'hours' && !ctx.trip) && !(k === 'trips' && ctx.trip) && !(k === 'cities' && !hasPos));
+    ctx.tracks = list.filter((d) => d.pts && d.pts.length > 1).map((d) => d.pts);
+    const opts = SOPT.filter(([k]) => !(k === 'hours' && !ctx.trip) && !(k === 'trips' && ctx.trip) && !(k === 'cities' && !hasPos) && !(k === 'map' && !ctx.tracks.length));
     let cities = '', blob = null, url = '', ver = 0;
     const body = openSheet(T('Ta story'),
       '<div style="text-align:center"><img id="stImg" alt="" style="max-width:100%;max-height:48vh;aspect-ratio:9/16;border-radius:18px;background:#0E1116;display:inline-block"></div>' +
