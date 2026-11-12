@@ -1,7 +1,7 @@
 /* ROUTA – service worker : l'app s'ouvre même avec un réseau faible. */
-const CACHE = 'routa-v0.9.37';
+const CACHE = 'routa-v0.9.38';
 const MAPC = 'routa-map';
-const SHELL = ['./', './index.html', './style.css', './app.js', './native.js', './extra.js', './i18n-a.js', './i18n-c.js', './i18n-d.js', './i18n.js', './config.js', './countries.js', './aide.html', './confidentialite.html', './i18n-e.js', './i18n-f.js', './i18n-g.js', './i18n-h.js', './zfe.js', './plus.js', './pro.js', './i18n-p.js', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'];
+const SHELL = ['./', './index.html', './style.css', './app.js', './native.js', './extra.js', './i18n-a.js', './i18n-c.js', './i18n-d.js', './i18n.js', './config.js', './countries.js', './aide.html', './confidentialite.html', './i18n-e.js', './i18n-f.js', './i18n-g.js', './i18n-h.js', './zfe.js', './plus.js', './pro.js', './more.js', './i18n-p.js', './i18n-m.js', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
