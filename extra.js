@@ -4,6 +4,9 @@
 'use strict';
 const A = window.ROUTA; if (!A) return;
 const { S, DB, map, CFG, esc, ic, el, toast, openSheet, closeSheet, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials } = A;
+const BANNED_CTRL = /(radar|blitz|flash[ée]?|contr[ôo]le|kontroll|controll|polic|polizei|polizia|pol[ií]cia|flics?\b|keufs?\b|cond[ée]s?\b|gendarm|bullen|schmier|laser|r[ée]p[ée]titeur)/i;
+const ctrlBlocked = (...t) => t.some((x) => x && BANNED_CTRL.test(x));
+const ctrlSafe = (x) => (x && !BANNED_CTRL.test(x) ? x : '');
 const $ = (id) => document.getElementById(id);
 const X = window.ROUTA_X = {};
 const TT = CFG.tomtomKey || '';
