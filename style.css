@@ -458,3 +458,20 @@ body:not(.navigating) .lowchip { top: calc(var(--sat) + 74px); }
 /* taille des boutons et de l'affichage (réglage) */
 :root { --ui: 1; }
 .fabs-right, .fab-report, .fab-search, .fab-menu, .speedbox, .limitsign, .limitnext, .navbanner, .navbar, .prochip { zoom: var(--ui); }
+
+/* iPhone : rien ne doit dépasser à droite dans les fenêtres (champs date, rangées de champs) */
+.sheet, .sheet-body { max-width: 100vw; }
+.sheet-body { overflow-x: hidden; }
+.row > *, label.field { min-width: 0; }
+.field input, .field select, .field textarea { min-width: 0; max-width: 100%; display: block; }
+.field input[type=date], .field input[type=time], .field input[type=datetime-local] { -webkit-appearance: none; appearance: none; text-align: left; line-height: 46px; }
+.field input::-webkit-date-and-time-value { text-align: left; }
+
+.proacts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.quickplaces { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.seg.langseg { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sheet-body .seg > *, .sheet-body .card > .grow, .sheet-body .card .sub, .sheet-body b, .sheet-body .pill { min-width: 0; overflow-wrap: anywhere; }
+.altlist { flex-wrap: wrap; }
+.sheet-body img, .sheet-body svg, .sheet-body iframe, .sheet-body canvas { max-width: 100%; }
+.seg { grid-auto-columns: minmax(0, 1fr); }
+.seg button { min-width: 0; overflow-wrap: anywhere; -webkit-hyphens: auto; hyphens: auto; }
