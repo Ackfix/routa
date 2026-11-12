@@ -1,4 +1,4 @@
-/* ROUTA – rappels intelligents, défis et badges, webcams et sécurité au volant. */
+/* ROUTA – rappels intelligents, défis et badges et sécurité au volant. */
 (function () {
   'use strict';
   const A = window.ROUTA, X = window.ROUTA_X;
@@ -9,7 +9,6 @@
   const nf = (n) => (+n || 0).toLocaleString(LANG(), { maximumFractionDigits: 0 });
   const ICO = (d) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>';
   const IC = {
-    cam: ICO('<rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 11l5-3v8l-5-3"/>'),
     medal: ICO('<circle cx="12" cy="15" r="5"/><path d="M8.5 11L6 3h4l2 5 2-5h4l-2.5 8"/>'),
     shield: ICO('<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>')
   };
@@ -26,62 +25,10 @@
     if (body.querySelector('.safetyb')) return;
     const b = el('<div class="banner warnb safetyb">' + IC.shield + '<span><b>' + esc(T('Tu roules : les yeux sur la route.')) + '</b><br>' + esc(T('Laisse ton passager utiliser le téléphone, ou arrête-toi dans un endroit sûr.')) + '<br><button class="btn small soft" id="safePass" style="margin-top:8px">' + esc(T('Je suis passager')) + '</button></span></div>');
     body.insertBefore(b, body.firstChild);
-    b.querySelector('#safePass').onclick = () => { passengerUntil = Date.now() + 30 * 60000; b.remove(); document.querySelectorAll('.wcimg[data-src]').forEach(showImg); };
+    b.querySelector('#safePass').onclick = () => { passengerUntil = Date.now() + 30 * 60000; b.remove(); };
   }
   const sb = document.getElementById('sheetBody');
   if (sb) new MutationObserver(() => safetyBanner()).observe(sb, { childList: true });
-
-  /* =========================================================
-     12 · WEBCAMS (OpenStreetMap, et Windy si une clé est configurée)
-     ========================================================= */
-  const WC = { list: [], at: 0, center: null };
-  async function camsOSM(c, km) {
-    if (!A.overpass) return [];
-    const d = km / 111, e = km / (111 * Math.cos(c.lat * Math.PI / 180));
-    const bb = [c.lat - d, c.lon - e, c.lat + d, c.lon + e].map((x) => x.toFixed(3)).join(',');
-    const q = '[out:json][timeout:25];(nwr["webcam"](' + bb + ');nwr["contact:webcam"](' + bb + ');nwr["surveillance:type"="webcam"](' + bb + '););out tags center 120;';
-    const els = await A.overpass(q);
-    return (els || []).map((x) => {
-      const t = x.tags || {}, p = x.center || x;
-      const url = t.webcam || t['contact:webcam'] || t.url || t.website || '';
-      if (!/^https?:\/\//.test(url) || p.lat == null) return null;
-      return { id: 'o' + x.id, name: t.name || t['name:' + LANG()] || T('Webcam'), lat: p.lat, lon: p.lon, page: url, img: /\.(jpe?g|png|webp)(\?|$)/i.test(url) ? url : '', src: 'OpenStreetMap' };
-    }).filter(Boolean);
-  }
-  async function camsWindy(c, km) {
-    if (!CFG.windyKey) return [];
-    const r = await fetch('https://api.windy.com/webcams/api/v3/webcams?' + new URLSearchParams({ nearby: c.lat.toFixed(4) + ',' + c.lon.toFixed(4) + ',' + Math.min(250, km), limit: '50', include: 'images,urls,location', lang: LANG() }).toString(), { headers: { 'x-windy-api-key': CFG.windyKey } });
-    if (!r.ok) return [];
-    const j = await r.json();
-    return (j.webcams || []).map((w) => ({ id: 'w' + w.webcamId, name: w.title || T('Webcam'), lat: w.location && w.location.latitude, lon: w.location && w.location.longitude, page: (w.urls && w.urls.detail) || 'https://www.windy.com/webcams/' + w.webcamId, img: (w.images && w.images.current && (w.images.current.preview || w.images.current.thumbnail)) || '', src: 'Windy.com' })).filter((w) => w.lat != null);
-  }
-  function showImg(img) { if (moving() && Date.now() >= passengerUntil) return; img.src = img.dataset.src; img.removeAttribute('data-src'); img.hidden = false; }
-  async function openCams(km) {
-    km = km || 30;
-    const c = S.pos || (() => { const m = A.map.getCenter(); return { lat: m.lat, lon: m.lng }; })();
-    const body = openSheet(T('Webcams autour'), '<p class="muted">' + esc(T('Recherche des webcams…')) + '</p>', 'webcams');
-    let list = [];
-    try {
-      const [w, o] = await Promise.all([camsWindy(c, km).catch(() => []), camsOSM(c, km).catch(() => [])]);
-      list = w.concat(o.filter((x) => !w.some((y) => dist(x, y) < 150)));
-    } catch (e) { list = []; }
-    if (S.sheetView !== 'webcams') return;
-    list.forEach((x) => { x.d = dist(c, x); });
-    list.sort((a, b) => a.d - b.d);
-    const blocked = moving() && Date.now() >= passengerUntil;
-    body.innerHTML = (blocked ? '' : '') +
-      (list.length ? list.slice(0, 40).map((x, i) => '<div class="card" style="display:block">' +
-        (x.img ? '<img class="wcimg" alt="" loading="lazy" data-src="' + esc(x.img) + '" hidden style="width:100%;border-radius:12px;display:block;margin-bottom:8px;background:#0E1116;min-height:60px">' : '') +
-        '<div style="display:flex;align-items:center;gap:10px"><div class="grow"><b>' + esc(x.name) + '</b><div class="sub">' + esc(fmtDist(Math.round(x.d / 100) * 100)) + ' · ' + esc(x.src) + '</div></div>' +
-        '<a class="btn small soft" href="' + esc(x.page) + '" target="_blank" rel="noopener">' + esc(T('Voir')) + '</a><button class="iconbtn" data-map="' + i + '" aria-label="' + esc(T('Sur la carte')) + '">' + IC.cam + '</button></div></div>').join('')
-        : '<div class="empty">' + esc(T('Aucune webcam trouvée dans ce rayon.')) + '</div>') +
-      (km < 120 ? '<button class="btn soft block" id="wcMore">' + esc(T('Chercher plus loin ({d} km)', { d: km * 3 })) + '</button>' : '') +
-      '<p class="muted small">' + esc(T('Images publiées par leurs propriétaires, pas toujours à jour. Ne les regarde jamais en conduisant.')) + '</p>';
-    safetyBanner();
-    body.querySelectorAll('.wcimg[data-src]').forEach(showImg);
-    body.querySelectorAll('[data-map]').forEach((b) => { b.onclick = () => { const x = list[+b.dataset.map]; try { A.closeSheet && A.closeSheet(); A.map.flyTo({ center: [x.lon, x.lat], zoom: 13 }); } catch (e) { /* */ } }; });
-    const m = body.querySelector('#wcMore'); if (m) m.onclick = () => openCams(km * 3);
-  }
 
   /* =========================================================
      14 · RAPPELS INTELLIGENTS (pneus selon la saison, service au kilométrage)
@@ -195,12 +142,10 @@
   /* ---------- branchement au menu ---------- */
   const tiles0 = X.tiles;
   X.tiles = () => (tiles0 ? tiles0() : []).concat([
-    ['webcams', IC.cam, T('Webcams')],
     ['badges', IC.medal, T('Défis et badges')]
   ]);
   const open0 = X.open;
   X.open = (k) => {
-    if (k === 'webcams') { openCams(); return true; }
     if (k === 'badges') { openBadges(); return true; }
     return open0 ? open0(k) : false;
   };
