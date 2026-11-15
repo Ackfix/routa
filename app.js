@@ -426,7 +426,7 @@ map.on('load', () => {
 });
 map.on('error', (e) => console.warn('carte', e && e.error));
 
-const stopFollow = () => { if (S.follow) { S.follow = false; $('btnLocate').classList.remove('active'); updateCompass(); } };
+const stopFollow = () => { if (S.follow) { S.follow = false; $('btnLocate').classList.remove('active'); updateCompass(); if (S.pos) renderMe(); } };
 map.on('movestart', (e) => { if (e.originalEvent) { stopFollow(); S.lastTouch = Date.now(); document.body.classList.add('panning'); } });
 map.on('moveend', () => { clearTimeout(S.panT); S.panT = setTimeout(() => document.body.classList.remove('panning'), 900); });
 function zoomClasses() { const z = map.getZoom(); const c = map.getContainer(); c.classList.toggle('z-low', z < 10); c.classList.toggle('z-mid', z < 13); }
@@ -547,15 +547,37 @@ function myView() {
   return { lat: S.pos.lat, lon: S.pos.lon, heading: S.heading };
 }
 /* Mon marqueur */
+/* En suivi, le curseur reste fixe à l'écran (la carte glisse dessous) : il ne disparaît plus et reste calé sur la route.
+   Hors suivi, c'est un marqueur posé sur la carte. */
+function meHtml() { return '<div class="mk-me"><i>' + '<svg aria-hidden="true" viewBox="0 0 24 24">' + P.nav + '</svg></i></div>'; }
+function puckEl() {
+  let p = $('mePuck');
+  if (!p) { p = el('<div id="mePuck" class="mepuck" hidden aria-hidden="true">' + meHtml() + '</div>'); document.body.appendChild(p); }
+  return p;
+}
 function renderMe() {
   if (!S.pos) return;
-  if (!S.markers.me) {
-    const e = el('<div class="mk-me"><i>' + '<svg aria-hidden="true" viewBox="0 0 24 24">' + P.nav + '</svg></i></div>');
-    S.markers.me = new maplibregl.Marker({ element: e, rotationAlignment: 'map', pitchAlignment: 'map' }).setLngLat([S.pos.lon, S.pos.lat]).addTo(map);
-  }
   const v = myView();
+  const fixed = S.follow && S.camOff && Date.now() >= (S.puckAt || 0);
+  const pk = puckEl();
+  if (fixed) {
+    if (S.markers.me) { S.markers.me.remove(); S.markers.me = null; }
+    const r = map.getContainer().getBoundingClientRect();
+    pk.style.left = Math.round(r.left + r.width / 2 + S.camOff[0]) + 'px';
+    pk.style.top = Math.round(r.top + r.height / 2 + S.camOff[1]) + 'px';
+    const rot = S.settings.navNorth ? (v.heading || 0) : (S.moving || S.nav) ? 0 : ((v.heading || 0) - map.getBearing() + 360) % 360; // en roulant, la carte suit la route : le curseur pointe vers le haut
+    pk.firstChild.style.transform = 'rotate(' + Math.round(rot) + 'deg)';
+    pk.hidden = false;
+    return;
+  }
+  pk.hidden = true;
+  if (!S.markers.me) {
+    const e = el(meHtml());
+    S.markers.me = new maplibregl.Marker({ element: e, rotationAlignment: 'map', pitchAlignment: 'map' }).setLngLat([v.lon, v.lat]).addTo(map);
+  }
   S.markers.me.setLngLat([v.lon, v.lat]).setRotation(v.heading || 0);
 }
+
 
 /* Conducteurs */
 function visibleDriver(d) {
@@ -643,17 +665,50 @@ function showPois(list, kind) {
 }
 
 /* ======================= GPS ======================= */
-function startGps() {
-  if (!('geolocation' in navigator)) { toast("Ce navigateur ne donne pas accès à la position."); return; }
-  if (S.watchId != null) return;
-  let first = true;
+/* État de la position : un petit bandeau discret (jamais de grande fenêtre) quand quelque chose ne va pas */
+const isNative = () => !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
+const platform = () => (window.Capacitor && Capacitor.getPlatform) ? Capacitor.getPlatform() : (/android/i.test(navigator.userAgent) ? 'android-web' : /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios-web' : 'web');
+S.geoState = 'idle';
+function setGeoState(st) {
+  if (S.geoState === st) return;
+  S.geoState = st;
+  let c = $('geoChip');
+  if (!c) { c = el('<button id="geoChip" class="geochip" hidden></button>'); c.onclick = openGeoHelp; document.body.appendChild(c); }
+  const T = { denied: ['Position désactivée pour ROUTA', 'Touche ici pour l\'activer'], off: ['Position du téléphone coupée', 'Touche ici pour l\'activer'], weak: ['Signal GPS faible', 'Recherche de ta position…'], approx: ['Position approximative', 'Active la position exacte'] }[st];
+  if (!T) { c.hidden = true; return; }
+  c.innerHTML = ic('info') + '<span><b>' + esc(I18N.t(T[0])) + '</b><br>' + esc(I18N.t(T[1])) + '</span>';
+  c.hidden = false;
+}
+function openGeoHelp() {
+  const pf = platform(), st = S.geoState;
+  const steps = pf === 'ios' ? ['Ouvre Réglages sur l\'iPhone', 'Touche ROUTA, puis Position', 'Choisis « Lorsque l\'app est active » et active « Position exacte »']
+    : pf === 'android' ? ['Ouvre les Paramètres du téléphone', 'Applications › ROUTA › Autorisations › Position', 'Choisis « Autoriser seulement si l\'appli est en cours d\'utilisation » et active « Utiliser la position exacte »']
+    : pf === 'ios-web' ? ['Ouvre Réglages sur l\'iPhone', 'Confidentialité et sécurité › Service de localisation › Safari', 'Choisis « Lorsque l\'app est active », puis recharge la page']
+    : ['Touche le cadenas à côté de l\'adresse du site', 'Autorise « Position »', 'Recharge la page'];
+  const offTxt = st === 'off' ? '<p>' + esc(I18N.t('La localisation du téléphone est coupée. Active-la dans le centre de contrôle ou les réglages rapides.')) + '</p>' : '';
+  const body = openSheet(I18N.t('Activer la position'),
+    '<p>' + esc(I18N.t('ROUTA a besoin de ta position pour te guider et afficher ta vitesse. Tu choisis dans ton profil qui peut la voir.')) + '</p>' + offTxt +
+    steps.map((x, i) => '<div class="card"><div class="ico" style="background:var(--info);border-radius:22px;color:#0E1116;font-weight:800">' + (i + 1) + '</div><div class="grow">' + esc(I18N.t(x)) + '</div></div>').join('') +
+    '<button class="btn block" id="geoRetry">' + esc(I18N.t('Réessayer')) + '</button>', 'geohelp');
+  body.querySelector('#geoRetry').onclick = () => { closeSheet(); startGps(true); };
+}
+let gpsRetryT = 0, gpsRetryN = 0, gpsWeakT = 0;
+function startGps(force) {
+  if (!('geolocation' in navigator)) { setGeoState('denied'); return; }
+  if (S.watchId != null && !force) return;
+  if (S.watchId != null) { try { navigator.geolocation.clearWatch(S.watchId); } catch (e) { /* */ } S.watchId = null; }
+  clearTimeout(gpsRetryT);
+  let first = !S.pos;
+  clearTimeout(gpsWeakT);
+  gpsWeakT = setTimeout(() => { if (!S.fixAt || Date.now() - S.fixAt > 15000) setGeoState('weak'); }, 15000);
   S.watchId = navigator.geolocation.watchPosition((p) => {
     const c = p.coords;
     const now = { lat: c.latitude, lon: c.longitude, t: p.timestamp };
     S.acc = c.accuracy;
-    const raw = (c.speed != null && c.speed >= 0) ? c.speed : (S.pos ? estSpeed(S.pos, now) : null);
-    S.speed = raw == null ? null : (S.speed == null ? raw : S.speed * 0.35 + raw * 0.65);
-    if (S.speed != null && S.speed < 1.7) S.speed = 0;
+    S.fixAt = Date.now();
+    gpsRetryN = 0;
+    setGeoState(c.accuracy > 1500 ? 'approx' : 'ok');
+    S.speed = filterSpeed(c, now);
     let hd = null;
     if (c.heading != null && !isNaN(c.heading) && c.heading >= 0 && (S.speed || 0) > 2.5) hd = c.heading;
     else if (S.pos && (S.speed || 0) > 2.5 && dist(S.pos, now) > Math.max(12, c.accuracy || 10)) hd = bearing(S.pos, now);
@@ -665,18 +720,56 @@ function startGps() {
     countryTick(false);
     if (first) { first = false; map.jumpTo({ center: [now.lon, now.lat], zoom: 14.5 }); pushPresence(true); }
     else if (S.follow) { if (!S.nav) followCam(); }
-    else if ((S.nav || (S.speed || 0) * 3.6 > 25) && Date.now() - (S.lastTouch || 0) > 12000) { S.follow = true; $('btnLocate').classList.add('active'); followCam(); }
+    else if ((S.nav || (S.moving && (S.speed || 0) * 3.6 > 25)) && Date.now() - (S.lastTouch || 0) > 12000) { S.follow = true; S.puckAt = Date.now() + 1100; $('btnLocate').classList.add('active'); followCam(); }
     if (S.nav) navUpdate();
     checkNearAlerts();
     pushPresence(false);
   }, (err) => {
-    S.watchId = null;
-    if (err.code === 1) toast(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() ? "Position refusée. Autorise la position pour ROUTA dans les réglages du téléphone (Réglages › ROUTA › Position), puis rouvre l'app." : "Position refusée. Autorise la localisation pour ce site dans les réglages du téléphone (Réglages › Safari › Position sur iPhone), puis recharge la page.", { ms: 9000 });
-    else toast("Position GPS introuvable pour le moment. On réessaie…");
-    if (err.code !== 1) setTimeout(startGps, 5000);
+    if (err.code === 1) {
+      try { navigator.geolocation.clearWatch(S.watchId); } catch (e) { /* */ }
+      S.watchId = null; S.geoAskAt = Date.now(); setGeoState('denied'); return;
+    }
+    // délai dépassé ou signal introuvable : la surveillance continue d'elle-même ; on relance doucement seulement si elle s'arrête
+    if (err.code === 2) setGeoState(S.pos ? 'weak' : 'off');
+    clearTimeout(gpsRetryT);
+    gpsRetryT = setTimeout(() => { if (!S.fixAt || Date.now() - S.fixAt > 20000) { gpsRetryN++; startGps(true); } }, Math.min(60000, 8000 * Math.pow(2, gpsRetryN)));
   }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
 }
-function estSpeed(a, b) { const dt = (b.t - a.t) / 1000; const d = dist(a, b); if (d < Math.max(6, S.acc || 0)) return 0; return dt > 0.5 ? d / dt : S.speed; }
+/* Retour dans l'app (après les réglages) : on reprend la position automatiquement */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (S.geoState === 'denied') {
+    const go = () => { if (Date.now() - (S.geoAskAt || 0) > 600000) { S.geoAskAt = Date.now(); startGps(true); } };
+    if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: 'geolocation' }).then((ps) => { if (ps.state === 'granted') startGps(true); else if (ps.state !== 'denied') go(); }).catch(go);
+    else go();
+  } else if (S.geoState === 'off' || S.watchId == null) startGps(true);
+});
+if (navigator.permissions && navigator.permissions.query) {
+  navigator.permissions.query({ name: 'geolocation' }).then((ps) => { ps.onchange = () => { if (ps.state === 'granted') startGps(true); else if (ps.state === 'denied') setGeoState('denied'); }; }).catch(() => {});
+}
+function estSpeed(a, b) { const dt = (b.t - a.t) / 1000; const d = dist(a, b); if (dt < 0.8 || d < Math.max(15, 2 * (S.acc || 0))) return 0; return d / dt; }
+/* Vitesse fiable : pas de vitesse « fantôme » à l'arrêt (relevés figés, GPS qui saute sur place) */
+function filterSpeed(c, now) {
+  const H = S.fixHist || (S.fixHist = []);
+  H.push({ lat: now.lat, lon: now.lon, t: Date.now(), acc: c.accuracy || 0 });
+  while (H.length > 2 && Date.now() - H[0].t > 10000) H.shift();
+  let raw = (c.speed != null && c.speed >= 0 && !((c.accuracy || 0) > 60 && c.speed > 0)) ? c.speed : (S.pos ? estSpeed(S.pos, now) : null);
+  if (raw == null) return S.speed == null ? null : S.speed;
+  if (raw > 70) raw = S.speed || 0; // saut de position (GPS retrouvé) : pas une vraie vitesse
+  if (raw > 0 && H.length >= 3) {
+    let o = H[0]; for (let i = H.length - 1; i >= 0; i--) if (Date.now() - H[i].t >= 2000) { o = H[i]; break; }
+    const span = (Date.now() - o.t) / 1000, moved = dist(o, now);
+    // la voiture aurait dû avancer : si elle est restée sur place, c'est du bruit
+    if (span >= 2 && moved < Math.max(8, (c.accuracy || 0)) && moved < raw * span * 0.35) raw = 0;
+  }
+  let v = S.speed == null ? raw : S.speed * 0.35 + raw * 0.65;
+  if (v < 1.7) v = 0;
+  return v;
+}
+/* Plus de relevé depuis 3 s : on est arrêté (l'iPhone n'envoie plus rien quand on ne bouge pas) */
+setInterval(() => {
+  if (S.speed && S.fixAt && Date.now() - S.fixAt > 3000) { S.speed = 0; S.moving = false; updateSpeed(); }
+}, 1000);
 function updateSpeed() {
   const box = $('speedBox');
   if (S.speed == null) { box.hidden = true; $('limitSign').hidden = true; return; }
@@ -721,6 +814,16 @@ async function speedLimitTick() {
     updateSpeed();
   } catch (e) { /* réseau */ } finally { clearTimeout(tm); limitBusy = false; }
 }
+/* Partie de l'écran vraiment libre (sans le bandeau, la barre du bas, ni le panneau de gauche en paysage) */
+function freeArea() {
+  const r = map.getContainer().getBoundingClientRect();
+  let top = 0, bot = r.height, left = 0;
+  const cx = r.width / 2;
+  const nb = $('navBanner'); if (nb && !nb.hidden) { const b = nb.getBoundingClientRect(); if (b.left < cx && b.right > cx) top = Math.max(top, b.bottom - r.top); else if (b.right < cx + 40 && b.bottom > r.height * 0.5) left = Math.max(left, b.right - r.left); }
+  const bar = $('navBar'); if (bar && !bar.hidden) { const b = bar.getBoundingClientRect(); if (b.height && b.left < cx && b.right > cx) bot = Math.min(bot, b.top - r.top); else if (b.height && b.right < cx + 40) left = Math.max(left, b.right - r.left); }
+  return { w: r.width, h: r.height, top, bot, left };
+}
+/* Caméra de conduite : 2D, voiture en bas au centre, route visible devant, cap et zoom sans à-coups */
 function followCam() {
   if (!S.pos) return;
   const nowT = Date.now(); if (nowT - (S.camAt || 0) < 900) return; S.camAt = nowT;
@@ -729,18 +832,28 @@ function followCam() {
   if (kmh >= 12) { S.moving = true; S.slowSince = 0; }
   else if (kmh < 10) { if (!S.slowSince) S.slowSince = nowT; if (nowT - S.slowSince > 4000) S.moving = false; }
   const moving = !!S.moving || !!S.nav;
-  const zoom = kmh < 30 ? 17.3 : kmh < 55 ? 16.5 : kmh < 90 ? 15.7 : 15;
+  // zoom continu selon la vitesse, changé seulement par petites marches
+  const zt = Math.max(15, Math.min(17.3, 17.6 - Math.max(0, kmh - 20) * 0.022));
+  if (S.camZoom == null || Math.abs(zt - S.camZoom) > 0.3 || !moving) S.camZoom = moving ? Math.round(zt * 10) / 10 : Math.max(map.getZoom(), 16);
+  const zoom = moving ? S.camZoom : (S.lastCam && !S.lastCam.moving ? map.getZoom() : 16.5);
   const north = S.settings.navNorth;
-  const pitch = moving ? (north ? 30 : 58) : 0;
   const v = myView();
   const live = S.moving || (S.nav && S.nav.snap);
-  const bearing = north ? 0 : (live && v.heading != null ? v.heading : map.getBearing());
-  const off = moving ? Math.round(window.innerHeight * 0.28) : 0;
-  const c = map.getCenter(), lc = S.lastCam;
-  if (!moving && lc && !lc.moving && Math.abs(map.getPitch() - pitch) < 1 && Math.abs(map.getZoom() - zoom) < 0.05 && dist({ lat: c.lat, lon: c.lng }, v) < 3) return;
-  S.lastCam = { moving };
+  let bearing = north ? 0 : (live && v.heading != null ? v.heading : map.getBearing());
   const turn = Math.abs(((bearing - map.getBearing()) % 360 + 540) % 360 - 180);
-  map.easeTo({ center: [v.lon, v.lat], bearing, pitch, zoom, duration: turn > 40 ? 600 : 1000, easing: (t) => t, offset: [0, off], essential: true });
+  if (!north && turn < 4) bearing = map.getBearing(); // petits écarts de cap : on ne fait pas tourner la carte
+  const A = freeArea();
+  const off = moving
+    ? [Math.round(A.left / 2), Math.round(A.top + (A.bot - A.top) * 0.74 - A.h / 2)]
+    : [Math.round(A.left / 2), Math.round((A.top + A.bot) / 2 - A.h / 2)];
+  S.camOff = off;
+  const c = map.getCenter(), lc = S.lastCam;
+  if (!moving && lc && !lc.moving && Math.abs(map.getPitch()) < 1 && dist({ lat: c.lat, lon: c.lng }, v) < 3) { renderMe(); return; }
+  if (S.puckAt == null) S.puckAt = 0;
+  if (lc && lc.moving !== moving) S.puckAt = nowT + 1000;
+  S.lastCam = { moving };
+  map.easeTo({ center: [v.lon, v.lat], bearing, pitch: 0, zoom, duration: turn > 40 ? 600 : 1000, easing: (t) => t, offset: off, essential: true });
+  renderMe();
 }
 setInterval(() => { if (S.follow && S.pos && !document.hidden) followCam(); }, 1500);
 
@@ -1126,7 +1239,7 @@ function startNav(R, dest) {
   document.body.classList.add('navigating');
   $('navBanner').hidden = false; $('navBar').hidden = false;
   $('etaDest').textContent = 'Vers ' + dest.name;
-  S.follow = true; $('btnLocate').classList.add('active');
+  S.follow = true; S.puckAt = Date.now() + 1100; S.lastCam = null; $('btnLocate').classList.add('active');
   requestWake();
   drawRoute(R, 0);
   const first = R.steps[1] || R.steps[0];
@@ -2620,7 +2733,7 @@ $('btnProfile').onclick = openMenu;
 $('btnLocate').onclick = () => {
   if (!S.pos) { startGps(); toast('Recherche de ta position…'); return; }
   S.follow = true; $('btnLocate').classList.add('active');
-  S.camAt = 0; followCam();
+  S.puckAt = Date.now() + 1100; S.camAt = 0; followCam(); setTimeout(renderMe, 1150);
 };
 $('btnPlaces').onclick = () => {
   S.settings.showPlaces = !S.settings.showPlaces; saveSettings(); applyPlaces();
