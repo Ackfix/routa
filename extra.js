@@ -434,7 +434,7 @@ function convertTT(rt) {
     const name = x.street || (x.roadNumbers && x.roadNumbers.join(' / ')) || '';
     const next = ins[i + 1];
     const startD = x.routeOffsetInMeters * k, endD = next ? next.routeOffsetInMeters * k : total;
-    steps.push({ maneuver: { type, modifier: mod, exit: x.roundaboutExitNumber || undefined, location: [x.point.longitude, x.point.latitude] }, name, distance: endD - startD, duration: 0 });
+    steps.push({ maneuver: { type, modifier: mod, exit: x.roundaboutExitNumber || undefined, angle: type === 'roundabout' && typeof x.turnAngleInDecimalDegrees === 'number' ? x.turnAngleInDecimalDegrees : undefined, location: [x.point.longitude, x.point.latitude] }, name, distance: endD - startD, duration: 0 });
     stepEnds.push(endD);
   });
   if (!steps.length) { steps.push({ maneuver: { type: 'depart' }, name: '', distance: total }); stepEnds.push(total); }
