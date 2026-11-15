@@ -521,3 +521,8 @@ body:not(.navigating) .lowchip { top: calc(var(--sat) + 74px); }
 .geochip b { font-size: 14px; }
 .geochip svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--alert); }
 body.navigating .geochip { top: calc(var(--sat) + 150px); }
+body.navigating .toasts { top: calc(var(--nbB, 150px) + 10px); }
+body.navigating .geochip { top: calc(var(--nbB, 150px) + 10px); }
+@media (orientation: landscape) and (max-height: 540px) {
+  body.navigating .toasts, body.navigating .geochip { top: calc(var(--sat) + 8px); left: auto; right: calc(var(--eR) + 8px); transform: none; width: min(44vw, 400px); }
+}
