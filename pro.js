@@ -227,26 +227,33 @@
     ['trips', 'Trajets', 0], ['limits', 'Respect des limites', 1], ['smooth', 'Freinages / accélérations brusques', 0],
     ['fuel', 'Carburant estimé', 0], ['co2', 'CO₂ estimé', 0], ['best', 'Meilleur trajet', 1]
   ];
-  const SCFG = Object.assign({}, ...SOPT.map(([k, , on]) => ({ [k]: !!on })), store.get('routa.storycfg', {}));
+  const SCFG = Object.assign({ style: 'dark' }, ...SOPT.map(([k, , on]) => ({ [k]: !!on })), store.get('routa.storycfg', {}));
+  const PAL = {
+    dark: { bg: '#0E1116', glow1: 'rgba(255,138,61,.35)', glow2: 'rgba(79,168,255,.18)', ink: '#F4F6FA', muted: '#9AA3AF', accent: '#FF8A3D', card: '#171B22', line: 'rgba(255,255,255,.06)', mapBg: 'rgba(23,27,34,.9)', grid: 'rgba(255,255,255,.035)', ringBg: 'rgba(255,255,255,.08)', g0: '#FFC531', g1: '#FF8A3D', halo: 'rgba(255,138,61,.18)', shadow: 'rgba(255,138,61,.55)', st1: '#F4F6FA', st2: '#0E1116', en1: '#FF8A3D', en2: '#F4F6FA' },
+    orange: { bg: '#FF9A4A', bg2: '#FF5F1F', glow1: 'rgba(255,224,150,.55)', glow2: null, ink: '#1A1205', muted: 'rgba(26,18,5,.62)', accent: '#1A1205', card: 'rgba(255,255,255,.22)', line: 'rgba(255,255,255,.3)', mapBg: 'rgba(26,18,5,.14)', grid: 'rgba(26,18,5,.07)', ringBg: 'rgba(26,18,5,.14)', g0: '#FFFFFF', g1: '#FFF3E6', halo: 'rgba(255,255,255,.28)', shadow: 'rgba(255,255,255,.7)', st1: '#1A1205', st2: '#FFFFFF', en1: '#FFFFFF', en2: '#1A1205' },
+    light: { bg: '#F5F6F8', glow1: 'rgba(255,138,61,.22)', glow2: 'rgba(79,168,255,.12)', ink: '#0E1116', muted: '#5B6472', accent: '#E8711F', card: '#FFFFFF', line: 'rgba(14,17,22,.07)', mapBg: '#FFFFFF', grid: 'rgba(14,17,22,.05)', ringBg: 'rgba(14,17,22,.07)', g0: '#FFB020', g1: '#FF7A1F', halo: 'rgba(255,138,61,.18)', shadow: 'rgba(255,138,61,.45)', st1: '#0E1116', st2: '#FFFFFF', en1: '#FF8A3D', en2: '#FFFFFF' }
+  };
   async function drawStory(a, label, ctx, cities) {
     const W = 1080, H = 1920, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const c = cv.getContext('2d');
-    c.fillStyle = '#0E1116'; c.fillRect(0, 0, W, H);
-    const g = c.createRadialGradient(W * 0.85, 120, 40, W * 0.85, 120, 900); g.addColorStop(0, 'rgba(255,138,61,.35)'); g.addColorStop(1, 'rgba(255,138,61,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H);
-    const g2 = c.createRadialGradient(80, H - 200, 20, 80, H - 200, 700); g2.addColorStop(0, 'rgba(79,168,255,.18)'); g2.addColorStop(1, 'rgba(79,168,255,0)'); c.fillStyle = g2; c.fillRect(0, 0, W, H);
+    const K = PAL[SCFG.style] || PAL.dark;
+    if (K.bg2) { const lg = c.createLinearGradient(0, 0, W, H); lg.addColorStop(0, K.bg); lg.addColorStop(1, K.bg2); c.fillStyle = lg; } else c.fillStyle = K.bg;
+    c.fillRect(0, 0, W, H);
+    const g = c.createRadialGradient(W * 0.85, 120, 40, W * 0.85, 120, 900); g.addColorStop(0, K.glow1); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+    if (K.glow2) { const g2 = c.createRadialGradient(80, H - 200, 20, 80, H - 200, 700); g2.addColorStop(0, K.glow2); g2.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g2; c.fillRect(0, 0, W, H); }
     let y = 230;
-    const ttl = (ctx.title || T('Mon suivi de conduite')).toUpperCase(); c.fillStyle = '#FF8A3D'; fit(c, ttl, 900, 38, '800'); c.fillText(ttl, 90, y);
-    if (SCFG.label && label) { y += 70; c.fillStyle = '#F4F6FA'; fit(c, label, 900, 50, '700'); c.fillText(label, 90, y); }
-    if (SCFG.cities && cities) { y += 62; c.fillStyle = '#9AA3AF'; fit(c, cities, 900, 40, '600'); c.fillText(cities, 90, y); }
-    if (SCFG.hours && ctx.trip) { const t = hm(ctx.trip.s) + ' → ' + hm(ctx.trip.e || ctx.trip.le); y += 58; c.fillStyle = '#9AA3AF'; fit(c, t, 900, 38, '600'); c.fillText(t, 90, y); }
+    const ttl = (ctx.title || T('Mon suivi de conduite')).toUpperCase(); c.fillStyle = K.accent; fit(c, ttl, 900, 38, '800'); c.fillText(ttl, 90, y);
+    if (SCFG.label && label) { y += 70; c.fillStyle = K.ink; fit(c, label, 900, 50, '700'); c.fillText(label, 90, y); }
+    if (SCFG.cities && cities) { y += 62; c.fillStyle = K.muted; fit(c, cities, 900, 40, '600'); c.fillText(cities, 90, y); }
+    if (SCFG.hours && ctx.trip) { const t = hm(ctx.trip.s) + ' → ' + hm(ctx.trip.e || ctx.trip.le); y += 58; c.fillStyle = K.muted; fit(c, t, 900, 38, '600'); c.fillText(t, 90, y); }
     y += 60;
     const tracks = SCFG.map ? (ctx.tracks || []) : [];
     if (tracks.length) {
       const bx = 90, bw = 900, bh = 620, by = y - 10, pad = 70;
-      c.fillStyle = 'rgba(23,27,34,.9)'; rr(c, bx, by, bw, bh, 40); c.fill();
-      c.strokeStyle = 'rgba(255,255,255,.06)'; c.lineWidth = 2; rr(c, bx, by, bw, bh, 40); c.stroke();
+      c.fillStyle = K.mapBg; rr(c, bx, by, bw, bh, 40); c.fill();
+      c.strokeStyle = K.line; c.lineWidth = 2; rr(c, bx, by, bw, bh, 40); c.stroke();
       c.save(); rr(c, bx, by, bw, bh, 40); c.clip();
-      c.strokeStyle = 'rgba(255,255,255,.035)'; c.lineWidth = 2;
+      c.strokeStyle = K.grid; c.lineWidth = 2;
       for (let gx = bx + 45; gx < bx + bw; gx += 60) { c.beginPath(); c.moveTo(gx, by); c.lineTo(gx, by + bh); c.stroke(); }
       for (let gy = by + 40; gy < by + bh; gy += 60) { c.beginPath(); c.moveTo(bx, gy); c.lineTo(bx + bw, gy); c.stroke(); }
       let la0 = 90, la1 = -90, lo0 = 180, lo1 = -180;
@@ -256,43 +263,43 @@
       const sc = Math.min((bw - 2 * pad) / w, (bh - 2 * pad) / h);
       const ox = bx + (bw - w * sc) / 2, oy = by + (bh - h * sc) / 2;
       const P = ([la, lo]) => [ox + (lo - lo0) * kx * sc, oy + (la1 - la) * sc];
-      const gl = c.createLinearGradient(bx, by, bx + bw, by + bh); gl.addColorStop(0, '#FFC531'); gl.addColorStop(1, '#FF8A3D');
+      const gl = c.createLinearGradient(bx, by, bx + bw, by + bh); gl.addColorStop(0, K.g0); gl.addColorStop(1, K.g1);
       c.lineJoin = 'round'; c.lineCap = 'round';
-      [[22, 'rgba(255,138,61,.18)', 0], [11, gl, 18]].forEach(([lw, st, blur]) => {
-        c.lineWidth = lw; c.strokeStyle = st; c.shadowColor = 'rgba(255,138,61,.55)'; c.shadowBlur = blur;
+      [[22, K.halo, 0], [11, gl, 18]].forEach(([lw, st, blur]) => {
+        c.lineWidth = lw; c.strokeStyle = st; c.shadowColor = K.shadow; c.shadowBlur = blur;
         tracks.forEach((t) => { c.beginPath(); t.forEach((pt, i) => { const [x, yy] = P(pt); if (i) c.lineTo(x, yy); else c.moveTo(x, yy); }); c.stroke(); });
       });
       c.shadowBlur = 0;
       if (tracks.length === 1) {
         const t = tracks[0], [sx, sy] = P(t[0]), [ex, ey] = P(t[t.length - 1]);
-        c.fillStyle = '#F4F6FA'; c.beginPath(); c.arc(sx, sy, 15, 0, Math.PI * 2); c.fill();
-        c.fillStyle = '#0E1116'; c.beginPath(); c.arc(sx, sy, 7, 0, Math.PI * 2); c.fill();
-        c.fillStyle = '#FF8A3D'; c.beginPath(); c.arc(ex, ey, 19, 0, Math.PI * 2); c.fill();
-        c.strokeStyle = '#F4F6FA'; c.lineWidth = 6; c.beginPath(); c.arc(ex, ey, 19, 0, Math.PI * 2); c.stroke();
+        c.fillStyle = K.st1; c.beginPath(); c.arc(sx, sy, 15, 0, Math.PI * 2); c.fill();
+        c.fillStyle = K.st2; c.beginPath(); c.arc(sx, sy, 7, 0, Math.PI * 2); c.fill();
+        c.fillStyle = K.en1; c.beginPath(); c.arc(ex, ey, 19, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = K.en2; c.lineWidth = 6; c.beginPath(); c.arc(ex, ey, 19, 0, Math.PI * 2); c.stroke();
       }
       c.restore();
       y = by + bh + 50;
     }
     if (SCFG.score && tracks.length) {
       const R = 92, cx = 90 + R + 8, cy = y + R;
-      c.lineWidth = 20; c.lineCap = 'round'; c.strokeStyle = 'rgba(255,255,255,.08)'; c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.stroke();
+      c.lineWidth = 20; c.lineCap = 'round'; c.strokeStyle = K.ringBg; c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.stroke();
       const sc = a.score == null ? 0 : a.score;
-      const gr = c.createLinearGradient(cx - R, cy - R, cx + R, cy + R); gr.addColorStop(0, '#FFC531'); gr.addColorStop(1, '#FF8A3D');
+      const gr = c.createLinearGradient(cx - R, cy - R, cx + R, cy + R); gr.addColorStop(0, K.g0); gr.addColorStop(1, K.g1);
       c.strokeStyle = gr; c.beginPath(); c.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * sc / 100); c.stroke();
-      c.textAlign = 'center'; c.fillStyle = '#F4F6FA'; c.font = '800 78px Inter, system-ui, -apple-system, sans-serif'; c.fillText(String(a.score == null ? '–' : sc), cx, cy + 27);
+      c.textAlign = 'center'; c.fillStyle = K.ink; c.font = '800 78px Inter, system-ui, -apple-system, sans-serif'; c.fillText(String(a.score == null ? '–' : sc), cx, cy + 27);
       c.textAlign = 'left';
-      c.fillStyle = '#9AA3AF'; fit(c, T('Score de conduite'), 560, 36, '600'); c.fillText(T('Score de conduite'), cx + R + 50, cy - 14);
-      c.fillStyle = '#FF8A3D'; fit(c, a.score == null ? '' : scoreLabel(sc), 560, 64, '800'); c.fillText(a.score == null ? '' : scoreLabel(sc), cx + R + 50, cy + 56);
+      c.fillStyle = K.muted; fit(c, T('Score de conduite'), 560, 36, '600'); c.fillText(T('Score de conduite'), cx + R + 50, cy - 14);
+      c.fillStyle = K.accent; fit(c, a.score == null ? '' : scoreLabel(sc), 560, 64, '800'); c.fillText(a.score == null ? '' : scoreLabel(sc), cx + R + 50, cy + 56);
       y = cy + R + 50;
     } else if (SCFG.score) {
       const R = 220, cx = W / 2, cy = y + R + 30;
-      c.lineWidth = 34; c.lineCap = 'round'; c.strokeStyle = 'rgba(255,255,255,.08)'; c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.stroke();
+      c.lineWidth = 34; c.lineCap = 'round'; c.strokeStyle = K.ringBg; c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.stroke();
       const sc = a.score == null ? 0 : a.score;
-      const gr = c.createLinearGradient(cx - R, cy - R, cx + R, cy + R); gr.addColorStop(0, '#FFC531'); gr.addColorStop(1, '#FF8A3D');
+      const gr = c.createLinearGradient(cx - R, cy - R, cx + R, cy + R); gr.addColorStop(0, K.g0); gr.addColorStop(1, K.g1);
       c.strokeStyle = gr; c.beginPath(); c.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * sc / 100); c.stroke();
-      c.textAlign = 'center'; c.fillStyle = '#F4F6FA'; c.font = '800 180px Inter, system-ui, -apple-system, sans-serif'; c.fillText(String(a.score == null ? '–' : sc), cx, cy + 60);
-      c.fillStyle = '#9AA3AF'; fit(c, T('Score de conduite'), 380, 32, '600'); c.fillText(T('Score de conduite'), cx, cy + 115);
-      c.fillStyle = '#FF8A3D'; fit(c, a.score == null ? '' : scoreLabel(sc), 700, 52, '800'); c.fillText(a.score == null ? '' : scoreLabel(sc), cx, cy + R + 100);
+      c.textAlign = 'center'; c.fillStyle = K.ink; c.font = '800 180px Inter, system-ui, -apple-system, sans-serif'; c.fillText(String(a.score == null ? '–' : sc), cx, cy + 60);
+      c.fillStyle = K.muted; fit(c, T('Score de conduite'), 380, 32, '600'); c.fillText(T('Score de conduite'), cx, cy + 115);
+      c.fillStyle = K.accent; fit(c, a.score == null ? '' : scoreLabel(sc), 700, 52, '800'); c.fillText(a.score == null ? '' : scoreLabel(sc), cx, cy + R + 100);
       c.textAlign = 'left';
       y = cy + R + 160;
     }
@@ -316,10 +323,10 @@
       cards.forEach(([v, l], i) => {
         const last = i === cards.length - 1 && cards.length % 2 === 1;
         const w = last ? cw * 2 + 30 : cw, x = 90 + (last ? 0 : (i % 2) * (cw + 30)), yy = y + Math.floor(i / 2) * (ch + gap);
-        c.fillStyle = '#171B22'; rr(c, x, yy, w, ch, 36); c.fill();
-        c.strokeStyle = 'rgba(255,255,255,.06)'; c.lineWidth = 2; rr(c, x, yy, w, ch, 36); c.stroke();
-        c.fillStyle = '#F4F6FA'; fit(c, v, w - 70, Math.round(ch * 0.33), '800'); c.fillText(v, x + 36, yy + ch * 0.5);
-        c.fillStyle = '#9AA3AF'; fit(c, l, w - 70, Math.round(ch * 0.16), '600'); c.fillText(l, x + 36, yy + ch * 0.78);
+        c.fillStyle = K.card; rr(c, x, yy, w, ch, 36); c.fill();
+        c.strokeStyle = K.line; c.lineWidth = 2; rr(c, x, yy, w, ch, 36); c.stroke();
+        c.fillStyle = K.ink; fit(c, v, w - 70, Math.round(ch * 0.33), '800'); c.fillText(v, x + 36, yy + ch * 0.5);
+        c.fillStyle = K.muted; fit(c, l, w - 70, Math.round(ch * 0.16), '600'); c.fillText(l, x + 36, yy + ch * 0.78);
       });
     }
     const logo = await loadImg('icons/icon-512.png');
@@ -336,6 +343,7 @@
     let cities = '', blob = null, url = '', ver = 0;
     const body = openSheet(T('Ta story'),
       '<div style="text-align:center"><img id="stImg" alt="" style="max-width:100%;max-height:48vh;aspect-ratio:9/16;border-radius:18px;background:#0E1116;display:inline-block"></div>' +
+      '<div class="seg" id="stStyle" style="margin-top:12px">' + [['dark', 'Sombre'], ['orange', 'Orange'], ['light', 'Clair']].map(([k, l]) => '<button data-st="' + k + '" class="' + (SCFG.style === k ? 'on' : '') + '">' + esc(T(l)) + '</button>').join('') + '</div>' +
       '<p class="muted small" style="margin:10px 0 6px">' + esc(T('Touche les éléments pour les afficher ou les cacher.')) + '</p>' +
       '<div id="stOpts" style="display:flex;flex-wrap:wrap;gap:8px">' + opts.map(([k, l]) => '<button class="btn small soft" data-k="' + k + '" aria-pressed="' + !!SCFG[k] + '" style="min-height:40px">' + esc(T(l)) + '</button>').join('') + '</div>' +
       '<button class="btn primary block" id="stShare" style="margin-top:14px">' + esc(T('Partager')) + '</button>' +
@@ -349,6 +357,7 @@
       cv.toBlob((b) => { if (v === ver) blob = b; }, 'image/png');
     };
     body.querySelectorAll('[data-k]').forEach((b) => { paint(b); b.onclick = () => { SCFG[b.dataset.k] = !SCFG[b.dataset.k]; store.set('routa.storycfg', SCFG); paint(b); render(); }; });
+    body.querySelectorAll('[data-st]').forEach((b) => { b.onclick = () => { SCFG.style = b.dataset.st; store.set('routa.storycfg', SCFG); body.querySelectorAll('[data-st]').forEach((x) => x.classList.toggle('on', x === b)); render(); }; });
     body.querySelector('#stBack').onclick = () => (ctx.trip && ctx.idx != null ? openTrip(ctx.idx) : openDrive());
     body.querySelector('#stShare').onclick = async () => {
       const file = blob && new File([blob], 'routa-story.png', { type: 'image/png' });
