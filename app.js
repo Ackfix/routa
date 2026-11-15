@@ -182,12 +182,17 @@ function veh() {
   return Object.assign({}, v, { type: S.vehicle.type, dims, hazmat: !!S.vehicle.hazmat && S.vehicle.type === 'camion', isHgv });
 }
 /* Vitesse maximale propre au véhicule (Suisse) : poids lourds 80 km/h, cars, minibus et camping-cars de plus de 3,5 t 100 km/h */
+function vehLimits(cc) {
+  const v = veh(), T = window.ROUTA_VLIM || {}, c = T[cc || S.country || 'CH'];
+  if (!c || !v.heavy) return null;
+  const k = v.type === 'minibus' ? 'bus' : v.type, f = c[k];
+  const r = f ? f(v.dims.weight || 0) : null;
+  return r ? { lim: r, src: c.src, pro: c.pro } : null;
+}
+/* Plafond = vitesse la plus haute permise à ce véhicule dans le pays (jamais plus bas que la loi). Pays non vérifié : pas de plafond. */
 function vehCap() {
-  const v = veh();
-  if (v.type === 'camion') return 80;
-  if (v.type === 'bus' || v.type === 'minibus') return 100;
-  if (v.type === 'camping' && (v.dims.weight || 0) > 3.5) return 100;
-  return null;
+  const L = vehLimits(); if (!L) return null;
+  const n = L.lim.join(' ').match(/\d+/g); return n ? Math.max(...n.map(Number)) : null;
 }
 window.ROUTA_VCAP = vehCap;
 const capLimit = (l) => { const c = vehCap(); return l && c ? Math.min(l, c) : l; };
@@ -381,10 +386,13 @@ function say(text, force) {
 }
 let voiceUnlocked = false;
 document.addEventListener('click', () => {
+  if (S.settings.voice) unlockVoice();
+}, { capture: true });
+function unlockVoice() {
   if (voiceUnlocked || !('speechSynthesis' in window)) return;
   voiceUnlocked = true;
   try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) { /* */ }
-}, { capture: true });
+}
 const vibrate = (p) => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) { /* */ } };
 
 /* ======================= Toasts ======================= */
@@ -570,7 +578,23 @@ function myView() {
 /* Mon marqueur */
 /* En suivi, le curseur reste fixe à l'écran (la carte glisse dessous) : il ne disparaît plus et reste calé sur la route.
    Hors suivi, c'est un marqueur posé sur la carte. */
-function meHtml() { return '<div class="mk-me"><i>' + '<svg aria-hidden="true" viewBox="0 0 24 24">' + P.nav + '</svg></i></div>'; }
+/* Curseur GPS personnalisable (forme et couleur, dans Réglages › Carte) */
+const CUR_COLORS = ['#4DA3FF', '#FF8A3D', '#3DDC97', '#E5484D', '#A78BFA', '#F5C542'];
+const CUR_SHAPES = [['arrow', 'Flèche'], ['car', 'Voiture'], ['dot', 'Point']];
+const hexA = (h, a) => 'rgba(' + [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(',') + ',' + a + ')';
+const curColor = () => (CUR_COLORS.includes(S.settings.cursorColor) ? S.settings.cursorColor : CUR_COLORS[0]);
+const carTop = (c) => '<path fill="' + c + '" stroke="#fff" stroke-width="1.6" d="M9 2.5h6c1.7 0 3 1.3 3 3V19c0 1.4-1.1 2.5-2.5 2.5h-7C7.1 21.5 6 20.4 6 19V5.5c0-1.7 1.3-3 3-3z"/><path fill="rgba(0,0,0,.45)" d="M8.2 8.4c2.5-1 5.1-1 7.6 0l-.8 3H9z"/><path fill="rgba(0,0,0,.35)" d="M9 16.4h6l.6 2.2c-2.4.6-4.8.6-7.2 0z"/>';
+function meHtml(shape, color) {
+  const st = shape || S.settings.cursor || 'arrow', c = color || curColor();
+  const halo = ' style="background:' + hexA(c, 0.22) + '"';
+  if (st === 'car') return '<div class="mk-me cur-car"' + halo + '><i style="background:transparent;border:0;box-shadow:none"><svg aria-hidden="true" viewBox="0 0 24 24" style="width:100%;height:100%">' + carTop(c) + '</svg></i></div>';
+  return '<div class="mk-me cur-' + st + '"' + halo + '><i style="background:' + c + '">' + (st === 'dot' ? '' : '<svg aria-hidden="true" viewBox="0 0 24 24">' + P.nav + '</svg>') + '</i></div>';
+}
+function applyCursor() {
+  const pk = $('mePuck'); if (pk) pk.remove();
+  if (S.markers.me) { S.markers.me.remove(); S.markers.me = null; }
+  renderMe();
+}
 function puckEl() {
   let p = $('mePuck');
   if (!p) { p = el('<div id="mePuck" class="mepuck" hidden aria-hidden="true">' + meHtml() + '</div>'); document.body.appendChild(p); }
@@ -1052,7 +1076,7 @@ function showResults(items, msg) {
   if (!items.length) { box.innerHTML = '<div class="result"><span class="muted">' + esc(msg || 'Aucun résultat.') + '</span></div>'; box.hidden = false; return; }
   box.innerHTML = items.map((it, i) => '<button class="result" data-i="' + i + '">' + (it.ackfix ? '<span class="ackico">A</span>' : ic(it.fav ? 'star' : it.spot ? 'spot' : it.recent ? 'clock' : 'pin')) + '<span class="grow"><b>' + esc(it.name) + '</b><small>' + esc(it.sub || '') + (S.pos && !it.nodist ? (it.sub ? ' · ' : '') + fmtDist(dist(S.pos, it)) : '') + '</small></span></button>').join('');
   box.hidden = false;
-  box.querySelectorAll('.result').forEach((b) => { b.onclick = () => { const it = items[+b.dataset.i]; hideResults(); q.blur(); if (it.ackfix) { openAckfix(); return; } if (S.pickSlot) { const k = S.pickSlot; q.value = ''; saveSlot(k, it); return; } chooseDestination(it); }; });
+  box.querySelectorAll('.result').forEach((b) => { b.onclick = () => { const it = items[+b.dataset.i]; hideResults(); q.blur(); if (it.ackfix) { openAckfix(); return; } if (S.pickSlot) { const k = S.pickSlot; q.value = ''; saveSlot(k, it); return; } if (S.pickVia) { const fin = S.pickVia; exitSearch(); if (window.ROUTA_X && ROUTA_X.addVia) ROUTA_X.addVia(it, fin); return; } chooseDestination(it); }; });
 }
 function openAckfix() {
   openSheet('ACKFIX', '<div class="banner"><span class="ackico">A</span><span><b>Informatique, simplement.</b><br>Dépannage, réparation et maintenance PC et Mac, PC sur mesure. On récupère ton ordinateur et on te le ramène, partout dans le Canton de Vaud.</span></div>' +
@@ -1074,6 +1098,13 @@ function exitSearch() {
   document.body.classList.remove('searching');
   hideResults(); q.blur(); q.value = ''; $('qclear').hidden = true;
   if (S.pickSlot) { S.pickSlot = null; q.placeholder = 'Où va-t-on ?'; }
+  if (S.pickVia) { S.pickVia = null; q.placeholder = I18N.t('Où va-t-on ?'); }
+}
+/* Choisir une étape dans la recherche (avant ou pendant la navigation) */
+function pickVia(fin) {
+  closeSheet();
+  S.pickVia = fin; q.value = ''; $('qclear').hidden = true; q.placeholder = I18N.t('Ajouter une étape');
+  enterSearch();
 }
 const SLOTS = { home: 'Domicile', work: 'Travail' };
 const slotFav = (k) => S.favs.find((f) => f.slot === k);
@@ -1421,6 +1452,7 @@ $('btnStop').onclick = () => stopNav();
 $('btnOverview').onclick = () => { if (S.nav) { stopFollow(); fitRoute(S.nav.R); } };
 $('btnMute').onclick = () => {
   S.settings.voice = !S.settings.voice; saveSettings();
+  if (S.settings.voice) unlockVoice();
   $('btnMute').classList.toggle('muted', !S.settings.voice);
   $('btnMute').setAttribute('aria-label', S.settings.voice ? 'Couper la voix' : 'Activer la voix');
   toast(S.settings.voice ? 'Voix activée.' : 'Voix coupée.');
@@ -1522,8 +1554,19 @@ function arrive() {
 }
 
 /* Écran allumé pendant la navigation */
-async function requestWake() { try { if ('wakeLock' in navigator) S.wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* refusé */ } }
-function releaseWake() { try { S.wakeLock && S.wakeLock.release(); } catch (e) { /* */ } S.wakeLock = null; }
+/* Écran allumé uniquement quand ROUTA est au premier plan avec une navigation en cours (le système le relâche en arrière-plan) */
+const KA = () => { const C = window.Capacitor; return C && C.Plugins && C.Plugins.KeepAwake; };
+async function requestWake() {
+  try { if (S.nav && KA()) await KA().keepAwake(); } catch (e) { /* */ }
+  try {
+    if (!('wakeLock' in navigator) || !S.nav || document.visibilityState !== 'visible') return;
+    if (S.wakeLock && !S.wakeLock.released) return;
+    const w = await navigator.wakeLock.request('screen');
+    S.wakeLock = w;
+    w.addEventListener('release', () => { if (S.wakeLock === w) S.wakeLock = null; setTimeout(() => { if (S.nav && document.visibilityState === 'visible') requestWake(); }, 1500); });
+  } catch (e) { /* refusé (économie d'énergie…) */ }
+}
+function releaseWake() { const w = S.wakeLock; S.wakeLock = null; try { w && w.release(); } catch (e) { /* */ } try { if (KA()) KA().allowSleep(); } catch (e) { /* */ } }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.nav) requestWake(); });
 
 /* ======================= Essence / recharge / parking ======================= */
@@ -2609,6 +2652,15 @@ function openCountry(code, tab) {
       (/mph/.test(c.lim[0]) ? '' : '<p class="muted small">Vitesses en km/h pour une voiture.</p>');
     if (c.alc) h += '<div class="card"><div class="grow"><b>Alcool</b><div class="sub">' + esc(c.alc) + '</div></div></div>';
     if (c.must.length) h += '<div class="card"><div class="grow"><b>Obligatoire</b><div class="sub">' + c.must.map(esc).join('<br>') + '</div></div></div>';
+    if (veh().heavy) {
+      const L = vehLimits(code);
+      h += '<h3>' + esc(I18N.t('Ton véhicule')) + ' : ' + esc(vehSummary()) + '</h3>' + (L
+        ? '<div class="limgrid">' + [['Ville', L.lim[0]], ['Hors localité', L.lim[1]], ['Autoroute', L.lim[2]]].map(([l, v]) => '<div class="limcell"><div class="limv">' + esc(v) + '</div><div class="sub">' + l + '</div></div>').join('') + '</div>' +
+          (L.lim.join('').includes('*') ? '<p class="muted small">' + esc(I18N.t('* Seulement sous conditions (homologation, équipement, poids) : vérifie la source officielle.')) + '</p>' : '') +
+          '<a class="btn soft block linkbtn" href="' + esc(L.src[1]) + '" target="_blank" rel="noopener">' + ic('web') + esc(L.src[0]) + '</a>'
+        : '<p class="muted small">' + esc(I18N.t('Les limites propres à ton véhicule ne sont pas encore vérifiées pour ce pays : suis la signalisation et le site officiel.')) + '</p>');
+      if (veh().type === 'camion' || veh().type === 'bus' || veh().type === 'minibus') { const pr = (L && L.pro) || (code !== 'CH' && window.ROUTA_PRO_EU); if (pr) h += '<a class="btn soft block linkbtn" href="' + esc(pr[1]) + '" target="_blank" rel="noopener">' + ic('web') + esc(I18N.t('Temps de conduite et de repos')) + ' · ' + esc(pr[0]) + '</a>'; }
+    }
     if (c.tips.length) h += '<div class="card"><div class="grow"><b>Bon à savoir</b><div class="sub">' + c.tips.map(esc).join('<br>') + '</div></div></div>';
   } else {
     const badge = { vignette: ['Vignette obligatoire', 'warn'], peage: ['Péage', ''], gratuit: ['Gratuit en voiture', 'ok'] }[c.toll.type] || ['', ''];
@@ -2769,6 +2821,8 @@ function openSettings() {
     '<p class="muted small" style="margin:0">Couleurs de la carte</p>' + segH('stNight', [['auto', 'Comme le téléphone'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
     sw('stPlaces', 'Afficher les établissements sur la carte', S.settings.showPlaces) +
     sw('stGoogle', 'Bouton « Voir les avis Google » sur les lieux', S.settings.googleLinks) +
+    '<p class="muted small" style="margin:0">' + esc(I18N.t('Curseur GPS')) + '</p><div class="curpick" id="stCur">' + CUR_SHAPES.map(([k, l]) => '<button data-v="' + k + '" class="' + ((S.settings.cursor || 'arrow') === k ? 'on' : '') + '" aria-label="' + esc(I18N.t(l)) + '">' + meHtml(k) + '<span>' + esc(I18N.t(l)) + '</span></button>').join('') + '</div>' +
+    '<div class="curcols" id="stCurCol">' + CUR_COLORS.map((c) => '<button data-c="' + c + '" class="' + (curColor() === c ? 'on' : '') + '" style="background:' + c + '" aria-label="' + c + '"></button>').join('') + '</div>' +
     '<label class="field" for="stUi">Taille des boutons et de l\'affichage<select id="stUi">' + [['0.85', 'Petite'], ['1', 'Normale'], ['1.15', 'Grande'], ['1.3', 'Très grande']].map(([v, l]) => '<option value="' + v + '"' + (String(+S.settings.uiSize || 1) === String(+v) ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
     '<button class="btn soft block" id="stMapView">' + ic('layers') + 'Plan, satellite, trafic et transports</button>' +
     '<h3>Véhicule</h3>' +
@@ -2783,7 +2837,7 @@ function openSettings() {
     '<button class="btn danger block" id="pfWipe">Supprimer mes données</button>' +
     '<p class="muted small">Version ' + VERSION + '.</p>', 'settings');
   const ch = (id, fn) => { const e = body.querySelector('#' + id); if (e) e.onchange = (ev) => { fn(ev.target.checked !== undefined && ev.target.type === 'checkbox' ? ev.target.checked : ev.target.value); saveSettings(); }; };
-  ch('stVoice', (v) => { S.settings.voice = v; $('btnMute').classList.toggle('muted', !v); });
+  ch('stVoice', (v) => { S.settings.voice = v; if (v) unlockVoice(); $('btnMute').classList.toggle('muted', !v); });
   ch('stLimit', (v) => { S.settings.showLimit = v; updateSpeed(); });
   ch('stOverSign', (v) => { S.settings.overSign = v; updateSpeed(); });
   ch('stAhead', (v) => { S.settings.limitAhead = v; });
@@ -2796,6 +2850,9 @@ function openSettings() {
   ch('stReadMsgs', (v) => { S.settings.readMsgs = v; });
   body.querySelectorAll('#stNight button').forEach((b) => { b.onclick = () => { S.settings.night = b.dataset.v; saveSettings(); applyNight(); body.querySelectorAll('#stNight button').forEach((x) => x.classList.toggle('on', x === b)); }; });
   body.querySelectorAll('#stNavNorth button').forEach((b) => { b.onclick = () => { S.settings.navNorth = b.dataset.v === 'north'; saveSettings(); body.querySelectorAll('#stNavNorth button').forEach((x) => x.classList.toggle('on', x === b)); if (S.nav) { S.follow = true; followCam(); } updateCompass(); }; });
+  const drawCur = () => { body.querySelectorAll('#stCur button').forEach((x) => { x.classList.toggle('on', x.dataset.v === (S.settings.cursor || 'arrow')); x.firstChild.outerHTML = meHtml(x.dataset.v); }); body.querySelectorAll('#stCurCol button').forEach((x) => x.classList.toggle('on', x.dataset.c === curColor())); };
+  body.querySelectorAll('#stCur button').forEach((b) => { b.onclick = () => { S.settings.cursor = b.dataset.v; saveSettings(); drawCur(); applyCursor(); }; });
+  body.querySelectorAll('#stCurCol button').forEach((b) => { b.onclick = () => { S.settings.cursorColor = b.dataset.c; saveSettings(); drawCur(); applyCursor(); }; });
   body.querySelector('#stMapView').onclick = openMapView;
   body.querySelector('#stVeh').onclick = () => openVehicle();
   body.querySelector('#stProfile').onclick = openProfile;
@@ -2865,7 +2922,7 @@ function openK(k) {
 document.querySelectorAll('.chip[data-open]').forEach((b) => { b.onclick = () => { const k = b.dataset.open; if (!SLOTS[k]) exitSearch(); openK(k); }; });
 $('fabSearch').onclick = enterSearch;
 $('fabMenu').onclick = openMenu;
-$('qback').onclick = exitSearch;
+$('qback').onclick = () => { const fin = S.pickVia; exitSearch(); if (fin && !S.nav) chooseDestination(fin); };
 function langSeg() {
   return '<div class="seg langseg" id="langSeg" data-notr>' + Object.entries(I18N.langs).map(([k, v]) => '<button data-l="' + k + '" class="' + (k === I18N.lang ? 'on' : '') + '">' + v + '</button>').join('') + '</div>';
 }
@@ -2989,7 +3046,7 @@ if (!store.get('routa.mig096', false)) { S.settings.voice = false; S.settings.re
 if (!store.get('routa.mig0913', false)) { S.settings.traffic = true; S.settings.showPlaces = true; S.settings.showTransit = false; saveSettings(); store.set('routa.mig0913', true); }
 S.settings.mapType = 'plan';
 S.settings.relief3d = false;
-window.ROUTA = { updateSpeed, bump, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials, veh, nameOf, openDriver, startNav, openSpot, openK, overpass };
+window.ROUTA = { reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, bump, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials, veh, nameOf, openDriver, startNav, openSpot, openK, overpass };
 if (!S.me || !S.me.pseudo) onboarding(); else boot();
 
 })();
