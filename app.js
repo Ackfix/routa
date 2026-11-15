@@ -52,9 +52,25 @@ const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = se
 const BANNED_CTRL = /(radar|blitz|flash[ée]?|contr[ôo]le|kontroll|controll|polic|polizei|polizia|pol[ií]cia|flics?\b|keufs?\b|cond[ée]s?\b|gendarm|bullen|schmier|laser|r[ée]p[ée]titeur)/i;
 const ctrlBlocked = (...t) => t.some((x) => x && BANNED_CTRL.test(x));
 const ctrlSafe = (x) => (x && !BANNED_CTRL.test(x) ? x : '');
+/* Pseudos et textes publics : pas d'insultes (9 langues), pas d'adresse e-mail ni de numéro de téléphone */
+const RUDE_LONG = ['connard', 'connasse', 'salope', 'encule', 'batard', 'niquer', 'nique', 'pede', 'tapette', 'negre', 'bougnoul', 'youpin', 'couille', 'putain', 'fuck', 'bitch', 'cunt', 'nigger', 'nigga', 'faggot', 'whore', 'asshole', 'motherf', 'arschloch', 'hurensohn', 'fotze', 'schwuchtel', 'wichser', 'hitler', 'cazzo', 'stronzo', 'puttana', 'vaffanculo', 'frocio', 'troia', 'coglion', 'caralho', 'viado', 'cuzao', 'mierda', 'cabron', 'maricon', 'gilipolla', 'pendejo', 'orospu', 'siktir', 'yarrak', 'yarak', 'ibne', 'qifsha', 'pidhi', 'jebem', 'jebote', 'kurac', 'picka', 'govno', 'pizda'];
+const RUDE_SHORT = ['pd', 'fdp', 'ntm', 'amk', 'aq', 'pute', 'puta', 'shit', 'slut', 'dick', 'nazi', 'kurva', 'kurv', 'peder', 'merde', 'bite', 'chatte', 'coño', 'cono', 'foda'];
+function rudeText(x) {
+  if (!x) return false;
+  const raw = String(x);
+  if (/[^\s@]+@[^\s@]+\.[a-z]{2,}/i.test(raw) || /(\+|00)?\d[\d\s./-]{7,}\d/.test(raw)) return true;
+  const n = raw.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/0/g, 'o').replace(/[1!|]/g, 'i').replace(/3/g, 'e').replace(/4|@/g, 'a').replace(/5|\$/g, 's').replace(/7/g, 't');
+  const flat = n.replace(/[^a-z]/g, '');
+  if (RUDE_LONG.some((w) => flat.includes(w))) return true;
+  const toks = n.split(/[^a-z]+/).filter(Boolean);
+  return toks.some((t) => RUDE_SHORT.includes(t));
+}
 
 /* ======================= Icônes ======================= */
 const P = {
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>',
+  layers: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
   pin: '<path d="M12 21s-7-6.2-7-11a7 7 0 0114 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   trou: '<ellipse cx="12" cy="14" rx="8" ry="4"/><path d="M8 8l2 2M16 8l-2 2"/>',
@@ -144,7 +160,7 @@ const DIM_LABELS = [['height', 'Hauteur', 'm'], ['width', 'Largeur', 'm'], ['len
 const S = {
   me: store.get('routa.me', null),
   settings: Object.assign({ voice: false, readMsgs: true, night: 'auto', traffic: true, mapType: 'plan', relief3d: false, navNorth: false, showPlaces: true, googleLinks: true, showLimit: true, speedAlert: true, showTransit: false, showStreets: true }, store.get('routa.settings', {})),
-  vehicle: Object.assign({ type: 'voiture', dims: {}, hazmat: false }, store.get('routa.vehicle', {})),
+  vehicle: Object.assign({ type: 'voiture', dims: {}, hazmat: false }, (store.get('routa.vehicles', []) || []).find((x) => x.id === store.get('routa.vehicleId', '')) || store.get('routa.vehicle', {})),
   recents: store.get('routa.recents', []),
   lastRead: store.get('routa.lastRead', 0),
   pos: null, prevPos: null, heading: 0, speed: null, acc: null,
@@ -177,9 +193,10 @@ window.ROUTA_VCAP = vehCap;
 const capLimit = (l) => { const c = vehCap(); return l && c ? Math.min(l, c) : l; };
 function vehSummary() {
   const v = veh();
-  if (!v.heavy) return v.label;
+  const nm = [S.vehicle.brand, S.vehicle.model].filter(Boolean).join(' ');
+  if (!v.heavy) return nm || v.label;
   const d = v.dims;
-  return v.label + ' · ' + String(d.height).replace('.', ',') + ' m · ' + String(d.weight).replace('.', ',') + ' t' + (v.hazmat ? ' · ADR' : '');
+  return (nm || v.label) + ' · ' + String(d.height).replace('.', ',') + ' m · ' + String(d.weight).replace('.', ',') + ' t' + (v.hazmat ? ' · ADR' : '');
 }
 
 /* ======================= Données (Supabase ou local) ======================= */
@@ -494,7 +511,7 @@ function openMapView() {
     '<label class="switch" for="mvTransit"><span><b>Transports publics</b><br><span class="muted small">Arrêts de bus, tram, métro et gares. Touche un arrêt pour voir les lignes et les prochains départs.</span></span><input id="mvTransit" type="checkbox"' + (S.settings.showTransit ? ' checked' : '') + '></label>' +
     '<label class="switch" for="mvPlaces"><span>Afficher les établissements (restos, magasins…) en zoomant</span><input id="mvPlaces" type="checkbox"' + (S.settings.showPlaces ? ' checked' : '') + '></label>' +
     '<label class="switch" for="mvStreets"><span><b>Noms des rues</b><br><span class="muted small">Les grands axes et les villes restent toujours affichés.</span></span><input id="mvStreets" type="checkbox"' + (S.settings.showStreets === false ? '' : ' checked') + '></label>' +
-    '<h3>Couleurs</h3>' + seg('mvNight', [['auto', 'Auto'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
+    '<h3>Couleurs</h3>' + seg('mvNight', [['auto', I18N.t('Comme le téléphone')], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
     '<h3>Pendant la navigation</h3>' + seg('mvNav', [['route', 'Dans le sens de la route'], ['north', 'Nord en haut']], S.settings.navNorth ? 'north' : 'route') +
     '<div class="banner">' + ic('info') + '<span><b>Tourner la carte :</b> pose deux doigts et tourne-les (sur ordinateur : clic droit et glisser). <b>Incliner :</b> glisse deux doigts vers le haut ou le bas. La boussole montre le nord : touche-la pour remettre le nord en haut.</span></div>' +
     '<p class="muted small">Images satellite : swisstopo (Suisse), IGN (France), Sentinel-2 cloudless – EOX (monde).</p>', 'mapview');
@@ -508,13 +525,17 @@ function openMapView() {
 }
 
 function applyNight() {
+  // « auto » suit le thème clair/sombre du téléphone ; sans préférence connue, on se base sur l'heure
   const h = new Date().getHours();
-  const on = S.settings.night === 'on' || (S.settings.night === 'auto' && (h >= 19 || h < 7));
+  const mq = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+  const sys = mq && (mq.matches || matchMedia('(prefers-color-scheme: light)').matches) ? mq.matches : (h >= 19 || h < 7);
+  const on = S.settings.night === 'on' || (S.settings.night === 'auto' && sys);
   document.body.classList.toggle('night', on);
   if (document.documentElement.classList.contains('web')) { document.documentElement.classList.toggle('night-bg', on); const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = on ? '#26282C' : '#F8F4F0'; }
   $('btnNight').classList.toggle('active', S.settings.night === 'on');
 }
 setInterval(applyNight, 60000);
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyNight); } catch (e) { /* */ }
 
 /* Appui long sur la carte */
 (function longPress() {
@@ -599,7 +620,7 @@ function renderDrivers() {
   driversList().forEach((d) => {
     seen.add(d.id);
     let m = S.markers.drivers.get(d.id);
-    const lbl = esc(d.pseudo || 'Conducteur') + (d.car ? ' · ' + esc(d.car) : '');
+    const lbl = esc(rudeText(d.pseudo) ? I18N.t('Conducteur') : (d.pseudo || 'Conducteur')) + (d.car && !rudeText(d.car) ? ' · ' + esc(d.car) : '');
     if (!m) {
       const e = el('<div class="mk-driver"><div class="av"></div><div class="lbl"></div></div>');
       e.addEventListener('click', (ev) => { ev.stopPropagation(); openDriver(d.id); });
@@ -773,14 +794,17 @@ setInterval(() => {
 function updateSpeed() {
   const box = $('speedBox');
   if (S.speed == null) { box.hidden = true; $('limitSign').hidden = true; return; }
-  box.hidden = false;
+  box.hidden = S.settings.showSpeedo === false;
   const kmh = S.speed * 3.6 < 6 ? 0 : Math.round(S.speed * 3.6);
   $('speedVal').textContent = kmh;
-  const lim = S.settings.showLimit ? capLimit(S.limit) : null;
-  const sign = $('limitSign');
-  sign.hidden = !lim;
-  if (lim) sign.textContent = lim;
+  const lim = capLimit(S.limit);
   const over = !!lim && kmh > lim + 3;
+  // panneau affiché si on le demande, et toujours (réglable) quand on dépasse
+  const showSign = !!lim && (S.settings.showLimit || (over && S.settings.overSign !== false));
+  const sign = $('limitSign');
+  sign.hidden = !showSign;
+  if (showSign) sign.textContent = lim;
+  sign.classList.toggle('over', over);
   box.classList.toggle('over', over);
   if (lim && kmh > lim + 5 && S.settings.speedAlert) {
     S.overCount = (S.overCount || 0) + 1;
@@ -795,7 +819,7 @@ function updateSpeed() {
 S.trail = []; S.limit = null;
 let limitBusy = false, lastLimitAt = 0, lastLimitPos = null;
 async function speedLimitTick() {
-  if (!S.pos || !S.settings.showLimit) return;
+  if (!S.pos || !(S.settings.showLimit || S.settings.overSign !== false)) return;
   if (S.nav && S.nav.R && S.nav.R.limits) return;
   const last = S.trail[S.trail.length - 1];
   if (!last || dist(last, S.pos) > 8) { S.trail.push({ lat: S.pos.lat, lon: S.pos.lon }); if (S.trail.length > 6) S.trail.shift(); }
@@ -2319,7 +2343,9 @@ function openDriver(id) {
     '<div class="row"><div class="ico" style="background:' + esc(d.color || '#FF8A3D') + ';border-radius:22px">' + esc(initials(d.pseudo)) + '</div><div class="grow"><b>' + esc(d.car || 'Voiture inconnue') + '</b><div class="sub">' + (d.fuzzy ? 'Zone approximative · ' : '') + (d.dist != null ? fmtDist(d.dist) : '') + ' · vu ' + ago(d.updated_at) + '</div></div></div>' +
     '<button class="btn block" id="dBump">Bump</button>' +
     '<button class="btn soft block" id="dJoin">' + ic('nav') + 'Le rejoindre</button>' +
-    (isFriend ? '' : '<button class="btn ghost" id="dFriend">Demander en ami</button>'), 'driver');
+    (isFriend ? '' : '<button class="btn ghost" id="dFriend">Demander en ami</button>') +
+    '<button class="btn ghost" id="dReport">' + esc(I18N.t('Signaler ce pseudo')) + '</button>', 'driver');
+  body.querySelector('#dReport').onclick = () => openFeedback({ kind: 'autre', page: 'signalement pseudo ' + d.id, text: I18N.t('Pseudo signalé :') + ' ' + (d.pseudo || '') + (d.car ? ' (' + d.car + ')' : '') + '\n' });
   body.querySelector('#dBump').onclick = () => bump(d);
   body.querySelector('#dJoin').onclick = () => { closeSheet(); chooseDestination({ name: d.pseudo, sub: d.car || '', lat: d.vlat, lon: d.vlon }); };
   const fr = body.querySelector('#dFriend'); if (fr) fr.onclick = async () => { if (window.ROUTA_X && ROUTA_X.requestFriend) await ROUTA_X.requestFriend(d); else addFriend({ id: d.id, pseudo: d.pseudo }); openDriver(id); };
@@ -2389,35 +2415,97 @@ function addFriend(f) {
 /* ======================= Mon véhicule ======================= */
 function updateVehChip() {
   const v = veh();
-  $('vehLabel').textContent = v.label;
+  $('vehLabel').textContent = [S.vehicle.brand, S.vehicle.model].filter(Boolean).join(' ') || v.label;
   $('vehIco').innerHTML = ic(v.icon);
   document.querySelectorAll('.chip.heavy-only').forEach((c) => { c.hidden = !v.heavy; });
   document.querySelectorAll('.chip.ev-only').forEach((c) => { c.hidden = !v.ev; });
 }
-function openVehicle(after) {
-  let type = S.vehicle.type;
-  let dims = Object.assign({}, (VEHICLES[type] || {}).dims || {}, S.vehicle.dims || {});
-  let hazmat = !!S.vehicle.hazmat;
-  const body = openSheet('Mon véhicule', '<p class="muted small">Le trajet, les alertes et les lieux proposés s\'adaptent à ton véhicule.</p><div class="vehgrid" id="vehGrid">' +
-    Object.entries(VEHICLES).map(([k, v]) => '<button class="typebtn' + (k === type ? ' sel' : '') + '" data-v="' + k + '">' + ic(v.icon) + esc(v.label) + '</button>').join('') + '</div><div id="vehDims"></div>' +
-    '<button class="btn block" id="vehSave">Enregistrer</button>', 'vehicle');
+/* ======================= Ton véhicule : assistant type › marque › modèle › année › motorisation › version, plusieurs véhicules ======================= */
+const ENERGIES = [['essence', 'Essence'], ['diesel', 'Diesel'], ['hybride', 'Hybride'], ['phev', 'Hybride rechargeable'], ['electrique', 'Électrique'], ['gaz', 'Gaz (GPL, GNV)']];
+const CAR_TYPES = ['voiture', 'electrique', 'hybride'];
+function loadVehicles() {
+  let list = store.get('routa.vehicles', null);
+  if (!Array.isArray(list) || !list.length) { list = [Object.assign({ id: uuid() }, S.vehicle)]; store.set('routa.vehicles', list); }
+  return list;
+}
+function vehName(v) { return [v.brand, v.model].filter(Boolean).join(' ') || (VEHICLES[v.type] || VEHICLES.voiture).label; }
+function useVehicle(v) {
+  const list = loadVehicles(); const i = list.findIndex((x) => x.id === v.id);
+  if (i >= 0) list[i] = v; else list.push(v);
+  store.set('routa.vehicles', list); store.set('routa.vehicleId', v.id);
+  S.vehicle = v; store.set('routa.vehicle', v);
+  updateVehChip();
+}
+function openVehicle(after, editId) {
+  const list = loadVehicles();
+  const curId = store.get('routa.vehicleId', list[0].id);
+  const base = list.find((x) => x.id === (editId || curId)) || list[0];
+  const V = JSON.parse(JSON.stringify(editId === 'new' ? { id: uuid(), type: 'voiture', dims: {}, hazmat: false } : base));
+  if (!V.id) V.id = uuid();
+  const DB0 = window.ROUTA_VDB || {};
+  const kind = () => (CAR_TYPES.includes(V.type) ? 'voiture' : V.type);
+  const KINDS = Object.entries(VEHICLES).filter(([k]) => k !== 'electrique' && k !== 'hybride');
+  const opt = (v, l, sel) => '<option value="' + esc(v) + '"' + (sel ? ' selected' : '') + '>' + esc(l) + '</option>';
+  const yNow = new Date().getFullYear();
+  const body = openSheet('Ton véhicule',
+    (list.length > 1 || editId === 'new' ? '<h3>Mes véhicules</h3>' + list.map((x) => '<button class="card tap vehcard' + (x.id === V.id ? ' sel' : '') + '" data-vid="' + esc(x.id) + '"><span class="ico">' + ic((VEHICLES[x.type] || VEHICLES.voiture).icon) + '</span><span class="grow"><b>' + esc(vehName(x)) + '</b><span class="sub">' + esc([x.year, x.energy && (x.energy === 'essence' && I18N.lang !== 'fr' ? I18N.t('Essence (moteur)') : I18N.t((ENERGIES.find((e) => e[0] === x.energy) || [0, ''])[1])), x.id === curId ? I18N.t('Véhicule actif') : ''].filter(Boolean).join(' · ')) + '</span></span></button>').join('') : '') +
+    '<p class="muted small">Le trajet, les alertes et les lieux proposés s\'adaptent à ton véhicule.</p>' +
+    '<h3>Type</h3><div class="vehgrid" id="vehGrid">' + KINDS.map(([k, v]) => '<button class="typebtn' + (k === kind() ? ' sel' : '') + '" data-v="' + k + '">' + ic(v.icon) + esc(v.label) + '</button>').join('') + '</div>' +
+    '<div id="vehAsst"></div><div id="vehDims"></div>' +
+    '<button class="btn block" id="vehSave">Enregistrer</button>' +
+    '<button class="btn soft block" id="vehAdd">' + ic('plus') + 'Ajouter un autre véhicule</button>' +
+    (list.length > 1 && editId !== 'new' ? '<button class="btn ghost" id="vehDel">Retirer ce véhicule</button>' : ''), 'vehicle');
+  const drawAsst = () => {
+    const brands = Object.keys(DB0).sort((a, b) => a.localeCompare(b));
+    const models = V.brand && DB0[V.brand] ? DB0[V.brand] : [];
+    const free = V.manual || (V.brand && !DB0[V.brand]) || (V.model && models.length && !models.includes(V.model));
+    let h = '<label class="field" for="vaBrand">Marque' + (free ? '<input id="vaBrand" type="text" maxlength="30" value="' + esc(V.brand || '') + '" placeholder="Ex. : Peugeot">' : '<select id="vaBrand">' + opt('', '—', !V.brand) + brands.map((x) => opt(x, x, x === V.brand)).join('') + '</select>') + '</label>';
+    if (V.brand || free) h += '<label class="field" for="vaModel">Modèle' + (free ? '<input id="vaModel" type="text" maxlength="30" value="' + esc(V.model || '') + '" placeholder="Ex. : 2008">' : '<select id="vaModel">' + opt('', '—', !V.model) + models.map((x) => opt(x, x, x === V.model)).join('') + '</select>') + '</label>';
+    if (V.model) h += '<label class="field" for="vaYear">Année<select id="vaYear">' + opt('', '—', !V.year) + Array.from({ length: yNow - 1979 }, (_, i) => yNow + 1 - i).map((y) => opt(String(y), String(y), String(V.year) === String(y))).join('') + '</select></label>';
+    if (V.year) h += '<h3>Motorisation</h3><div class="seg energyseg" id="vaEnergy">' + ENERGIES.map(([k, l]) => '<button data-v="' + k + '" class="' + (V.energy === k ? 'on' : '') + '">' + esc(k === 'essence' && I18N.lang !== 'fr' ? I18N.t('Essence (moteur)') : I18N.t(l)) + '</button>').join('') + '</div>';
+    if (V.energy) h += '<label class="field" for="vaVersion">Version (facultatif)<input id="vaVersion" type="text" maxlength="40" value="' + esc(V.version || '') + '" placeholder="Ex. : 1.2 PureTech 130 GT"></label>';
+    h += '<p class="muted small">' + (free ? '' : '<button class="txtlink" id="vaManual">Je ne trouve pas mon véhicule</button> · ') + '<button class="txtlink" id="vaMissing">Signaler un véhicule manquant</button></p>';
+    $('vehAsst').innerHTML = h;
+    const on = (id, ev, fn) => { const e = $(id); if (e) e[ev] = fn; };
+    on('vaBrand', free ? 'oninput' : 'onchange', (e) => { V.brand = e.target.value.trim(); if (!free) { V.model = ''; V.year = ''; drawAsst(); } });
+    on('vaModel', free ? 'oninput' : 'onchange', (e) => { V.model = e.target.value.trim(); if (!free) drawAsst(); else if (V.model && !$('vaYear')) drawAsst(); });
+    on('vaYear', 'onchange', (e) => { V.year = e.target.value; drawAsst(); });
+    on('vaVersion', 'oninput', (e) => { V.version = e.target.value.trim(); });
+    on('vaManual', 'onclick', () => { V.manual = true; drawAsst(); });
+    on('vaMissing', 'onclick', () => openFeedback({ kind: 'idee', page: 'véhicule manquant', text: I18N.t('Véhicule manquant :') + ' ' + [V.brand, V.model, V.year].filter(Boolean).join(' ') }));
+    $('vehAsst').querySelectorAll('#vaEnergy button').forEach((b) => { b.onclick = () => {
+      V.energy = b.dataset.v;
+      if (CAR_TYPES.includes(V.type)) V.type = V.energy === 'electrique' ? 'electrique' : (V.energy === 'hybride' || V.energy === 'phev') ? 'hybride' : 'voiture';
+      drawAsst();
+    }; });
+  };
   const drawDims = () => {
-    const v = VEHICLES[type];
+    const v = VEHICLES[V.type] || VEHICLES.voiture;
     if (!v.heavy) { $('vehDims').innerHTML = ''; return; }
+    const dims = Object.assign({}, v.dims || {}, V.dims || {});
     $('vehDims').innerHTML = '<h3>Dimensions</h3><p class="muted small">Remplis avec les valeurs de ta carte grise ou de ton véhicule chargé.</p><div class="dimgrid">' +
       DIM_LABELS.map(([k, l, u]) => '<label class="field" for="dim_' + k + '">' + l + ' (' + u + ')<input id="dim_' + k + '" type="text" inputmode="decimal" value="' + String(dims[k] != null ? dims[k] : '').replace('.', ',') + '"></label>').join('') + '</div>' +
-      (type === 'camion' ? '<label class="switch" for="dimHaz"><span>Matières dangereuses (ADR)</span><input id="dimHaz" type="checkbox"' + (hazmat ? ' checked' : '') + '></label>' : '');
+      (V.type === 'camion' ? '<label class="switch" for="dimHaz"><span>Matières dangereuses (ADR)</span><input id="dimHaz" type="checkbox"' + (V.hazmat ? ' checked' : '') + '></label>' : '');
   };
-  drawDims();
+  drawAsst(); drawDims();
   body.querySelectorAll('#vehGrid .typebtn').forEach((b) => {
     b.onclick = () => {
-      type = b.dataset.v; dims = Object.assign({}, VEHICLES[type].dims || {});
+      const k = b.dataset.v;
+      V.type = k === 'voiture' ? (V.energy === 'electrique' ? 'electrique' : (V.energy === 'hybride' || V.energy === 'phev') ? 'hybride' : 'voiture') : k;
+      V.dims = Object.assign({}, (VEHICLES[V.type] || {}).dims || {});
       body.querySelectorAll('#vehGrid .typebtn').forEach((x) => x.classList.toggle('sel', x === b));
       drawDims();
     };
   });
+  body.querySelectorAll('[data-vid]').forEach((b) => { b.onclick = () => { const x = loadVehicles().find((y) => y.id === b.dataset.vid); if (!x) return; useVehicle(x); toast(I18N.t('Véhicule actif') + ' : <b>' + esc(vehName(x)) + '</b>'); openVehicle(after); }; });
+  body.querySelector('#vehAdd').onclick = () => openVehicle(after, 'new');
+  const del = body.querySelector('#vehDel');
+  if (del) del.onclick = () => {
+    if (!del.dataset.confirm) { del.dataset.confirm = '1'; del.textContent = I18N.t('Touche encore pour retirer ce véhicule'); return; }
+    const rest = loadVehicles().filter((x) => x.id !== V.id); store.set('routa.vehicles', rest); useVehicle(rest[0]); openVehicle(after);
+  };
   body.querySelector('#vehSave').onclick = () => {
-    const v = VEHICLES[type]; const nd = {};
+    const v = VEHICLES[V.type] || VEHICLES.voiture; const nd = {};
     if (v.heavy) {
       const lim = { height: [1.5, 5], width: [1.5, 3.5], length: [3, 30], weight: [1, 60] };
       for (const [k, l] of DIM_LABELS) {
@@ -2425,11 +2513,12 @@ function openVehicle(after) {
         if (isNaN(x) || x < lim[k][0] || x > lim[k][1]) { toast(l + ' : entre une valeur entre ' + lim[k][0] + ' et ' + lim[k][1] + '.'); return; }
         nd[k] = Math.round(x * 100) / 100;
       }
-      hazmat = type === 'camion' && $('dimHaz') ? $('dimHaz').checked : false;
-    }
-    S.vehicle = { type, dims: nd, hazmat };
-    store.set('routa.vehicle', S.vehicle);
-    updateVehChip();
+      V.hazmat = V.type === 'camion' && $('dimHaz') ? $('dimHaz').checked : false;
+    } else V.hazmat = false;
+    V.dims = nd;
+    if (ctrlBlocked(V.brand || '', (V.model || '') + ' ' + (V.version || ''))) { toast('Pas de mention de contrôles de police ou de radars : c\'est interdit en Suisse.'); return; }
+    useVehicle(V);
+    if (!S.me.car && V.model) { S.me.car = vehName(V).slice(0, 30); saveMe(); pushPresence(true); }
     toast('Véhicule : <b>' + esc(vehSummary()) + '</b>');
     closeSheet();
     if (after) after();
@@ -2614,7 +2703,7 @@ function profileForm(isNew) {
   return {
     html:
       '<label class="field" for="pfName">Pseudo<input id="pfName" type="text" maxlength="20" value="' + esc(S.me.pseudo || '') + '" placeholder="Ex. : Pilote_GT"></label>' +
-      '<label class="field" for="pfCar">Ta voiture<input id="pfCar" type="text" maxlength="30" value="' + esc(S.me.car || '') + '" placeholder="Ex. : Golf 8 GTI"></label>' +
+      '<label class="field" for="pfCar">Ton véhicule<input id="pfCar" type="text" maxlength="30" value="' + esc(S.me.car || '') + '" placeholder="Ex. : Golf 8 GTI"></label>' +
       '<h3>Qui peut me voir sur la carte ?</h3>' + visSeg('pfVis') +
       '<p class="muted small">Tes amis voient ta position exacte. Les autres voient seulement une zone d\'environ 1 km.</p>',
     bind(root) {
@@ -2624,6 +2713,7 @@ function profileForm(isNew) {
         const name = $('pfName').value.trim();
         if (name.length < 2) { toast('Choisis un pseudo d\'au moins 2 caractères.'); return false; }
         if (ctrlBlocked(name, $('pfCar').value)) { toast('Pas de mention de contrôles de police ou de radars : c\'est interdit en Suisse.'); return false; }
+        if (rudeText(name) || rudeText($('pfCar').value)) { toast(I18N.t('Choisis un pseudo correct, sans insulte, e-mail ni numéro de téléphone.')); return false; }
         S.me.pseudo = name; S.me.car = $('pfCar').value.trim(); S.me.color = color;
         saveMe(); updateVisChip(); setAvatar();
         pushPresence(true);
@@ -2634,30 +2724,21 @@ function profileForm(isNew) {
 }
 function openProfile() {
   const f = profileForm(false);
-  const body = openSheet('Mon profil', f.html +
+  const body = openSheet('Mon profil', '<button class="card tap menuprof" id="pfSettings"><span class="ico">' + ic('gear') + '</span><span class="grow"><b>' + esc(I18N.t('Réglages')) + '</b><span class="sub">' + esc(I18N.t('Navigation, carte, véhicule, notifications, confidentialité et compte')) + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' + f.html +
     '<button class="btn block" id="pfSave">Enregistrer</button>' +
     '<h3>Mon code ami</h3><div class="card"><div class="grow"><div class="code">' + esc(S.me.code) + '</div><div class="sub">Donne-le à tes potes : ils l\'entrent dans « Ajouter un ami ».</div></div><button class="iconbtn small" id="pfCopy" aria-label="Copier le code">' + ic('copy') + '</button></div>' +
     '<h3>Ajouter un ami</h3><form id="frForm" class="row"><label class="field grow" for="frCode"><span class="sr">Code ami</span><input id="frCode" type="text" maxlength="6" placeholder="Code à 6 caractères" autocapitalize="characters" autocomplete="off"></label><button class="btn" type="submit">Ajouter</button></form>' +
     ((S.me.friends || []).length ? (S.me.friends.map((fr, i) => '<div class="card"><div class="grow"><b>' + esc(fr.pseudo) + '</b><div class="sub">Peut te voir quand tu es visible</div></div><button class="iconbtn small" data-rm="' + i + '" aria-label="Retirer ' + esc(fr.pseudo) + '">' + ic('trash') + '</button></div>').join('')) : '<div class="empty">Pas encore d\'amis.</div>') +
     '<button class="btn block" id="pfFeedback">' + ic('msg') + 'Signaler un problème ou une idée</button>' +
     '<a class="btn soft block" href="aide.html" style="text-decoration:none">' + ic('info') + 'Aide et installation (iPhone, Android)</a>' +
-    '<button class="btn soft block" id="pfVeh">' + ic(veh().icon) + 'Mon véhicule : ' + esc(vehSummary()) + '</button>' +
-    '<h3>Réglages</h3>' +
-    '<label class="switch" for="stVoice"><span>Guidage vocal</span><input id="stVoice" type="checkbox"' + (S.settings.voice ? ' checked' : '') + '></label>' +
-    '<label class="switch" for="stPlaces"><span>Afficher les établissements sur la carte</span><input id="stPlaces" type="checkbox"' + (S.settings.showPlaces ? ' checked' : '') + '></label>' +
-    '<label class="switch" for="stGoogle"><span>Bouton « Voir les avis Google » sur les lieux</span><input id="stGoogle" type="checkbox"' + (S.settings.googleLinks ? ' checked' : '') + '></label>' +
-    '<label class="switch" for="stLimit"><span>Afficher la limite de vitesse (indicative)</span><input id="stLimit" type="checkbox"' + (S.settings.showLimit ? ' checked' : '') + '></label>' +
-    '<label class="switch" for="stAlert"><span>Alerte vocale si je dépasse la limite</span><input id="stAlert" type="checkbox"' + (S.settings.speedAlert ? ' checked' : '') + '></label>' +
-    '<label class="field" for="stNight">Mode nuit de la carte<select id="stNight"><option value="auto"' + (S.settings.night === 'auto' ? ' selected' : '') + '>Automatique (19 h – 7 h)</option><option value="on"' + (S.settings.night === 'on' ? ' selected' : '') + '>Toujours</option><option value="off"' + (S.settings.night === 'off' ? ' selected' : '') + '>Jamais</option></select></label>' +
-    '<label class="field" for="stUi">Taille des boutons et de l\'affichage<select id="stUi">' + [['0.85', 'Petite'], ['1', 'Normale'], ['1.15', 'Grande'], ['1.3', 'Très grande']].map(([v, l]) => '<option value="' + v + '"' + (String(+S.settings.uiSize || 1) === String(+v) ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
+    '<button class="btn soft block" id="pfVeh">' + ic(veh().icon) + esc(I18N.t('Ton véhicule')) + ' : ' + esc(vehSummary()) + '</button>' +
     '<div class="banner">' + ic('info') + '<span>' + (S.online ? 'Mode en ligne : alertes, spots, conducteurs et messages partagés.' : 'Mode solo : tes alertes et spots restent sur ce téléphone.') + ' Version ' + VERSION + '. Carte © OpenStreetMap, OpenFreeMap. Itinéraires OSRM et Valhalla. Recherche Photon.</span></div>' +
-    '<button class="btn ghost" id="pfReset">Réinitialiser mon profil sur ce téléphone</button>' +
-    '<button class="btn danger block" id="pfWipe">Supprimer mes données</button>' +
     '<p class="muted small"><a href="confidentialite.html" style="color:var(--info)">Confidentialité et règles d\'utilisation</a></p>', 'profile');
   const save = f.bind(body);
   body.querySelector('#pfSave').onclick = () => { if (save()) { toast('Profil enregistré.'); closeSheet(); } };
   body.querySelector('#pfFeedback').onclick = () => openFeedback();
   body.querySelector('#pfVeh').onclick = () => openVehicle();
+  body.querySelector('#pfSettings').onclick = () => openSettings();
   body.querySelector('#pfCopy').onclick = async () => { try { await navigator.clipboard.writeText(S.me.code); toast('Code copié.'); } catch (e) { toast('Ton code : <b>' + esc(S.me.code) + '</b>'); } };
   body.querySelector('#frForm').onsubmit = async (e) => {
     e.preventDefault();
@@ -2670,13 +2751,54 @@ function openProfile() {
     addFriend({ id: d.id, pseudo: d.pseudo }); openProfile();
   };
   body.querySelectorAll('[data-rm]').forEach((b) => { b.onclick = () => { S.me.friends.splice(+b.dataset.rm, 1); saveMe(); pushPresence(true); openProfile(); }; });
-  body.querySelector('#stVoice').onchange = (e) => { S.settings.voice = e.target.checked; saveSettings(); $('btnMute').classList.toggle('muted', !S.settings.voice); };
-  body.querySelector('#stPlaces').onchange = (e) => { S.settings.showPlaces = e.target.checked; saveSettings(); applyPlaces(); };
-  body.querySelector('#stGoogle').onchange = (e) => { S.settings.googleLinks = e.target.checked; saveSettings(); };
-  body.querySelector('#stLimit').onchange = (e) => { S.settings.showLimit = e.target.checked; saveSettings(); updateSpeed(); };
-  body.querySelector('#stAlert').onchange = (e) => { S.settings.speedAlert = e.target.checked; saveSettings(); };
-  body.querySelector('#stUi').onchange = (e) => { S.settings.uiSize = +e.target.value; saveSettings(); applyUi(); };
-  body.querySelector('#stNight').onchange = (e) => { S.settings.night = e.target.value; saveSettings(); applyNight(); };
+}
+/* ======================= Réglages (accès direct depuis « Mon profil ») ======================= */
+function openSettings() {
+  const sw = (id, label, on, sub) => '<label class="switch" for="' + id + '"><span>' + label + (sub ? '<br><span class="muted small">' + sub + '</span>' : '') + '</span><input id="' + id + '" type="checkbox"' + (on ? ' checked' : '') + '></label>';
+  const segH = (id, opts, cur) => '<div class="seg" id="' + id + '">' + opts.map(([k, v]) => '<button data-v="' + k + '" class="' + (k === cur ? 'on' : '') + '">' + esc(I18N.t(v)) + '</button>').join('') + '</div>';
+  const body = openSheet('Réglages',
+    '<h3>Navigation</h3>' +
+    sw('stVoice', 'Guidage vocal', S.settings.voice) +
+    '<p class="muted small" style="margin:0">Pendant la navigation, la carte tourne :</p>' + segH('stNavNorth', [['route', 'Dans le sens de la route'], ['north', 'Nord en haut']], S.settings.navNorth ? 'north' : 'route') +
+    sw('stLimit', 'Afficher la limite de vitesse (indicative)', S.settings.showLimit) +
+    sw('stOverSign', 'Afficher le panneau quand je dépasse la limite', S.settings.overSign !== false, 'Même si l\'affichage de la limite est coupé.') +
+    sw('stAhead', 'Prévenir à l\'avance des baisses de limitation', S.settings.limitAhead !== false, 'Un petit panneau, sans son.') +
+    sw('stAlert', 'Alerte vocale si je dépasse la limite', S.settings.speedAlert) +
+    sw('stSpeedo', 'Afficher le compteur de vitesse', S.settings.showSpeedo !== false) +
+    '<h3>Carte</h3>' +
+    '<p class="muted small" style="margin:0">Couleurs de la carte</p>' + segH('stNight', [['auto', 'Comme le téléphone'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
+    sw('stPlaces', 'Afficher les établissements sur la carte', S.settings.showPlaces) +
+    sw('stGoogle', 'Bouton « Voir les avis Google » sur les lieux', S.settings.googleLinks) +
+    '<label class="field" for="stUi">Taille des boutons et de l\'affichage<select id="stUi">' + [['0.85', 'Petite'], ['1', 'Normale'], ['1.15', 'Grande'], ['1.3', 'Très grande']].map(([v, l]) => '<option value="' + v + '"' + (String(+S.settings.uiSize || 1) === String(+v) ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
+    '<button class="btn soft block" id="stMapView">' + ic('layers') + 'Plan, satellite, trafic et transports</button>' +
+    '<h3>Véhicule</h3>' +
+    '<button class="btn soft block" id="stVeh">' + ic(veh().icon) + esc(I18N.t('Ton véhicule')) + ' : ' + esc(vehSummary()) + '</button>' +
+    '<h3>Notifications</h3>' +
+    sw('stReminders', 'Rappels d\'entretien (pneus, service, batterie)', S.settings.reminders !== false) +
+    sw('stReadMsgs', 'Lire les messages reçus à voix haute', S.settings.readMsgs) +
+    '<h3>Confidentialité et compte</h3>' +
+    '<button class="btn soft block" id="stProfile">' + ic('user') + 'Pseudo, visibilité et amis</button>' +
+    '<p class="muted small"><a href="confidentialite.html" style="color:var(--info)">Confidentialité et règles d\'utilisation</a></p>' +
+    '<button class="btn ghost" id="pfReset">Réinitialiser mon profil sur ce téléphone</button>' +
+    '<button class="btn danger block" id="pfWipe">Supprimer mes données</button>' +
+    '<p class="muted small">Version ' + VERSION + '.</p>', 'settings');
+  const ch = (id, fn) => { const e = body.querySelector('#' + id); if (e) e.onchange = (ev) => { fn(ev.target.checked !== undefined && ev.target.type === 'checkbox' ? ev.target.checked : ev.target.value); saveSettings(); }; };
+  ch('stVoice', (v) => { S.settings.voice = v; $('btnMute').classList.toggle('muted', !v); });
+  ch('stLimit', (v) => { S.settings.showLimit = v; updateSpeed(); });
+  ch('stOverSign', (v) => { S.settings.overSign = v; updateSpeed(); });
+  ch('stAhead', (v) => { S.settings.limitAhead = v; });
+  ch('stAlert', (v) => { S.settings.speedAlert = v; });
+  ch('stSpeedo', (v) => { S.settings.showSpeedo = v; updateSpeed(); });
+  ch('stPlaces', (v) => { S.settings.showPlaces = v; applyPlaces(); });
+  ch('stGoogle', (v) => { S.settings.googleLinks = v; });
+  ch('stUi', (v) => { S.settings.uiSize = +v; applyUi(); });
+  ch('stReminders', (v) => { S.settings.reminders = v; });
+  ch('stReadMsgs', (v) => { S.settings.readMsgs = v; });
+  body.querySelectorAll('#stNight button').forEach((b) => { b.onclick = () => { S.settings.night = b.dataset.v; saveSettings(); applyNight(); body.querySelectorAll('#stNight button').forEach((x) => x.classList.toggle('on', x === b)); }; });
+  body.querySelectorAll('#stNavNorth button').forEach((b) => { b.onclick = () => { S.settings.navNorth = b.dataset.v === 'north'; saveSettings(); body.querySelectorAll('#stNavNorth button').forEach((x) => x.classList.toggle('on', x === b)); if (S.nav) { S.follow = true; followCam(); } updateCompass(); }; });
+  body.querySelector('#stMapView').onclick = openMapView;
+  body.querySelector('#stVeh').onclick = () => openVehicle();
+  body.querySelector('#stProfile').onclick = openProfile;
   body.querySelector('#pfReset').onclick = () => {
     const b = body.querySelector('#pfReset');
     if (b.dataset.confirm) { try { localStorage.removeItem('routa.me'); } catch (e2) { /* */ } location.reload(); }
@@ -2776,12 +2898,11 @@ function openMenu() {
     ['Carte et routes', [
       ['favs', ic('star'), 'Favoris'],
       v.ev && X.open && ['chargers', XI.plug || ic('charge'), 'Bornes libres'],
-      XO('parkfree') && xt('parkfree'),
       ['mapview', '<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>', 'Affichage carte'],
       X.openTrips && ['trips', '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', 'Mes trajets'],
       X.openOffline && ['offline', '<svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>', 'Carte hors connexion']
     ]],
-    ['Ma voiture', [
+    ['Mes déplacements', [
       ['vehicle', ic(v.icon), 'Véhicule · ' + v.label],
       X.open && ['carnet', XI.book || ic('info'), 'Carnet du véhicule'],
       X.open && ['parked', XI.park || ic('parking'), 'Parking'],
