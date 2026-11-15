@@ -421,8 +421,8 @@ setInterval(() => {
 
 /* ======================= Navigation TomTom : trafic, alternatives, évitements, étapes ======================= */
 X.opts = store.get('routa.ropts', { tolls: false, motorways: false, vignette: false });
-X.via = []; X.viaFor = null; X.addingVia = null; X.altIdx = 0;
-let routeCache = null;
+X.via = []; X.viaFor = null; X.altIdx = 0;
+const routeCache = new Map();
 const keyOf = (p) => p ? p.lat.toFixed(4) + ',' + p.lon.toFixed(4) : '';
 const MAN = {
   STRAIGHT: ['continue', 'straight'], KEEP_RIGHT: ['fork', 'slight right'], KEEP_LEFT: ['fork', 'slight left'], BEAR_RIGHT: ['turn', 'slight right'], BEAR_LEFT: ['turn', 'slight left'],
@@ -461,15 +461,12 @@ function convertTT(rt) {
   })).filter((s) => s.lanes.some((l) => l.follow));
   return { lanes: lanes.length ? lanes : null, coords, cum, total, duration: rt.summary.travelTimeInSeconds, steps, stepEnds, limits: limits.some(Boolean) ? limits : null, tomtom: true, trafficDelay: rt.summary.trafficDelayInSeconds || 0, noTraffic: rt.summary.noTrafficTravelTimeInSeconds };
 }
-X.route = async (from, to) => {
-  if (!TT) return null;
-  if (X.addingVia) return null;
-  if (X.via.length && X.viaFor !== keyOf(to)) { X.via = []; X.viaFor = null; }
-  const vias = X.via.filter((v) => !v.done && dist(from, v) > 120);
+async function ttRoutes(from, to, vias) {
   const locs = [from].concat(vias, [to]).map((p) => p.lat.toFixed(6) + ',' + p.lon.toFixed(6)).join(':');
   const key = locs + '|' + JSON.stringify(X.opts) + '|' + JSON.stringify(A.veh ? [A.veh().type, A.veh().dims, A.veh().hazmat] : '');
   let routes;
-  if (routeCache && routeCache.key === key && Date.now() - routeCache.at < 90000) routes = routeCache.routes;
+  const hit = routeCache.get(key);
+  if (hit && Date.now() - hit.at < 90000) routes = hit.routes;
   else {
     const avoid = [];
     if (X.opts.tolls) avoid.push('tollRoads');
@@ -491,19 +488,23 @@ X.route = async (from, to) => {
     const j = await getJson(url, 9000);
     if (!j.routes || !j.routes.length) throw new Error('no route');
     routes = j.routes.map(convertTT);
-    routeCache = { key, at: Date.now(), routes };
+    routeCache.set(key, { at: Date.now(), routes });
+    if (routeCache.size > 8) routeCache.delete(routeCache.keys().next().value);
   }
+  return routes;
+}
+X.route = async (from, to) => {
+  if (!TT) return null;
+  if (X.via.length && X.viaFor !== keyOf(to)) { X.via = []; X.viaFor = null; }
+  const vias = X.via.filter((v) => !v.done && dist(from, v) > 120);
+  const routes = await ttRoutes(from, to, vias);
   const R = routes[Math.min(X.altIdx, routes.length - 1)];
   R.alts = routes.map((r) => ({ duration: r.duration, total: r.total, delay: r.trafficDelay }));
   R.altIdx = Math.min(X.altIdx, routes.length - 1);
+  R.viaCount = vias.length;
   return R;
 };
 X.preview = (R, dest, body) => {
-  if (X.addingVia) {
-    const fin = X.addingVia; X.addingVia = null;
-    X.via.push({ name: dest.name, lat: dest.lat, lon: dest.lon }); X.viaFor = keyOf(fin); X.altIdx = 0;
-    setTimeout(() => chooseDestination(fin), 50); return;
-  }
   const go = body.querySelector('#goNav'); if (!go) return;
   const box = el('<div class="routex"></div>');
   if (R.tomtom) {
@@ -524,10 +525,7 @@ X.preview = (R, dest, body) => {
     o.querySelectorAll('input').forEach((c) => { c.onchange = () => { X.opts[c.dataset.o] = c.checked; store.set('routa.ropts', X.opts); X.altIdx = 0; chooseDestination(dest); }; });
     box.appendChild(o);
   }
-  if (X.via.length && X.viaFor === keyOf(dest)) {
-    box.appendChild(el('<h3>Étapes</h3>'));
-    X.via.forEach((v, i) => { const c = el('<div class="card"><div class="ico" style="background:#4DA3FF">' + (i + 1) + '</div><div class="grow"><b>' + esc(v.name) + '</b></div><button class="iconbtn small" aria-label="Retirer">' + ic('trash') + '</button></div>'); c.querySelector('button').onclick = () => { X.via.splice(i, 1); chooseDestination(dest); }; box.appendChild(c); });
-  }
+  box.appendChild(viaBox(dest, R));
   go.parentNode.insertBefore(box, go.nextSibling);
   routeWeather(R, box);
 };
@@ -536,6 +534,111 @@ setInterval(() => {
   const v = X.via.find((x) => !x.done);
   if (v && dist(S.pos, v) < 80) { v.done = true; toast('Étape atteinte : <b>' + esc(v.name) + '</b>'); say('Étape atteinte'); }
 }, 3000);
+
+/* ======================= Étapes : restos, essence ou adresse sur le trajet, ordre, détour ======================= */
+const MAX_VIA = 5;
+const routeDest = () => (S.nav && S.nav.dest) || (S.preview && S.preview.dest) || null;
+const curRoute = () => (S.nav && S.nav.R) || (S.preview && S.preview.R) || null;
+const openVias = (d) => (d && X.via.length && X.viaFor === keyOf(d) ? X.via.filter((v) => !v.done) : []);
+function nearIdx(R, p) { let b = 0, bd = Infinity; for (let i = 0; i < R.coords.length; i += 2) { const x = dist(R.coords[i], p); if (x < bd) { bd = x; b = i; } } return b; }
+function viaChanged(d) {
+  X.altIdx = 0;
+  if (S.nav) { A.saveActiveNav(); A.reroute(); } else chooseDestination(d);
+}
+X.addVia = (p, fin) => {
+  const d = fin || routeDest(); if (!d || !p || p.lat == null) return;
+  if (X.viaFor !== keyOf(d)) { X.via = []; X.viaFor = keyOf(d); }
+  X.via = X.via.filter((v) => !v.done);
+  if (X.via.length >= MAX_VIA) { toast(esc(TRX('{n} étapes au maximum.', { n: MAX_VIA }))); return; }
+  if (dist(p, d) < 60 || X.via.some((v) => dist(v, p) < 40)) { toast(esc(TRX('Cette étape est déjà sur le trajet.'))); return; }
+  const v = { name: String(p.name || TRX('Étape')).slice(0, 60), lat: p.lat, lon: p.lon };
+  const R = curRoute();
+  let at = X.via.length;
+  if (R && R.coords && R.coords.length > 1 && X.via.length) { const k = nearIdx(R, v); const j = X.via.findIndex((x) => nearIdx(R, x) > k); if (j >= 0) at = j; }
+  X.via.splice(at, 0, v);
+  closeSheet(); A.clearPois();
+  toast(TRX('Étape ajoutée : {n}', { n: '<b>' + esc(v.name) + '</b>' }));
+  viaChanged(d);
+};
+function viaList(d, onChange) {
+  const vv = openVias(d);
+  const wrap = el('<div class="vialist"></div>');
+  if (!vv.length) { wrap.appendChild(el('<p class="muted small">' + esc(TRX('Aucune étape pour le moment.')) + '</p>')); return wrap; }
+  vv.forEach((v, i) => {
+    const c = el('<div class="card"><div class="ico" style="background:#4DA3FF">' + (i + 1) + '</div><div class="grow"><b>' + esc(v.name) + '</b></div>' +
+      '<button class="iconbtn small" data-a="up" aria-label="' + esc(TRX('Monter')) + '"' + (i === 0 ? ' disabled' : '') + '><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>' +
+      '<button class="iconbtn small" data-a="down" aria-label="' + esc(TRX('Descendre')) + '"' + (i === vv.length - 1 ? ' disabled' : '') + '><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>' +
+      '<button class="iconbtn small" data-a="rm" aria-label="' + esc(TRX('Retirer')) + '">' + ic('trash') + '</button></div>');
+    c.querySelectorAll('button').forEach((b) => { b.onclick = () => {
+      const list = X.via.filter((x) => !x.done); const k = list.indexOf(v);
+      if (b.dataset.a === 'rm') list.splice(k, 1);
+      else { const j = b.dataset.a === 'up' ? k - 1 : k + 1; if (j < 0 || j >= list.length) return; list[k] = list[j]; list[j] = v; }
+      X.via = list; onChange();
+    }; });
+    wrap.appendChild(c);
+  });
+  return wrap;
+}
+function aheadRoute() {
+  const N = S.nav; const R = N && N.R; if (!R) return curRoute();
+  const i = Math.max(0, Math.min((N.seg || 0), R.coords.length - 2));
+  return { coords: R.coords.slice(i), total: Math.max(1000, R.total - (N.along || 0)) };
+}
+function viaActions(d) {
+  const v = A.veh ? A.veh() : {};
+  const row = el('<div class="row viaact"><button class="btn soft grow" data-k="food">' + ic('food') + esc(TRX('Restos sur le trajet')) + '</button>' +
+    (v.type !== 'electrique' ? '<button class="btn soft grow" data-k="fuel">' + ic('fuel') + esc(TRX('Essence sur le trajet')) + '</button>' : '<button class="btn soft grow" data-k="charge">' + ic('charge') + esc(TRX('Bornes sur le trajet')) + '</button>') + '</div>');
+  row.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => { const R = S.nav ? aheadRoute() : curRoute(); if (!R) return; if (S.nav) closeSheet(); A.alongRoute(R, b.dataset.k); }; });
+  const add = el('<button class="btn soft block">' + ic('plus') + esc(TRX('Ajouter une adresse')) + '</button>');
+  add.onclick = () => { if (X.via.filter((x) => !x.done && X.viaFor === keyOf(d)).length >= MAX_VIA) { toast(esc(TRX('{n} étapes au maximum.', { n: MAX_VIA }))); return; } A.pickVia(d); };
+  const f = document.createDocumentFragment(); f.appendChild(row); f.appendChild(add);
+  return f;
+}
+async function showDetour(R, d, line) {
+  try {
+    if (!TT || !S.pos || !R.viaCount) return;
+    const base = (await ttRoutes(S.pos, d, []))[0];
+    const dt = R.duration - base.duration, dd = R.total - base.total;
+    line.textContent = dt < 60 && dd < 500 ? TRX('Détour négligeable') : TRX('Détour : +{t} · +{d}', { t: fmtDur(Math.max(60, dt)), d: fmtDist(Math.max(0, dd)) });
+    line.hidden = false;
+  } catch (e) { /* détour inconnu : on n'affiche rien plutôt qu'un chiffre faux */ }
+}
+function viaBox(dest, R) {
+  const box = el('<div class="viabox"><h3>' + esc(TRX('Étapes')) + '</h3></div>');
+  const vv = openVias(dest);
+  if (vv.length && !R.viaCount) box.appendChild(el('<div class="banner warnb">' + ic('info') + '<span>' + esc(TRX('Les étapes n\'ont pas pu être prises en compte pour ce calcul. Réessaie dans un instant.')) + '</span></div>'));
+  box.appendChild(viaList(dest, () => chooseDestination(dest)));
+  if (vv.length) { const line = el('<p class="muted small" hidden></p>'); box.appendChild(line); showDetour(R, dest, line); }
+  box.appendChild(viaActions(dest));
+  return box;
+}
+/* Pendant la navigation : la barre du bas ouvre le trajet (étapes, restos et essence sur la route) */
+X.openTrip = () => {
+  const N = S.nav; if (!N) return;
+  const d = N.dest;
+  const moving = (S.speed || 0) * 3.6 > 15;
+  const body = openSheet(TRX('Trajet'),
+    (moving ? '<div class="banner proto">' + ic('info') + '<span>' + esc(TRX('Au volant, ne touche pas ton téléphone : demande à un passager, utilise le micro ou arrête-toi.')) + '</span></div>' : '') +
+    '<div class="card"><div class="ico" style="background:#FF8A3D">' + IC.flag + '</div><div class="grow"><b>' + esc(d.name) + '</b><div class="sub">' + esc(($('etaMin') || {}).textContent || '') + ' ' + esc(($('etaRest') || {}).textContent || '') + '</div></div></div>' +
+    '<h3>' + esc(TRX('Étapes')) + '</h3><div id="tripVias"></div>', 'trip');
+  const draw = () => { const h = body.querySelector('#tripVias'); if (!h) return; h.innerHTML = ''; h.appendChild(viaList(d, () => { viaChanged(d); draw(); })); };
+  draw();
+  body.appendChild(viaActions(d));
+};
+setTimeout(function tripHook() {
+  const info = document.querySelector('#navBar .navbar-info'); if (!info) return;
+  info.classList.add('tripinfo'); info.setAttribute('role', 'button'); info.tabIndex = 0;
+  info.appendChild(el('<div class="tripchip">' + ic('plus') + '<span>' + esc(TRX('Étape')) + '</span></div>'));
+  info.addEventListener('click', () => X.openTrip());
+  info.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); X.openTrip(); } });
+}, 0);
+X.poiVia = (p, body) => {
+  const d = routeDest(); const go = body.querySelector('#poiGo');
+  if (!d || !go || dist(p, d) < 60) return;
+  const b = el('<button class="btn soft block" id="poiVia">' + ic('plus') + esc(TRX('Ajouter comme étape')) + '</button>');
+  b.onclick = () => X.addVia({ name: p.name, lat: p.lat, lon: p.lon }, d);
+  go.parentNode.insertBefore(b, go.nextSibling);
+};
 
 /* ======================= Voies à suivre (comme Google Maps / Waze) ======================= */
 const LANE_ROT = { STRAIGHT: 0, SLIGHT_RIGHT: 45, RIGHT: 90, SHARP_RIGHT: 135, SLIGHT_LEFT: -45, LEFT: -90, SHARP_LEFT: -135, U_TURN: 180 };
@@ -668,6 +771,7 @@ async function openChargers() {
   } catch (e) { body.innerHTML = '<div class="empty">Service de bornes indisponible pour le moment.</div>'; }
 }
 X.poiExtra = async (p, kind, body) => {
+  X.poiVia(p, body);
   if (kind !== 'charge' || !TT) return;
   const box = el('<div class="card"><div class="grow"><b>Disponibilité</b><div class="sub">Recherche…</div></div></div>');
   const go = body.querySelector('#poiGo'); if (go) go.parentNode.insertBefore(box, go); else body.appendChild(box);
