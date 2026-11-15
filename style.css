@@ -533,3 +533,22 @@ body.navigating .geochip { top: calc(var(--nbB, 150px) + 10px); }
 .txtlink { background: none; border: 0; padding: 0; color: var(--info); font: inherit; text-decoration: underline; cursor: pointer; }
 #pfSettings .ico { width: 44px; height: 44px; border-radius: 14px; background: var(--surface-2); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 #pfSettings .ico svg { width: 24px; height: 24px; color: var(--accent); }
+.tripinfo { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.tripchip { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 3px 10px 3px 6px; border-radius: 12px; background: var(--surface-2); color: var(--accent); font-size: 12px; font-weight: 600; line-height: 1.2; }
+.tripchip svg { width: 14px; height: 14px; }
+.vialist .card .iconbtn[disabled] { opacity: .3; pointer-events: none; }
+.vialist .card .iconbtn { flex-shrink: 0; }
+.viaact .btn { min-width: 0; white-space: normal; line-height: 1.2; }
+body.navigating.searching .topbar { display: flex; z-index: 30; }
+body.navigating.searching #navBanner, body.navigating.searching .lanebar { display: none; }
+.curpick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.curpick button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; border-radius: 14px; background: var(--surface-2); border: 2px solid transparent; color: var(--fg); font: inherit; font-size: 13px; min-height: 44px; }
+.curpick button.on { border-color: var(--accent); }
+.curpick .mk-me { width: 46px; height: 46px; border-radius: 23px; }
+.curpick .mk-me i { width: 30px; height: 30px; border-radius: 15px; border-width: 3px; }
+.curpick .mk-me svg { width: 14px; height: 14px; }
+.curpick .mk-me.cur-car i, .mk-me.cur-car i { border-radius: 0; }
+.mk-me.cur-car i { width: 76%; height: 76%; }
+.curcols { display: flex; flex-wrap: wrap; gap: 10px; }
+.curcols button { width: 36px; height: 36px; border-radius: 18px; border: 3px solid transparent; box-shadow: 0 0 0 1px rgba(255,255,255,.15) inset; }
+.curcols button.on { border-color: var(--fg); }
