@@ -43,6 +43,7 @@
     return Math.round(base.km + drives.reduce((s, d) => s + d.km, 0));
   }
   function smartReminders() {
+    if (S.settings && S.settings.reminders === false) return;
     const today = new Date().toISOString().slice(0, 10);
     if (store.get('routa.smartCheck', '') === today) return;
     store.set('routa.smartCheck', today);
