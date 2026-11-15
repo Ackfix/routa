@@ -1880,6 +1880,12 @@ async function fetchPlaceTags(p) {
     return els.length ? els.reduce((acc, e) => Object.assign(acc, e.tags || {}), {}) : null;
   } catch (e) { return null; }
 }
+/* Erreur de carte (adresse, lieu, entrée, sens unique, route, restriction) : passe par « Donner mon avis », avec la position */
+function mapErrBtn(body, p, name) {
+  const b = el('<button class="btn ghost" id="mapErr">' + esc(I18N.t('Signaler une erreur sur la carte')) + '</button>');
+  b.onclick = () => openFeedback({ kind: 'bug', page: 'erreur carte ' + p.lat.toFixed(5) + ',' + p.lon.toFixed(5), text: (name ? name + ' · ' : '') + p.lat.toFixed(5) + ', ' + p.lon.toFixed(5) + '\n' + I18N.t('Ce qui est faux (adresse, lieu, entrée, sens unique, route, restriction) :') + ' ' });
+  body.appendChild(b);
+}
 function openPoi(p, kind) {
   const d = S.pos ? fmtDist(dist(S.pos, p)) : '';
   let html = '<div class="row"><div class="ico" style="background:' + KIND_COLOR[kind] + '">' + ic(kind) + '</div><div class="grow"><div class="muted small">' + esc(KIND_LABEL[kind]) + (d ? ' · ' + d : '') + '</div><div>' + esc(p.details || '') + '</div>' + '</div></div>' + placeInfoHtml(p);
@@ -1901,6 +1907,7 @@ function openPoi(p, kind) {
   body.querySelector('#poiGo').onclick = () => { closeSheet(); chooseDestination({ name: p.name, sub: KIND_LABEL[kind], lat: p.lat, lon: p.lon }); };
   body.querySelector('#poiFav').onclick = () => addFav({ name: p.name, addr: p.addr || '', lat: p.lat, lon: p.lon });
   if (window.ROUTA_X && ROUTA_X.poiExtra) ROUTA_X.poiExtra(p, kind, body);
+  mapErrBtn(body, p, p.name);
   const pb = body.querySelector('#poiPrice'); if (pb) pb.onclick = () => openPriceForm(p);
 }
 /* ======================= Tous les établissements ======================= */
@@ -2228,6 +2235,7 @@ function openPoint(p) {
   body.querySelector('#ptGo').onclick = () => { closeSheet(); chooseDestination({ name: p.addr || 'Point choisi', sub: p.addr ? 'Point choisi' : p.lat.toFixed(4) + ', ' + p.lon.toFixed(4), lat: p.lat, lon: p.lon }); };
   body.querySelector('#ptFav').onclick = () => addFav({ lat: p.lat, lon: p.lon, addr: p.addr || '' });
   body.querySelector('#ptRep').onclick = () => openReport(p);
+  mapErrBtn(body, p, p.addr || '');
   body.querySelector('#ptSpot').onclick = () => openAddSpot(p);
 }
 
