@@ -62,24 +62,40 @@ Object.keys(PTS).forEach((k) => {
 });
 const origUpd = DB.updateAlert.bind(DB);
 DB.updateAlert = async (id, patch) => { const r = await origUpd(id, patch); if (patch && (patch.confirms || patch.denies)) addPoints(2); return r; };
+/* Classement : on y apparaît à partir de 100 points ; en dessous, on voit sa progression (les points restent acquis) */
+const RANK_MIN = 100;
 async function openRanking(scope) {
   scope = scope || 'all';
   const body = openSheet('Classement', '<p class="muted">Chargement…</p>', 'ranking');
-  let rows = [];
+  let rows = [], myRank = null, failed = false;
+  const mine = S.me.points || 0;
+  const friendIds = (S.me.friends || []).map((f) => f.id).concat([S.me.id]);
   if (DB.sb) {
-    const { data } = await DB.sb.from('drivers').select('id,pseudo,color,points,car').gt('points', 0).order('points', { ascending: false }).limit(50);
-    rows = data || [];
+    try {
+      let q = DB.sb.from('drivers').select('id,pseudo,color,points,car').gte('points', RANK_MIN).order('points', { ascending: false }).limit(50);
+      if (scope === 'friends') q = q.in('id', friendIds);
+      const { data, error } = await q; if (error) throw error;
+      rows = data || [];
+      if (mine >= RANK_MIN) {
+        let cq = DB.sb.from('drivers').select('id', { count: 'exact', head: true }).gt('points', mine);
+        if (scope === 'friends') cq = cq.in('id', friendIds);
+        const { count } = await cq; if (typeof count === 'number') myRank = count + 1;
+      }
+    } catch (e) { failed = true; }
   }
   if (S.sheetView !== 'ranking') return;
-  const friendIds = new Set((S.me.friends || []).map((f) => f.id).concat([S.me.id]));
-  if (scope === 'friends') rows = rows.filter((r) => friendIds.has(r.id));
-  if (!rows.some((r) => r.id === S.me.id)) rows.push({ id: S.me.id, pseudo: S.me.pseudo, color: S.me.color, points: S.me.points || 0, mine: true });
+  if (mine >= RANK_MIN && !rows.some((r) => r.id === S.me.id)) rows.push({ id: S.me.id, pseudo: S.me.pseudo, color: S.me.color, points: mine, car: S.me.car, rank: myRank });
   rows.sort((a, b) => (b.points || 0) - (a.points || 0));
-  const myRank = rows.findIndex((r) => r.id === S.me.id) + 1;
-  body.innerHTML = '<div class="seg" id="rkSeg"><button data-s="all" class="' + (scope === 'all' ? 'on' : '') + '">Tout le monde</button><button data-s="friends" class="' + (scope === 'friends' ? 'on' : '') + '">Mes amis</button></div>' +
-    '<div class="card"><div class="grow"><b>Toi : ' + (S.me.points || 0) + ' points</b><div class="sub">' + myRank + (myRank === 1 ? 'er' : 'e') + ' du classement</div></div></div>' +
-    rows.slice(0, 30).map((r, i) => '<div class="card' + (r.id === S.me.id ? ' meRow' : '') + '"><div class="rank">' + (i + 1) + '</div><div class="ico" style="background:' + esc(r.color || '#FF8A3D') + ';border-radius:22px">' + esc(initials(r.pseudo)) + '</div><div class="grow"><b>' + esc(r.pseudo || 'Conducteur') + '</b>' + (r.car ? '<div class="sub">' + esc(r.car) + '</div>' : '') + '</div><div class="val">' + (r.points || 0) + '</div></div>').join('') +
-    '<p class="muted small">Points : alerte signalée +10, alerte confirmée +2, spot ajouté +20, prix signalé +5, avis +3.</p>';
+  if (mine >= RANK_MIN && myRank == null) myRank = rows.findIndex((r) => r.id === S.me.id) + 1;
+  const pct = Math.min(100, Math.round(mine / RANK_MIN * 100));
+  const meCard = mine >= RANK_MIN
+    ? '<div class="card"><div class="grow"><b>' + esc(TRX('Toi : {n} points', { n: mine })) + '</b><div class="sub">' + esc(TRX('{r} du classement', { r: myRank + (((window.ROUTA_I18N && ROUTA_I18N.lang) || 'fr') === 'fr' ? (myRank === 1 ? 'er' : 'e') : '.') })) + '</div></div></div>'
+    : '<div class="card" style="display:block"><b>' + esc(TRX('Toi : {n} points', { n: mine })) + '</b><div class="sub">' + esc(TRX('Encore {n} points pour apparaître dans le classement.', { n: RANK_MIN - mine })) + '</div><div style="height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:8px"><i style="display:block;height:100%;width:' + pct + '%;background:var(--accent);border-radius:4px"></i></div></div>';
+  body.innerHTML = '<div class="seg" id="rkSeg"><button data-s="all" class="' + (scope === 'all' ? 'on' : '') + '">Tout le monde</button><button data-s="friends" class="' + (scope === 'friends' ? 'on' : '') + '">Mes amis</button></div>' + meCard +
+    (failed ? '<div class="empty">' + esc(TRX('Le classement n\'est pas disponible pour le moment. Réessaie plus tard.')) + '</div>'
+      : rows.length ? rows.slice(0, 50).map((r, i) => '<div class="card' + (r.id === S.me.id ? ' meRow' : '') + '"><div class="rank">' + (r.rank || i + 1) + '</div><div class="ico" style="background:' + esc(r.color || '#FF8A3D') + ';border-radius:22px">' + esc(initials(r.pseudo)) + '</div><div class="grow"><b>' + esc(r.pseudo || 'Conducteur') + '</b>' + (r.car ? '<div class="sub">' + esc(r.car) + '</div>' : '') + '</div><div class="val">' + (r.points || 0) + '</div></div>').join('')
+      : '<div class="empty">' + esc(TRX('Personne n\'a encore 100 points ici.')) + '</div>') +
+    '<p class="muted small">' + esc(TRX('On apparaît dans le classement à partir de 100 points.')) + ' Points : alerte signalée +10, alerte confirmée +2, spot ajouté +20, prix signalé +5, avis +3.</p>';
   body.querySelectorAll('#rkSeg button').forEach((b) => { b.onclick = () => openRanking(b.dataset.s); });
 }
 
@@ -550,7 +566,8 @@ function limNextBox() {
 }
 setInterval(() => {
   const N = S.nav, box = limNextBox();
-  if (!N || !N.R || !N.R.limits || !S.settings.showLimit) { box.hidden = true; limShownCur = null; return; }
+  const wantLim = S.settings.showLimit || S.settings.overSign !== false || S.settings.limitAhead !== false;
+  if (!N || !N.R || !N.R.limits || !wantLim) { box.hidden = true; limShownCur = null; return; }
   const L = N.R.limits, i = Math.max(0, Math.min(N.seg || 0, L.length - 1));
   let cur = L[i];
   if (cur == null) { for (let k = i; k >= 0 && k > i - 20; k--) if (L[k]) { cur = L[k]; break; } }
@@ -563,7 +580,9 @@ setInterval(() => {
   let j = i; while (j < L.length && (cap(L[j]) === ccur || L[j] == null)) j++;
   const d = j < L.length ? N.R.cum[j] - (N.along || 0) : Infinity;
   const nx = j < L.length ? cap(L[j]) : null;
-  if (nx && d > 0 && d < 800) {
+  // baisse de limitation à venir : affichée assez tôt selon la vitesse (environ 12 s avant), sans nouveau son
+  const ahead = Math.max(200, Math.min(900, (S.speed || 0) * 12));
+  if (S.settings.limitAhead !== false && nx && ccur && nx < ccur && d > 0 && d < ahead) {
     box.hidden = false; box.querySelector('.ln-sign').textContent = nx; box.querySelector('.ln-dist').textContent = TRX('dans {d}', { d: fmtDist(Math.round(d / 10) * 10) });
     if (ccur && nx < ccur && d < 350 && limSaidFor !== j && S.settings.speedAlert) { limSaidFor = j; say('Limitation à ' + nx + ' dans ' + (d < 100 ? 'quelques mètres' : Math.round(d / 50) * 50 + ' mètres')); }
   } else box.hidden = true;
