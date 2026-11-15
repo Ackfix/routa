@@ -814,6 +814,8 @@ async function speedLimitTick() {
     updateSpeed();
   } catch (e) { /* réseau */ } finally { clearTimeout(tm); limitBusy = false; }
 }
+/* bas du bandeau de navigation : les messages s'affichent dessous, jamais par-dessus */
+try { new ResizeObserver(() => { const b = $('navBanner'); document.documentElement.style.setProperty('--nbB', (b.hidden ? 0 : Math.round(b.getBoundingClientRect().bottom)) + 'px'); }).observe($('navBanner')); } catch (e) { /* */ }
 /* Partie de l'écran vraiment libre (sans le bandeau, la barre du bas, ni le panneau de gauche en paysage) */
 function freeArea() {
   const r = map.getContainer().getBoundingClientRect();
@@ -1134,6 +1136,7 @@ async function fetchOsrm(from, to) {
   const k = total / stepSum;
   const stepEnds = []; let acc = 0;
   steps.forEach((s) => { acc += s.distance * k; stepEnds.push(acc); });
+  steps.forEach((s) => { const m = s.maneuver; if (m && isRb(m) && m.bearing_before != null && m.bearing_after != null && m.angle == null) m.angle = ((m.bearing_after - m.bearing_before + 540) % 360) - 180; });
   return { coords, cum, total, duration: rt.duration, steps, stepEnds, raw: rt };
 }
 function drawRoute(R, doneIdx) {
@@ -1198,7 +1201,35 @@ function cancelPreview() { if (!S.nav) { S.preview = null; drawRoute(null); setD
 /* ======================= Navigation ======================= */
 const DIRS = { left: 'à gauche', right: 'à droite', 'slight left': 'légèrement à gauche', 'slight right': 'légèrement à droite', 'sharp left': 'franchement à gauche', 'sharp right': 'franchement à droite', straight: 'tout droit', uturn: 'demi-tour' };
 const ORD = ['', 'première', 'deuxième', 'troisième', 'quatrième', 'cinquième', 'sixième', 'septième', 'huitième'];
+/* Ronds-points : sens de sortie tiré du tracé, et phrase sans numéro quand les sources ne sont pas d'accord */
+const RB_TXT = {
+  fr: { right: 'Au rond-point, prenez la sortie à droite', straight: 'Au rond-point, continuez tout droit', left: 'Au rond-point, prenez la sortie à gauche', back: 'Au rond-point, faites demi-tour', on: ' sur ' },
+  en: { right: 'At the roundabout, take the exit on the right', straight: 'At the roundabout, go straight ahead', left: 'At the roundabout, take the exit on the left', back: 'At the roundabout, make a U-turn', on: ' onto ' },
+  tr: { right: 'Dönelde sağdaki çıkışı alın', straight: 'Dönelde düz devam edin', left: 'Dönelde soldaki çıkışı alın', back: 'Dönelde geri dönün', on: ', ' },
+  de: { right: 'Nimm im Kreisel die Ausfahrt rechts', straight: 'Fahre im Kreisel geradeaus', left: 'Nimm im Kreisel die Ausfahrt links', back: 'Wende im Kreisel', on: ', ' },
+  it: { right: 'Alla rotonda, prendi l\'uscita a destra', straight: 'Alla rotonda, prosegui dritto', left: 'Alla rotonda, prendi l\'uscita a sinistra', back: 'Alla rotonda, torna indietro', on: ', ' },
+  pt: { right: 'Na rotunda, sai à direita', straight: 'Na rotunda, segue em frente', left: 'Na rotunda, sai à esquerda', back: 'Na rotunda, inverte o sentido', on: ', ' },
+  es: { right: 'En la rotonda, toma la salida a la derecha', straight: 'En la rotonda, sigue recto', left: 'En la rotonda, toma la salida a la izquierda', back: 'En la rotonda, da la vuelta', on: ', ' },
+  sq: { right: 'Në rrethrrotullim, merr daljen djathtas', straight: 'Në rrethrrotullim, vazhdo drejt', left: 'Në rrethrrotullim, merr daljen majtas', back: 'Në rrethrrotullim, kthehu prapa', on: ', ' },
+  sr: { right: 'Na kružnom toku, izađi desno', straight: 'Na kružnom toku, nastavi pravo', left: 'Na kružnom toku, izađi levo', back: 'Na kružnom toku, okreni se nazad', on: ', ' }
+};
+const isRb = (m) => /roundabout|rotary/.test((m && m.type) || '');
+function rbSide(a) { return a == null ? null : Math.abs(a) <= 30 ? 'straight' : a > 30 && a <= 150 ? 'right' : a < -30 && a >= -150 ? 'left' : 'back'; }
+function rbIcon(a) {
+  // vue du dessus, circulation à droite : on entre par le bas et on tourne dans le sens inverse des aiguilles d'une montre
+  const cx = 12, cy = 11, r = 5.2;
+  if (a > 165) a -= 360; // demi-tour : on fait tout le tour
+  let span = 180 - a; if (span < 25) span = 25; if (span > 340) span = 340;
+  const pt = (phi, rad) => [cx + rad * Math.sin(phi * Math.PI / 180), cy - rad * Math.cos(phi * Math.PI / 180)];
+  const e = 180 - span, [x0, y0] = pt(180, r), [x1, y1] = pt(e, r), [x2, y2] = pt(e, r + 5.5);
+  const ux = (x2 - x1) / 5.5, uy = (y2 - y1) / 5.5, hx = x2 - ux * 2.6, hy = y2 - uy * 2.6;
+  const f = (n) => n.toFixed(2);
+  return '<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" opacity=".35"/><path d="M12 23V' + f(y0) + 'A' + r + ' ' + r + ' 0 ' + (span > 180 ? 1 : 0) + ' 0 ' + f(x1) + ' ' + f(y1) + 'L' + f(x2) + ' ' + f(y2) + '"/><path d="M' + f(hx - uy * 2.4) + ' ' + f(hy + ux * 2.4) + 'L' + f(x2) + ' ' + f(y2) + 'L' + f(hx + uy * 2.4) + ' ' + f(hy - ux * 2.4) + '"/></svg>';
+}
+function stepArrow(s) { const m = s && s.maneuver; return m && isRb(m) && m.angle != null ? rbIcon(m.angle) : ic(stepIcon(s)); }
 function stepText(s) {
+  const mm = s.maneuver || {};
+  if (isRb(mm) && mm.uncertain && rbSide(mm.angle)) { const L = RB_TXT[I18N.lang] || RB_TXT.fr; return L[rbSide(mm.angle)] + (s.name ? L.on + s.name : ''); }
   if (s.text) return s.text;
   if (I18N.lang !== 'fr' && I18N.step) return I18N.step(s);
   const m = s.maneuver || {}; const t = m.type; const mod = m.modifier || '';
@@ -1233,6 +1264,31 @@ function stepIcon(s) {
   return 'straight';
 }
 
+/* Deuxième avis sur le numéro de sortie (OpenStreetMap via Valhalla, sur le tracé exact) : en cas de désaccord, on annonce le sens sans numéro */
+async function checkRoundabouts(R) {
+  try {
+    if (!R || R.engine === 'valhalla' || R.rbChecked) return;
+    const rb = R.steps.map((s, i) => [s, i]).filter(([s]) => isRb(s.maneuver) && s.maneuver.exit && s.maneuver.location);
+    if (!rb.length) return;
+    R.rbChecked = true;
+    const lim = Math.min(R.coords.length, (R.cum.findIndex((c) => c > 60000) + 1) || R.coords.length);
+    const shape = []; let last = null;
+    for (let i = 0; i < lim; i++) { const c = R.coords[i]; if (!last || dist(last, c) > 4 || i === lim - 1) { shape.push({ lat: +c.lat.toFixed(6), lon: +c.lon.toFixed(6) }); last = c; } }
+    if (shape.length < 2 || shape.length > 6000) return;
+    const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), 12000);
+    const r = await fetch((CFG.valhallaUrl || 'https://valhalla1.openstreetmap.de') + '/trace_route', { method: 'POST', signal: ac.signal, body: JSON.stringify({ shape, costing: 'auto', shape_match: 'map_snap', directions_options: { units: 'kilometers' } }) });
+    clearTimeout(tm);
+    const j = await r.json(); const leg = j && j.trip && j.trip.legs && j.trip.legs[0]; if (!leg) return;
+    const sh = decodePoly6(leg.shape);
+    const v = leg.maneuvers.filter((m) => m.type === 26 && m.roundabout_exit_count).map((m) => ({ p: sh[Math.min(m.begin_shape_index, sh.length - 1)], n: m.roundabout_exit_count }));
+    rb.forEach(([s]) => {
+      const m = s.maneuver, at = { lat: m.location[1], lon: m.location[0] };
+      const hit = v.filter((x) => dist(x.p, at) < 45).sort((a, b) => dist(a.p, at) - dist(b.p, at))[0];
+      if (hit && hit.n !== m.exit) { m.uncertain = true; m.altExit = hit.n; }
+    });
+    if (S.nav && S.nav.R === R) navUpdate();
+  } catch (e) { /* deuxième avis indisponible : on garde l'annonce d'origine */ }
+}
 function startNav(R, dest) {
   S.preview = null;
   S.nav = { R, dest, along: 0, seg: 0, offCount: 0, lastReroute: 0, spoken: {}, startedAt: Date.now() };
@@ -1242,6 +1298,8 @@ function startNav(R, dest) {
   S.follow = true; S.puckAt = Date.now() + 1100; S.lastCam = null; $('btnLocate').classList.add('active');
   requestWake();
   drawRoute(R, 0);
+  checkRoundabouts(R);
+  saveActiveNav();
   const first = R.steps[1] || R.steps[0];
   say("C'est parti. " + stepText(R.steps[0]) + '. Puis, ' + stepText(first).toLowerCase());
   navUpdate();
@@ -1257,8 +1315,29 @@ function saveTrip(N) {
     store.set('routa.trips', t.slice(0, 50));
   } catch (e) { /* */ }
 }
+/* Reprise d'un trajet interrompu (app fermée, téléphone redémarré…) */
+function saveActiveNav() {
+  const N = S.nav; if (!N) return;
+  const X = window.ROUTA_X;
+  store.set('routa.activeNav', { dest: N.dest, via: X && X.via ? X.via.filter((v) => !v.done).map((v) => ({ name: v.name, lat: v.lat, lon: v.lon })) : [], at: Date.now() });
+}
+setInterval(() => { if (S.nav) saveActiveNav(); }, 30000);
+function offerResume() {
+  const a = store.get('routa.activeNav', null);
+  if (!a || !a.dest || S.nav || Date.now() - a.at > 3 * 3600000) { if (a) store.set('routa.activeNav', null); return; }
+  if (S.pos && dist(S.pos, a.dest) < 150) { store.set('routa.activeNav', null); return; }
+  toast(esc(I18N.t('Trajet interrompu vers {d}').replace('{d}', a.dest.name || '')), { action: I18N.t('Reprendre'), ms: 20000, onAction: () => resumeNav(a) });
+}
+async function resumeNav(a) {
+  if (!S.pos) { toast(I18N.t('Recherche de ta position…')); setTimeout(() => resumeNav(a), 3000); return; }
+  const X = window.ROUTA_X;
+  if (X && a.via && a.via.length) { X.via = a.via.map((v) => Object.assign({}, v)); X.viaFor = a.dest.lat.toFixed(4) + ',' + a.dest.lon.toFixed(4); X.altIdx = 0; }
+  try { setDestMarker(a.dest); const R = await fetchRoute(S.pos, a.dest); closeSheet(); startNav(R, a.dest); }
+  catch (e) { toast('Impossible de calculer le trajet pour le moment. Vérifie ta connexion et réessaie.'); }
+}
 function stopNav(silent) {
   if (!S.nav) return;
+  store.set('routa.activeNav', null);
   saveTrip(S.nav);
   S.nav = null;
   document.body.classList.remove('navigating');
@@ -1374,9 +1453,9 @@ function navUpdate() {
   const toNext = Math.max(0, R.stepEnds[i] - N.along);
   $('navDist').textContent = fmtDist(toNext);
   $('navInstr').textContent = stepText(next);
-  $('navArrow').innerHTML = ic(stepIcon(next));
+  $('navArrow').innerHTML = stepArrow(next);
   const after = R.steps[i + 2];
-  if (after && next && next.distance < 200) { $('navThen').hidden = false; $('navThen').innerHTML = 'Puis ' + ic(stepIcon(after)) + '<span>' + esc(stepText(after).replace(/^./, (c) => c.toLowerCase())) + '</span>'; }
+  if (after && next && next.distance < 200) { $('navThen').hidden = false; $('navThen').innerHTML = 'Puis ' + stepArrow(after) + '<span>' + esc(stepText(after).replace(/^./, (c) => c.toLowerCase())) + '</span>'; }
   else $('navThen').hidden = true;
 
   const kmh = (S.speed || 0) * 3.6;
@@ -1402,7 +1481,7 @@ async function reroute() {
     const R = await fetchRoute(S.pos, N.dest);
     if (!S.nav) return;
     Object.assign(S.nav, { R, along: 0, seg: 0, spoken: {} });
-    drawRoute(R, 0); navUpdate();
+    drawRoute(R, 0); checkRoundabouts(R); navUpdate();
   } catch (e) { toast("Impossible de recalculer pour l'instant. On réessaie."); }
 }
 function arrive() {
@@ -2773,6 +2852,7 @@ async function boot() {
   draw();
   DB.subscribe();
   pushPresence(true);
+  setTimeout(offerResume, 4000);
   if (!store.get('routa.protoSeen', false)) {
     store.set('routa.protoSeen', true);
     setTimeout(() => toast('ROUTA est un prototype : ton avis compte !', { action: 'Mon avis', onAction: () => openFeedback(), ms: 9000 }), 2500);
