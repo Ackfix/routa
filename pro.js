@@ -347,13 +347,13 @@
       '<p class="muted small" style="margin:10px 0 6px">' + esc(T('Touche les éléments pour les afficher ou les cacher.')) + '</p>' +
       '<div id="stOpts" style="display:flex;flex-wrap:wrap;gap:8px">' + opts.map(([k, l]) => '<button class="btn small soft" data-k="' + k + '" aria-pressed="' + !!SCFG[k] + '" style="min-height:40px">' + esc(T(l)) + '</button>').join('') + '</div>' +
       '<button class="btn primary block" id="stShare" style="margin-top:14px">' + esc(T('Partager')) + '</button>' +
-      '<a class="btn ghost block" id="stDl" download="routa-story.png">' + esc(T('Télécharger l\'image')) + '</a>' +
+      '<button class="btn ghost block" id="stDl">' + esc(T('Télécharger l\'image')) + '</button>' +
       '<button class="btn ghost block" id="stBack">' + esc(T('Retour')) + '</button>', 'drive');
     const img = body.querySelector('#stImg');
     const paint = (b) => { const on = SCFG[b.dataset.k]; b.setAttribute('aria-pressed', String(!!on)); b.style.background = on ? 'var(--accent)' : ''; b.style.color = on ? '#1A1205' : ''; b.style.borderColor = on ? 'var(--accent)' : ''; };
     const render = async () => {
       const v = ++ver; const cv = await drawStory(a, label, ctx, cities); if (v !== ver) return;
-      url = cv.toDataURL('image/png'); img.src = url; body.querySelector('#stDl').href = url;
+      url = cv.toDataURL('image/png'); img.src = url;
       cv.toBlob((b) => { if (v === ver) blob = b; }, 'image/png');
     };
     body.querySelectorAll('[data-k]').forEach((b) => { paint(b); b.onclick = () => { SCFG[b.dataset.k] = !SCFG[b.dataset.k]; store.set('routa.storycfg', SCFG); paint(b); render(); }; });
@@ -363,6 +363,24 @@
       const file = blob && new File([blob], 'routa-story.png', { type: 'image/png' });
       try { if (file && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'ROUTA' }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
       toast(T('Appuie longuement sur l\'image pour l\'enregistrer, puis ajoute-la à ta story Instagram.'));
+    };
+    /* Télécharger : fichier sur ordinateur et navigateur ; dans l'app, feuille de partage (« Enregistrer l'image ») */
+    body.querySelector('#stDl').onclick = async () => {
+      let b = blob; if (!b && url) { try { b = await (await fetch(url)).blob(); } catch (e) { /* */ } }
+      if (!b) return;
+      const name = 'routa-story-' + new Date().toISOString().slice(0, 10) + '.png';
+      const C = window.Capacitor, native = !!(C && C.isNativePlatform && C.isNativePlatform());
+      if (native) {
+        const file = new File([b], name, { type: 'image/png' });
+        try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+        const P = C.Plugins || {};
+        if (P.Filesystem && P.Share) { try { const w = await P.Filesystem.writeFile({ path: name, data: url.split(',')[1], directory: 'CACHE' }); await P.Share.share({ title: 'ROUTA', files: [w.uri] }); return; } catch (e) { if (e && /cancel/i.test(e.message || '')) return; } }
+        toast(T('Appuie longuement sur l\'image pour l\'enregistrer, puis ajoute-la à ta story Instagram.'));
+        return;
+      }
+      const u = URL.createObjectURL(b); const a2 = document.createElement('a');
+      a2.href = u; a2.download = name; a2.rel = 'noopener'; document.body.appendChild(a2); a2.click(); a2.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 5000);
     };
     await render();
     if (hasPos) { cities = await citiesFor(list).catch(() => ''); if (cities && S.sheetView === 'drive') render(); }
