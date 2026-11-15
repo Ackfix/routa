@@ -526,3 +526,10 @@ body.navigating .geochip { top: calc(var(--nbB, 150px) + 10px); }
 @media (orientation: landscape) and (max-height: 540px) {
   body.navigating .toasts, body.navigating .geochip { top: calc(var(--sat) + 8px); left: auto; right: calc(var(--eR) + 8px); transform: none; width: min(44vw, 400px); }
 }
+.limitsign.over { transform: scale(1.12); box-shadow: 0 0 0 6px rgba(229,72,77,.35), 0 6px 18px rgba(0,0,0,.35); transition: transform .2s, box-shadow .2s; }
+.vehcard.sel { outline: 2px solid var(--accent); }
+.energyseg { grid-auto-flow: row; grid-template-columns: repeat(3, 1fr); }
+.energyseg button { min-height: 44px; font-size: 13px; }
+.txtlink { background: none; border: 0; padding: 0; color: var(--info); font: inherit; text-decoration: underline; cursor: pointer; }
+#pfSettings .ico { width: 44px; height: 44px; border-radius: 14px; background: var(--surface-2); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+#pfSettings .ico svg { width: 24px; height: 24px; color: var(--accent); }
