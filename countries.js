@@ -86,3 +86,18 @@ window.ROUTA_COUNTRIES = {
     lim: ['30 mph (48 km/h)', '60 mph (97 km/h)', '70 mph (113 km/h)'], alc: '0,8 ‰ en Angleterre et au pays de Galles, 0,5 ‰ en Écosse', must: [], tips: ['On roule à GAUCHE', 'Congestion Charge et zone ULEZ à Londres'],
     toll: { type: 'peage', label: 'quelques péages', text: 'Pas de péage général. Dartford Crossing (Dart Charge à payer en ligne avant minuit le lendemain), autoroute M6 Toll, Congestion Charge et ULEZ à Londres.', links: [['Dart Charge', 'https://www.gov.uk/pay-dartford-crossing-charge'], ['Transport for London', 'https://tfl.gov.uk']] } }
 };
+/* Vitesses maximales propres au véhicule (km/h : localité, hors localité, autoroute). Vérifié en novembre 2026 sur les textes cités.
+   « * » = possible seulement sous conditions (homologation, équipement, poids) : l'app renvoie vers la source. Pays absent = pas encore vérifié, aucune valeur inventée. */
+window.ROUTA_VLIM = {
+  CH: { src: ['OCR art. 5', 'https://justement.ch/fr/doc/act/ch/741_11/part_1/chap_1/art_5'], pro: ['OTR 1 / OTR 2 (SECO)', 'https://www.seco.admin.ch/fr/delimitation-entre-la-loi-sur-le-travail-et-les-ordonnances-sur-les-chauffeurs'],
+    camion: () => ['50', '80', '80'], bus: () => ['50', '80', '100'], camping: (w) => (w > 3.5 ? ['50', '80', '100'] : null), remorque: () => ['50', '80', '80 · 100*'] },
+  FR: { src: ['Your Europe · France', 'https://europa.eu/youreurope/citizens/travel/driving-abroad/road-rules-and-safety/france/index_fr.htm'],
+    camion: () => ['50', '80*', '90'], bus: () => ['50', '80', '100*'] },
+  DE: { src: ['StVO § 3, § 18', 'https://www.gesetze-im-internet.de/stvo_2013/__18.html'],
+    camion: (w) => (w > 7.5 ? ['50', '60', '80'] : ['50', '80', '80']), bus: () => ['50', '80', '80 · 100*'], remorque: () => ['50', '80', '80 · 100*'] },
+  IT: { src: ['Codice della strada art. 142', 'https://www.avvocatoandreani.it/servizi/codice-della-strada/art-142-cds.html'],
+    camion: (w) => (w > 12 ? ['50', '70', '80'] : ['50', '80', '100']), bus: (w) => (w > 8 ? ['50', '80', '100'] : null), camping: (w) => (w > 3.5 && w <= 12 ? ['50', '80', '100'] : null), remorque: () => ['50', '70', '80'] },
+  AT: { src: ['ÖAMTC', 'https://www.oeamtc.at/thema/vorschriften-strafen/zulaessige-hoechstgeschwindigkeiten-in-oesterreich-16182124'],
+    camion: () => ['50', '70', '80'], bus: () => ['50', '80', '100'], camping: (w) => (w > 3.5 ? ['50', '70', '80'] : null), remorque: () => ['50', '70–100*', '80–100*'] }
+};
+window.ROUTA_PRO_EU = ['UE · 561/2006', 'https://europa.eu/youreurope/citizens/work/work-abroad/rules-working-road-transport/indexamp_fr.htm'];
