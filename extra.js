@@ -1296,7 +1296,7 @@ async function openOffline(st) {
   if (pf) pf.onsubmit = async (e) => {
     e.preventDefault(); const q = body.querySelector('#offPlace').value.trim(); if (q.length < 2) return;
     const out = body.querySelector('#offRes'); out.innerHTML = '<p class="muted small">' + esc(TRX('Chargement…')) + '</p>';
-    let r = []; try { r = (A.geoSearch ? await A.geoSearch(q, S.pos || null) : []) || []; } catch (e2) { /* */ }
+    let r = []; try { const mc = map.getCenter(); r = (A.geoSearch ? await A.geoSearch(q, S.pos || { lat: mc.lat, lon: mc.lng }, true) : []) || []; } catch (e2) { /* */ }
     out.innerHTML = r.length ? r.slice(0, 5).map((x, i) => '<button class="card tap" data-pi="' + i + '"><span class="grow"><b>' + esc(x.name) + '</b><span class="sub">' + esc(x.sub || '') + '</span></span></button>').join('') : '<div class="empty">' + esc(TRX('Aucun résultat.')) + '</div>';
     out.querySelectorAll('[data-pi]').forEach((b) => { b.onclick = () => { const x = r[+b.dataset.pi]; openOffline(Object.assign(st, { place: { name: x.name, lat: x.lat, lon: x.lon } })); }; });
   };
