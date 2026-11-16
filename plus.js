@@ -5,6 +5,7 @@
   const A = window.ROUTA, X = window.ROUTA_X;
   if (!A || !X) return;
   const { S, map, CFG, esc, el, toast, openSheet, closeSheet, dist, fmtDist, fmtDur, store, chooseDestination } = A;
+  const say = (t) => { try { A.say(t); } catch (e) { /* */ } };
   const T = (s, v) => { let o = (A.I18N && A.I18N.t) ? A.I18N.t(s) : s; if (v) Object.keys(v).forEach((k) => { o = o.split('{' + k + '}').join(v[k]); }); return o; };
   const TT = CFG.tomtomKey || '';
   const $ = (id) => document.getElementById(id);
@@ -160,6 +161,19 @@
     } catch (e) { return []; }
   }
 
+  const workRect = (w) => ({ id: 'w:' + w.id, s: w.lat - 0.003, n: w.lat + 0.003, w: w.lon - 0.0045, e: w.lon + 0.0045 });
+  function avoidBtn(label, dest, rects) {
+    const b = el('<button class="btn soft block">' + IC.work + '<span>' + esc(label) + '</span></button>');
+    b.onclick = () => {
+      let added = 0, inside = false;
+      rects.forEach((r) => { const k = X.avoidAdd(dest, r); if (k === 'ok') added++; if (k === 'inside') inside = true; });
+      if (inside && !added) { toast(esc(T('Ton départ ou ta destination est dans cette zone : impossible de l\'éviter.'))); return; }
+      if (!added) return;
+      toast(esc(T('Nouveau calcul en évitant cette zone…')));
+      X.recalc(dest);
+    };
+    return b;
+  }
   /* ---------- aperçu du trajet : ZFE, travaux, faune ---------- */
   const P = { R: null, works: [], animals: [], rest: [], restFor: null, warned: {} };
   function banner(icon, html, warn) { return el('<div class="banner' + (warn ? ' warnb' : '') + '">' + icon + '<span>' + html + '</span></div>'); }
@@ -169,11 +183,23 @@
     if (!box) { box = el('<div class="routex2" style="display:flex;flex-direction:column;gap:8px"></div>'); const ref = body.querySelector('.routex') || go; ref.parentNode.insertBefore(box, ref.nextSibling); }
     P.R = R; P.works = []; P.animals = []; P.warned = {};
     const v = A.veh ? A.veh() : {};
+    const av = X.avoidList ? X.avoidList(dest) : [];
+    if (av.length) {
+      const bx = R.avoidN ? banner(IC.work, esc(T('Itinéraire recalculé en évitant {n} zone(s).', { n: R.avoidN }))) : banner(IC.work, esc(T('Les zones à éviter n\'ont pas pu être prises en compte pour ce calcul. Réessaie dans un instant.')), true);
+      const undo = el('<button class="btn ghost">' + esc(T('Ne plus éviter')) + '</button>');
+      undo.onclick = () => { X.avoidClear(dest); X.recalc(dest); };
+      box.appendChild(bx); box.appendChild(undo);
+    }
     zfeCrossed(R).forEach((z) => {
       const head = '<b>' + esc(T('Zone à faibles émissions')) + ' : ' + esc(z.n) + '</b> · ';
       const txt = v.type === 'electrique' ? T('accès autorisé avec la vignette Crit\'Air verte.') : z.nc ? T('vignette Crit\'Air recommandée, pas de restriction annoncée pour les voitures.') : T('vignette Crit\'Air obligatoire, les véhicules les plus anciens y sont interdits.');
       const b = banner(IC.leaf, head + esc(txt) + (z.u ? ' <a href="' + esc(z.u) + '" target="_blank" rel="noopener" style="color:var(--info)">' + esc(T('Règles officielles')) + '</a>' : ''), !z.nc && v.type !== 'electrique');
       box.appendChild(b);
+      // #037 : contourner la zone si on le souhaite (rectangle autour du périmètre officiel)
+      if (X.avoidAdd) {
+        const [a, bb, c, d] = zfeBox(z);
+        box.appendChild(avoidBtn(T('Contourner cette zone'), dest, [{ id: 'zfe:' + z.n, s: bb, w: a, n: d, e: c }]));
+      }
     });
     const [works, animals] = await Promise.all([worksOnRoute(R), animalsOnRoute(R)]);
     if (P.R !== R || !box.isConnected) return;
@@ -182,6 +208,8 @@
       const closed = works.filter((w) => w.cat === 8).length;
       const lines = works.slice(0, 4).map((w) => '<br>· ' + esc(fmtDist(Math.round(w.along / 100) * 100)) + ' : ' + esc(w.cat === 8 ? T('route fermée') : T('travaux')) + (w.road ? ' ' + esc(w.road) : '') + (w.where ? ' (' + esc(w.where) + ')' : '') + (w.delay > 60 ? ' · +' + esc(fmtDur(w.delay)) : '')).join('');
       box.appendChild(banner(IC.work, '<b>' + esc(T(closed ? 'Travaux et fermetures sur le trajet' : 'Travaux sur le trajet')) + ' : ' + works.length + '</b>' + lines, closed > 0));
+      // #057 : recalculer en évitant ces endroits (données TomTom en cours, pas de suppositions)
+      if (X.avoidAdd) box.appendChild(avoidBtn(T(closed ? 'Éviter ces fermetures et travaux' : 'Éviter ces travaux'), dest, works.slice(0, 8).map(workRect)));
     }
     if (animals.length) box.appendChild(banner(IC.deer, esc(T('{n} passages d\'animaux sauvages signalés sur le trajet. Prudence surtout la nuit.', { n: animals.length }))));
   }
@@ -257,6 +285,24 @@
     if (moving && isDark()) {
       const an = (P.R === N.R ? P.animals : []).find((x) => x.along > a && x.along - a < 600 && !P.warned['a' + x.along]);
       if (an) { P.warned['a' + an.along] = 1; toast(IC.deer + ' ' + esc(T('Passage d\'animaux sauvages dans {d}. Ralentis et surveille les bas-côtés.', { d: fmtDist(Math.round((an.along - a) / 50) * 50) })), { ms: 8000 }); }
+    }
+    /* #057 · travaux et fermetures sur la suite du trajet : mis à jour toutes les 4 min et après chaque recalcul */
+    if (P.R !== N.R && now - (D.worksAt || 0) > 20000 || now - (D.worksAt || 0) > 240000) {
+      D.worksAt = now; const R0 = N.R;
+      worksOnRoute(R0).then((w) => {
+        if (S.nav && S.nav.R === R0) {
+          if (P.R !== R0) { P.R = R0; P.animals = []; }
+          P.works = w;
+          const a2 = alongNow();
+          const cl = w.find((x) => x.cat === 8 && x.along > a2 + 300 && x.along - a2 < 30000 && !P.warned['c' + x.id]);
+          if (cl && X.avoidAdd) {
+            P.warned['c' + cl.id] = 1;
+            toast(IC.work + ' ' + esc(T('Route fermée sur ton trajet dans {d}.', { d: fmtDist(Math.round((cl.along - a2) / 100) * 100) })) + (cl.where ? '<br><span class="muted small">' + esc(cl.where) + '</span>' : ''),
+              { action: T('Éviter'), onAction: () => { if (S.nav && X.avoidAdd(S.nav.dest, workRect(cl)) === 'ok') X.recalc(S.nav.dest); }, ms: 15000 });
+            say(T('Route fermée sur ton trajet dans {d}.', { d: fmtDist(Math.round((cl.along - a2) / 100) * 100) }));
+          }
+        }
+      }).catch(() => { /* trafic indisponible */ });
     }
     /* 20 · travaux : 1,5 km avant */
     const wk = (P.R === N.R ? P.works : []).find((x) => x.along > a && x.along - a < 1500 && !P.warned['w' + x.id]);

@@ -26,9 +26,12 @@ const IC = {
   flag: sv('<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>')
 };
 const nowIso = () => new Date().toISOString();
-async function getJson(url, ms) {
+async function getJson(url, ms, body) {
   const ac = new AbortController(); const t = setTimeout(() => ac.abort(), ms || 9000);
-  try { const r = await fetch(url, { signal: ac.signal }); if (!r.ok) throw new Error('http ' + r.status); return await r.json(); } finally { clearTimeout(t); }
+  try {
+    const r = await fetch(url, body ? { signal: ac.signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { signal: ac.signal });
+    if (!r.ok) throw new Error('http ' + r.status); return await r.json();
+  } finally { clearTimeout(t); }
 }
 const tt = (path, params) => 'https://api.tomtom.com' + path + '?' + new URLSearchParams(Object.assign({ key: TT }, params || {})).toString();
 const here = () => S.pos || (() => { const c = map.getCenter(); return { lat: c.lat, lon: c.lng }; })();
@@ -461,9 +464,24 @@ function convertTT(rt) {
   })).filter((s) => s.lanes.some((l) => l.follow));
   return { lanes: lanes.length ? lanes : null, coords, cum, total, duration: rt.summary.travelTimeInSeconds, steps, stepEnds, limits: limits.some(Boolean) ? limits : null, tomtom: true, trafficDelay: rt.summary.trafficDelayInSeconds || 0, noTraffic: rt.summary.noTrafficTravelTimeInSeconds };
 }
+/* Zones à éviter pour un trajet (#057 travaux et fermetures, #037 ZFE) : choisies par la personne, jamais inventées */
+X.avoid = { for: null, rects: [] };
+function avoidFor(to) { return X.avoid.for && to && X.avoid.for === keyOf(to) ? X.avoid.rects : []; }
+X.avoidAdd = (to, rect) => {
+  if (X.avoid.for !== keyOf(to)) X.avoid = { for: keyOf(to), rects: [] };
+  const inR = (p) => p && p.lat >= rect.s && p.lat <= rect.n && p.lon >= rect.w && p.lon <= rect.e;
+  if (inR(to) || inR(S.pos)) return 'inside';
+  if (X.avoid.rects.some((r) => r.id === rect.id)) return 'dup';
+  if (X.avoid.rects.length >= 10) return 'full';
+  X.avoid.rects.push(rect); X.altIdx = 0; return 'ok';
+};
+X.avoidClear = (to) => { if (!to || X.avoid.for === keyOf(to)) X.avoid = { for: null, rects: [] }; };
+X.avoidList = (to) => avoidFor(to);
+X.recalc = (d) => viaChanged(d);
 async function ttRoutes(from, to, vias) {
   const locs = [from].concat(vias, [to]).map((p) => p.lat.toFixed(6) + ',' + p.lon.toFixed(6)).join(':');
-  const key = locs + '|' + JSON.stringify(X.opts) + '|' + JSON.stringify(A.veh ? [A.veh().type, A.veh().dims, A.veh().hazmat] : '');
+  const rects = avoidFor(to);
+  const key = locs + '|' + JSON.stringify(X.opts) + '|' + JSON.stringify(A.veh ? [A.veh().type, A.veh().dims, A.veh().hazmat] : '') + '|' + JSON.stringify(rects);
   let routes;
   const hit = routeCache.get(key);
   if (hit && Date.now() - hit.at < 90000) routes = hit.routes;
@@ -485,7 +503,9 @@ async function ttRoutes(from, to, vias) {
     avoid.forEach((a) => { url += '&avoid=' + a; });
     url += '&sectionType=speedLimit&sectionType=lanes';
     if (X.opts.vignette) url += '&avoidVignette=CHE,AUT,SVN,HUN,CZE,SVK,BGR,ROU,MDA';
-    const j = await getJson(url, 9000);
+    // zones à éviter (route fermée, travaux, ZFE) : rectangles envoyés à TomTom
+    const body = rects.length ? { avoidAreas: { rectangles: rects.slice(0, 10).map((r) => ({ southWestCorner: { latitude: r.s, longitude: r.w }, northEastCorner: { latitude: r.n, longitude: r.e } })) } } : null;
+    const j = await getJson(url, 9000, body);
     if (!j.routes || !j.routes.length) throw new Error('no route');
     routes = j.routes.map(convertTT);
     routeCache.set(key, { at: Date.now(), routes });
@@ -502,6 +522,7 @@ X.route = async (from, to) => {
   R.alts = routes.map((r) => ({ duration: r.duration, total: r.total, delay: r.trafficDelay }));
   R.altIdx = Math.min(X.altIdx, routes.length - 1);
   R.viaCount = vias.length;
+  R.avoidN = avoidFor(to).length;
   return R;
 };
 X.preview = (R, dest, body) => {
@@ -884,7 +905,7 @@ setInterval(() => {
 }, 30000);
 X.arrived = (dest) => {
   if (S.pos) { saveParked(S.pos); setTimeout(() => toast('Position de ta voiture enregistrée.', { action: 'Rappel parking', onAction: openParked, ms: 8000 }), 1500); }
-  X.via = []; X.viaFor = null;
+  X.via = []; X.viaFor = null; X.avoidClear();
 };
 
 /* ======================= Installer l'app sur l'écran d'accueil ======================= */
