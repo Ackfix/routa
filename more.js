@@ -55,6 +55,13 @@
       if ((m === 10 && d >= 10) || m === 11) { store.set(wk, true); toast('<b>' + esc(T('Pneus hiver')) + '</b> : ' + esc(T('c\'est la saison. Pense à prendre rendez-vous si ce n\'est pas fait.')), { action: T('Carnet'), onAction: () => X.open && X.open('carnet'), ms: 10000 }); return; }
       if ((m === 3 && d >= 20) || m === 4) { store.set(wk, true); toast('<b>' + esc(T('Pneus été')) + '</b> : ' + esc(T('c\'est la saison. Pense à prendre rendez-vous si ce n\'est pas fait.')), { action: T('Carnet'), onAction: () => X.open && X.open('carnet'), ms: 10000 }); return; }
     }
+    // #040 batterie 12 V : un rappel discret par hiver (le froid est la première cause de panne de batterie)
+    const bk = 'routa.batt12.' + new Date().getFullYear();
+    const bDate = c.dates && c.dates.battery ? Date.parse(c.dates.battery) : 0;
+    if ((m === 11 || m === 12) && !store.get(bk, false) && !(bDate && Math.abs(bDate - Date.now()) < 120 * 86400000)) {
+      store.set(bk, true);
+      toast('<b>' + esc(T('Batterie 12 V')) + '</b> : ' + esc(T('le froid fatigue la batterie. Si elle a plusieurs années, fais-la contrôler (garage ou centre auto). Note la date dans le carnet du véhicule.')), { ms: 9000 });
+    }
     if (c.serviceKm) {
       const now = kmEstimate();
       if (now != null && c.serviceKm - now <= 500) toast('<b>' + esc(T('Service')) + '</b> : ' + esc(c.serviceKm - now <= 0 ? T('le kilométrage prévu est atteint.') : T('plus que {k} km environ.', { k: nf(c.serviceKm - now) })), { action: T('Carnet'), onAction: () => X.open && X.open('carnet'), ms: 10000 });

@@ -769,7 +769,7 @@ function renderDrivers() {
   S.markers.drivers.forEach((m, id) => { if (!seen.has(id)) { m.remove(); S.markers.drivers.delete(id); } });
   if (S.sheetView === 'drivers') openDrivers();
 }
-setInterval(renderDrivers, 30000);
+setInterval(() => { if (!document.hidden) renderDrivers(); }, 30000);
 
 /* Alertes */
 /* Modes de déplacement (#042 vélo et vélo électrique, #043 à pied et transports publics, #063 trajets plus sûrs et agréables).
@@ -788,6 +788,8 @@ function softOpts() {
   // vélo : pistes et rues calmes d'abord, mauvais revêtements évités ; à pied : trottoirs et chemins, rues éclairées le soir
   if (S.mode === 'bike') return ['bicycle', { bicycle_type: 'Hybrid', cycling_speed: 16, use_roads: 0.2, use_hills: 0.3, avoid_bad_surfaces: 0.4, use_living_streets: 0.7, use_ferry: 0.5 }];
   if (S.mode === 'ebike') return ['bicycle', { bicycle_type: 'Hybrid', cycling_speed: 22, use_roads: 0.3, use_hills: 0.8, avoid_bad_surfaces: 0.35, use_living_streets: 0.6, use_ferry: 0.5 }];
+  // #049 fauteuil roulant : profil « wheelchair » de Valhalla (évite marches et fortes pentes connues)
+  if (S.settings.wheelchair) return ['pedestrian', { type: 'wheelchair', walking_speed: 4, step_penalty: 600, use_lit: dark ? 1 : 0.3, use_ferry: 0.3 }];
   return ['pedestrian', { walking_speed: 5, walkway_factor: 0.8, sidewalk_factor: 0.8, alley_factor: 2, driveway_factor: 5, step_penalty: 10, use_lit: dark ? 1 : 0.3, max_hiking_difficulty: 1, use_ferry: 0.5 }];
 }
 function putAlert(r) { if (!r || !r.id) return; if (r.type === 'lieu_ferme') S.closed.set(r.id, r); else S.alerts.set(r.id, r); }
@@ -808,7 +810,7 @@ function renderAlerts() {
   });
   S.markers.alerts.forEach((m, id) => { if (!seen.has(id)) { m.remove(); S.markers.alerts.delete(id); } });
 }
-setInterval(renderAlerts, 60000);
+setInterval(() => { if (!document.hidden) renderAlerts(); }, 60000);
 
 /* Spots */
 function renderSpots() {
@@ -1041,6 +1043,8 @@ function pushPresence(force) {
   const now = Date.now();
   const moved = S.pos && lastPushPos ? dist(S.pos, lastPushPos) : Infinity;
   if (!force && !(now - lastPush > 4000 && moved > 15) && now - lastPush < 25000) return;
+  // #074 économie de batterie : app en arrière-plan sans navigation → présence envoyée au plus toutes les 2 min
+  if (!force && document.hidden && !S.nav && now - lastPush < 120000) return;
   lastPush = now; lastPushPos = S.pos;
   const invisible = S.me.vis === 'invisible';
   DB.presence({
@@ -1201,7 +1205,7 @@ const runSearch = debounce(async (text, full) => {
   try {
     const c = S.pos || (() => { const m = map.getCenter(); return { lat: m.lat, lon: m.lng }; })();
     const items = await geoSearch(text, c, full);
-    const ack = /(informati|ordinateur|ordi\b|\bpc\b|\bmac\b|macbook|laptop|portable|computer|r[ée]paration|d[ée]pann|ackfix|bilgisayar|tamir)/i.test(text) && inVaud(c) ? [{ name: 'ACKFIX', sub: 'Dépannage PC et Mac · tout le Canton de Vaud', ackfix: true, nodist: true }] : [];
+    const ack = []; // #017 : plus de publicité de réparation informatique dans la recherche
     const spotHits = [...S.spots.values()].filter((s) => s.name.toLowerCase().includes(text.toLowerCase())).slice(0, 3).map((s) => ({ name: s.name, sub: 'Spot · ' + (SPOT_CATS[s.category] || ''), lat: s.lat, lon: s.lon, spot: true }));
     showResults(ack.concat(spotHits, items));
   } catch (e) {
@@ -1440,6 +1444,11 @@ async function chooseDestination(dest) {
     body.insertBefore(modeSeg(dest), body.firstChild);
     body.querySelector('#goNav').onclick = () => { closeSheet(); startNav(R, dest); };
     const cv = body.querySelector('#chgVeh'); if (cv) cv.onclick = () => openVehicle(() => chooseDestination(dest));
+    if (S.mode === 'walk') {
+      const wc = el('<div><label class="switch" for="pvWheel"><span><b>' + esc(I18N.t('Accessible en fauteuil roulant')) + '</b><br><span class="muted small">' + esc(I18N.t('Évite les marches et les fortes pentes connues. Les données d\'accessibilité peuvent être incomplètes : vérifie sur place.')) + '</span></span><input id="pvWheel" type="checkbox"' + (S.settings.wheelchair ? ' checked' : '') + '></label></div>');
+      body.appendChild(wc);
+      wc.querySelector('#pvWheel').onchange = (e) => { S.settings.wheelchair = e.target.checked; saveSettings(); chooseDestination(dest); };
+    }
     if (softMode()) return;
     routeCountries(R, dest);
     if (window.ROUTA_X && ROUTA_X.preview) ROUTA_X.preview(R, dest, body);
@@ -1753,7 +1762,7 @@ async function reroute() {
 }
 function arrive() {
   const name = S.nav.dest.name;
-  const arrDest = S.nav.dest;
+  const arrDest = Object.assign({}, S.nav.dest, { mode: S.nav.mode || 'car' });
   say('Vous êtes arrivé.');
   S.nav.arrived = true;
   stopNav(true);
@@ -3245,14 +3254,16 @@ function openMenu() {
       ['restrictions', '<svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M6 20V9l6-5 6 5v11"/><path d="M12 9v6M9 12h6"/></svg>', 'Restrictions autour']
     ]]
   ];
-  const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + t[1] + '<span>' + t[2] + '</span></button>';
+  // #008 : fonctions classées Premium (étiquette seulement pendant les tests, rien n'est verrouillé)
+  const PREM_TILES = ['plan'];
+  const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + (PREM_TILES.includes(t[0]) ? '<i class="prem tileprem">Premium</i>' : '') + t[1] + '<span>' + t[2] + '</span></button>';
   const body = openSheet('Menu',
     '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     '<button class="card tap menusos" data-k="country"><span class="sosdot big">SOS</span><span class="grow"><b>Urgences et infos pays</b><span class="sub">' + ($('ctryLabel').textContent === 'Infos pays' ? 'Numéros d\'urgence, règles, vignettes' : esc($('ctryLabel').textContent)) + '</span></span></button>' +
     '<button class="card tap menufb" data-k="feedback"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg></span><span class="grow"><b>Donner mon avis</b><span class="sub">Un bug, un truc pas clair, une idée : dis-le-nous</span></span></button>' +
-    groups.map(([g, ts]) => { const list = ts.filter(Boolean); if (!list.length) return ''; return '<h3 class="menuh' + (g === 'Pro' ? ' menupro' : '') + '">' + (g === 'Pro' ? '<span class="probadge">PRO</span> ' + esc(I18N.t('Outils pour les professionnels de la route')) : g) + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
+    groups.map(([g, ts]) => { const list = ts.filter(Boolean); if (!list.length) return ''; return '<h3 class="menuh' + (g === 'Pro' ? ' menupro' : '') + '">' + (g === 'Pro' ? esc(I18N.t('Outils pour les professionnels de la route')) : g) + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
     '<div class="menulinks">' + (X.canInstall && X.canInstall() ? '<button data-k="install">Installer l\'app</button>' : '') + '<button data-k="share">Partager ROUTA</button><button data-k="help">Aide</button><button data-k="privacy">Confidentialité</button></div>' +
-    '<a class="menusig" href="https://ackfix.com" target="_blank" rel="noopener">ROUTA par <b>ACKFIX</b> · Informatique, simplement.<br><span>Dépannage PC et Mac dans tout le Canton de Vaud</span></a>' +
+    '<p class="menusig">ROUTA par <b>ACKFIX</b></p>' +
     langSeg(), 'menu');
   body.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => openK(b.dataset.k); });
   bindLangSeg(body);

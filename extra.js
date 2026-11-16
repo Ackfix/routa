@@ -548,6 +548,7 @@ X.preview = (R, dest, body) => {
     box.appendChild(o);
   }
   box.appendChild(viaBox(dest, R));
+  if (!/parking/i.test(dest.sub || '')) { const pb = el('<button class="btn soft block">' + ic('parking') + esc(TRX('Parkings près de la destination')) + '</button>'); pb.onclick = () => X.parkingsNear(dest); box.appendChild(pb); }
   go.parentNode.insertBefore(box, go.nextSibling);
   routeWeather(R, box);
 };
@@ -833,7 +834,7 @@ async function openFreeParking() {
 /* ======================= Carnet de la voiture ======================= */
 let carnet = store.get('routa.carnet', { dates: {}, fills: [] });
 const saveCarnet = () => store.set('routa.carnet', carnet);
-const DUE = [['expertise', 'Expertise (contrôle technique)'], ['service', 'Prochain service'], ['tyres', 'Changement de pneus'], ['insurance', 'Assurance'], ['vignette', 'Vignette'], ['other', 'Autre rappel']];
+const DUE = [['expertise', 'Expertise (contrôle technique)'], ['service', 'Prochain service'], ['tyres', 'Changement de pneus'], ['battery', 'Batterie 12 V (contrôle ou remplacement)'], ['insurance', 'Assurance'], ['vignette', 'Vignette'], ['other', 'Autre rappel']];
 function consumption() {
   const f = carnet.fills.filter((x) => x.km && x.liters).sort((a, b) => a.km - b.km);
   if (f.length < 2) return null;
@@ -904,9 +905,37 @@ setInterval(() => {
   }
 }, 30000);
 X.arrived = (dest) => {
-  if (S.pos) { saveParked(S.pos); setTimeout(() => toast('Position de ta voiture enregistrée.', { action: 'Rappel parking', onAction: openParked, ms: 8000 }), 1500); }
+  // voiture garée seulement après un trajet en voiture (pas à pied ni à vélo)
+  if (S.pos && (!dest || !dest.mode || dest.mode === 'car')) { saveParked(S.pos); setTimeout(() => toast('Position de ta voiture enregistrée.', { action: 'Rappel parking', onAction: openParked, ms: 8000 }), 1500); }
   X.via = []; X.viaFor = null; X.avoidClear();
 };
+
+/* ======================= #048 Parkings près de la destination (OpenStreetMap, sans inventer de prix ni de places) ======================= */
+X.parkingsNear = async (dest) => {
+  const body = openSheet(TRX('Parkings près de la destination'), '<p class="muted">' + esc(TRX('Recherche des parkings…')) + '</p>', 'parkdest');
+  let els = [];
+  try { els = await A.overpass('[out:json][timeout:20];nwr["amenity"="parking"]["access"!~"private|customers|no"](around:700,' + dest.lat.toFixed(5) + ',' + dest.lon.toFixed(5) + ');out center 60;'); } catch (e) { els = null; }
+  if (S.sheetView !== 'parkdest') return;
+  if (!els) { body.innerHTML = '<p class="muted">' + esc(TRX('Données indisponibles pour le moment. Réessaie plus tard.')) + '</p>'; return; }
+  const list = els.map((e) => { const c = e.center || e; const t = e.tags || {}; return { name: t.name || (t.parking === 'underground' ? TRX('Parking souterrain') : t.parking === 'multi-storey' ? TRX('Parking couvert') : TRX('Parking')), lat: c.lat, lon: c.lon, t }; })
+    .filter((p) => p.lat != null).map((p) => Object.assign(p, { d: dist(p, dest) })).sort((a, b) => a.d - b.d).slice(0, 12);
+  if (!list.length) { body.innerHTML = '<p class="muted">' + esc(TRX('Aucun parking public connu à moins de 700 m.')) + '</p>'; return; }
+  body.innerHTML = list.map((p, i) => {
+    const t = p.t, info = [];
+    if (t.fee === 'yes') info.push(TRX('Payant')); else if (t.fee === 'no') info.push(TRX('Gratuit'));
+    if (t.capacity && /^\d+$/.test(t.capacity)) info.push(TRX('{n} places', { n: t.capacity }));
+    if (t['capacity:disabled'] && t['capacity:disabled'] !== 'no') info.push(TRX('Places PMR'));
+    if (t.maxstay) info.push(TRX('Durée max : {d}', { d: t.maxstay }));
+    return '<button class="card tap" data-i="' + i + '"><span class="ico" style="background:#1E4FD8">' + ic('parking') + '</span><span class="grow"><b>' + esc(p.name) + '</b><span class="sub">' + esc(TRX('{m} min à pied de la destination', { m: Math.max(1, Math.round(p.d / 75)) })) + (info.length ? ' · ' + esc(info.join(' · ')) : '') + '</span></span></button>';
+  }).join('') + '<p class="muted small">' + esc(TRX('Source : OpenStreetMap. Vérifie les tarifs et horaires sur place.')) + '</p>';
+  body.querySelectorAll('[data-i]').forEach((b) => { b.onclick = () => { const p = list[+b.dataset.i]; chooseDestination({ name: p.name, sub: TRX('Parking près de {d}', { d: dest.name }), lat: p.lat, lon: p.lon }); }; });
+};
+/* En voiture, à l'approche de la destination : proposer une seule fois les parkings proches (visuel, sans son) */
+setInterval(() => {
+  const N = S.nav; if (!N || (N.mode && N.mode !== 'car') || N.parkHint || !N.R || !S.pos) return;
+  const left = N.R.total - (N.along || 0);
+  if (left > 0 && left < 900 && !/parking/i.test(N.dest.sub || '')) { N.parkHint = true; toast(esc(TRX('Bientôt arrivé : parkings près de ta destination ?')), { action: TRX('Voir'), onAction: () => X.parkingsNear(N.dest), ms: 10000 }); }
+}, 5000);
 
 /* ======================= Installer l'app sur l'écran d'accueil ======================= */
 let installEvt = null;
