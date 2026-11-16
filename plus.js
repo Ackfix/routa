@@ -354,7 +354,6 @@
     }
     /* 20 · travaux : 1,5 km avant */
     const wk = (P.R === N.R ? P.works : []).find((x) => x.cat !== 8 && x.along > a && x.along - a < 800 && !P.warned['w' + x.id]);
-    if (wk) { P.warned['w' + wk.id] = 1; toast(IC.work + ' ' + esc(T('Travaux dans {d}', { d: fmtDist(Math.round((wk.along - a) / 100) * 100) })), { ms: 5000 }); }
     if (wk) { P.warned['w' + wk.id] = 1; toast(IC.work + ' ' + esc(T(wk.cat === 8 ? 'Route fermée dans {d}' : 'Travaux dans {d}', { d: fmtDist(Math.round((wk.along - a) / 100) * 100) })) + (wk.where ? '<br><span class="muted small">' + esc(wk.where) + '</span>' : ''), { ms: 8000 }); }
     /* 5 · verglas : toutes les 15 min en hiver */
     if (now - D.iceAt > 15 * 60000) { D.iceAt = now; const m = new Date().getMonth(); if (m >= 9 || m <= 4) iceCheck(); }
