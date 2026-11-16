@@ -610,3 +610,8 @@ body.navsoft .tripchip { display: none; }
 #licCats { flex-wrap: wrap; overflow: visible; margin-right: 0; padding-right: 0; }
 #licCats .chip { box-shadow: none; border: 1px solid var(--line); height: 36px; min-width: 48px; justify-content: center; }
 #licCats .chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+/* #030 météo détaillée */
+.wxmore { display: block; margin-top: 6px; padding: 0; border: 0; background: none; color: var(--info); font-weight: 700; font-size: 13px; text-align: left; }
+.card.wxwarn { box-shadow: inset 3px 0 0 var(--warn, #F5C542); }
+#wxOff { margin-bottom: 10px; }
+#wxOff button { font-size: 12.5px; }

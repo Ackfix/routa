@@ -736,9 +736,39 @@ async function routeWeather(R, box) {
     const snow = w.some((x) => (x.current.snowfall || 0) > 0 || /Neige/.test(WMO(x.current.weather_code)));
     const ice = min <= 1;
     const html = '<div class="banner' + (snow || ice ? ' warnb' : '') + '">' + IC.mount + '<span><b>Météo sur le trajet :</b> ' + Math.round(min) + '° à ' + Math.round(max) + '°, ' + WMO(w[w.length - 1].current.weather_code).toLowerCase() + ' à l\'arrivée.' + (snow ? ' <b>Neige sur une partie du trajet.</b>' : ice ? ' <b>Risque de verglas.</b>' : '') + '</span></div>';
-    box.insertBefore(el(html), box.firstChild);
+    const node = el(html); const more = el('<button class="linkbtn wxmore">' + esc(TRX('Météo détaillée aux heures de passage')) + ' <span class="prem">Premium</span></button>');
+    more.onclick = () => X.routeWeatherDetail(R); node.querySelector('span').appendChild(more);
+    box.insertBefore(node, box.firstChild);
   } catch (e) { /* météo indisponible */ }
 }
+/* #030 (Premium, étiquette seulement) : prévision horaire aux lieux et heures de passage, avec probabilité de pluie */
+X.routeWeatherDetail = async (R, offH) => {
+  offH = offH || 0;
+  const body = openSheet(TRX('Météo sur le trajet'), '<p class="muted">' + esc(TRX('Chargement…')) + '</p>', 'wxroute');
+  const C = R.coords, cum = [0];
+  for (let i = 1; i < C.length; i++) cum.push(cum[i - 1] + dist(C[i - 1], C[i]));
+  const tot = cum[cum.length - 1] || 1, n = R.total > 150000 ? 7 : 5, pts = [];
+  for (let k = 0; k <= n; k++) { const target = tot * k / n; let i = cum.findIndex((d) => d >= target); if (i < 0) i = C.length - 1; pts.push({ lat: C[i].lat, lon: C[i].lon, km: R.total * k / n, t: Date.now() + offH * 3600000 + (R.duration || 0) * 1000 * k / n }); }
+  let w;
+  try {
+    const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + pts.map((p) => p.lat.toFixed(3)).join(',') + '&longitude=' + pts.map((p) => p.lon.toFixed(3)).join(',') + '&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_gusts_10m,snowfall&forecast_days=3&timeformat=unixtime';
+    w = await getJson(u, 10000); if (!Array.isArray(w)) w = [w];
+  } catch (e) { w = null; }
+  if (S.sheetView !== 'wxroute') return;
+  const seg = '<div class="seg" id="wxOff">' + [0, 1, 3, 6].map((h) => '<button data-h="' + h + '"' + (h === offH ? ' class="on"' : '') + '>' + esc(h ? TRX('Départ dans {h} h', { h }) : TRX('Départ maintenant')) + '</button>').join('') + '</div>';
+  if (!w) { body.innerHTML = seg + '<p class="muted">' + esc(TRX('Données indisponibles pour le moment. Réessaie plus tard.')) + '</p>'; }
+  else {
+    body.innerHTML = seg + pts.map((p, k) => {
+      const h = w[k] && w[k].hourly; if (!h) return '';
+      const ts = p.t / 1000; let j = 0, best = Infinity; h.time.forEach((t, i) => { const d = Math.abs(t - ts); if (d < best) { best = d; j = i; } });
+      const code = h.weather_code[j], pp = h.precipitation_probability[j], gust = h.wind_gusts_10m[j], tmp = h.temperature_2m[j], snow = h.snowfall[j] > 0 || (code >= 71 && code <= 77) || code === 85 || code === 86;
+      const warn = snow || tmp <= 1 || gust >= 70 || code >= 95;
+      const when = new Date(p.t).toLocaleTimeString(I18N.lang === 'en' ? 'en-GB' : I18N.lang, { hour: '2-digit', minute: '2-digit' });
+      return '<div class="card' + (warn ? ' wxwarn' : '') + '"><div class="grow"><b>' + (k === 0 ? esc(TRX('Départ')) : k === n ? esc(TRX('Arrivée')) : 'km ' + Math.round(p.km / 1000)) + ' · ' + when + '</b><div class="sub">' + esc(I18N.t(WMO(code))) + ' · ' + esc(TRX('Pluie : {p} % de probabilité', { p: pp == null ? '?' : pp })) + ' · ' + esc(TRX('Rafales {v} km/h', { v: Math.round(gust || 0) })) + (snow ? ' · <b>' + esc(TRX('Neige')) + '</b>' : tmp <= 1 ? ' · <b>' + esc(TRX('Risque de verglas')) + '</b>' : '') + '</div></div><div class="val">' + Math.round(tmp) + '°</div></div>';
+    }).join('') + '<p class="muted small">' + esc(TRX('Prévisions Open-Meteo, heure par heure. Plus l\'heure de passage est lointaine, plus la prévision est incertaine. Les heures de passage sont estimées à partir de la durée du trajet.')) + '</p>';
+  }
+  body.querySelectorAll('#wxOff button').forEach((b) => { b.onclick = () => X.routeWeatherDetail(R, +b.dataset.h); });
+};
 async function closureNear(p) {
   if (!TT) return null;
   const d = 0.03;
