@@ -766,3 +766,8 @@ body.hzfar .hzmk { display: none; }
 body:has(#geoChip:not([hidden])):not(.navigating) .toasts { top: calc(var(--sat) + 136px); }
 @media (orientation: portrait) { body.navigating:has(#geoChip:not([hidden])) .toasts { top: calc(var(--nbB, 150px) + 52px); } }
 .seg.wrap2 { flex-wrap: wrap; } .seg.wrap2 button { flex: 1 1 45%; }
+/* Entretien : une ligne par rappel, date modifiable sur place */
+.remrow { gap: 10px; }
+.remrow .remdate { width: 132px; flex: 0 0 auto; min-height: 40px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line, rgba(255,255,255,.12)); background: var(--bg); color: var(--fg); font: inherit; font-size: 14px; }
+.remrow .remcal { flex: 0 0 auto; }
+@media (max-width: 380px) { .remrow { flex-wrap: wrap; } .remrow .remdate { width: auto; flex: 1 1 auto; } }

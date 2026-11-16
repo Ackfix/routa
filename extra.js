@@ -980,24 +980,56 @@ function carnetInto(root) {
   if (!root) return;
   const cons = consumption();
   const spent = carnet.fills.reduce((s, x) => s + (x.price || 0), 0);
+  const LG = () => { const l = (window.ROUTA_I18N && ROUTA_I18N.lang) || 'fr'; return l === 'en' ? 'en-GB' : l === 'sr' ? 'sr-Latn' : l; };
+  const daysTo = (v) => Math.ceil((Date.parse(v + 'T12:00') - Date.now()) / 86400000);
+  const state = (v) => { if (!v) return '<span class="muted">' + esc(TRX('Pas de date')) + '</span>'; const d = daysTo(v); return '<span class="pill ' + (d <= 30 ? 'warn' : 'ok') + '">' + esc(d < 0 ? TRX('dépassé') : TRX('dans {n} j', { n: d })) + '</span>'; };
+  const hasAny = () => DUE.some(([k]) => carnet.dates[k]);
   root.innerHTML = '<h3>' + esc(TRX('Entretien et suivi')) + '</h3>' +
-    '<h3>' + esc(TRX('Rappels')) + '</h3>' + DUE.map(([k, l]) => { const v = carnet.dates[k] || ''; const days = v ? Math.ceil((Date.parse(v) - Date.now()) / 86400000) : null; return '<label class="field" for="cd_' + k + '">' + l + (days != null ? ' <span class="pill ' + (days < 0 ? 'warn' : days <= 30 ? 'warn' : 'ok') + '">' + (days < 0 ? 'dépassé' : 'dans ' + days + ' j') + '</span>' : '') + '<input id="cd_' + k + '" type="date" value="' + esc(v) + '"></label>'; }).join('') +
-    '<button class="btn soft block" id="cdIcs">' + IC.event + 'Ajouter les rappels au calendrier</button>' +
-    '<h3>Pleins</h3>' +
-    '<div class="row"><label class="field grow" for="fKm">Km au compteur<input id="fKm" type="number" inputmode="numeric"></label><label class="field grow" for="fL">Litres<input id="fL" type="number" step="0.01" inputmode="decimal"></label><label class="field grow" for="fP">Prix total<input id="fP" type="number" step="0.05" inputmode="decimal"></label></div>' +
-    '<button class="btn block" id="fAdd">Ajouter le plein</button>' +
-    (cons ? '<div class="card"><div class="grow"><b>Consommation moyenne : ' + cons.toFixed(1) + ' L/100 km</b><div class="sub">' + carnet.fills.length + ' pleins · ' + spent.toFixed(2) + ' au total</div></div></div>' : '<p class="muted small">Note au moins deux pleins (en faisant le plein complet) pour calculer ta consommation.</p>') +
-    carnet.fills.slice(-8).reverse().map((f) => '<div class="card"><div class="grow"><b>' + (f.liters || '?') + ' L · ' + (f.price != null ? f.price.toFixed(2) : '?') + '</b><div class="sub">' + new Date(f.date).toLocaleDateString('fr-CH') + (f.km ? ' · ' + f.km + ' km' : '') + '</div></div></div>').join('') +
+    '<p class="muted small" style="margin:0">' + esc(TRX('Touche une date pour la changer. Tout est enregistré tout de suite.')) + '</p>' +
+    DUE.map(([k, l]) => '<div class="card remrow"><div class="grow"><b>' + esc(TRX(l)) + '</b><div class="sub" id="rs_' + k + '">' + state(carnet.dates[k] || '') + '</div></div>' +
+      '<input class="remdate" id="cd_' + k + '" type="date" value="' + esc(carnet.dates[k] || '') + '" aria-label="' + esc(TRX(l)) + '">' +
+      '<button class="iconbtn small remcal" data-cal="' + k + '" aria-label="' + esc(TRX('Ajouter au calendrier')) + '"' + (carnet.dates[k] ? '' : ' hidden') + '>' + IC.event + '</button></div>').join('') +
+    '<button class="btn soft block" id="cdIcs"' + (hasAny() ? '' : ' hidden') + '>' + IC.event + esc(TRX('Ajouter tous les rappels au calendrier')) + '</button>' +
+    '<h3>' + esc(TRX('Pleins')) + '</h3>' +
+    '<div class="row"><label class="field grow" for="fKm">' + esc(TRX('Km au compteur')) + '<input id="fKm" type="number" inputmode="numeric"></label><label class="field grow" for="fL">' + esc(TRX('Litres')) + '<input id="fL" type="number" step="0.01" inputmode="decimal"></label><label class="field grow" for="fP">' + esc(TRX('Prix total')) + '<input id="fP" type="number" step="0.05" inputmode="decimal"></label></div>' +
+    '<button class="btn block" id="fAdd">' + esc(TRX('Ajouter le plein')) + '</button>' +
+    (cons ? '<div class="card"><div class="grow"><b>' + esc(TRX('Consommation moyenne : {c} L/100 km', { c: cons.toFixed(1) })) + '</b><div class="sub">' + esc(TRX('{n} pleins', { n: carnet.fills.length })) + ' · ' + spent.toFixed(2) + '</div></div></div>' : '<p class="muted small">' + esc(TRX('Note au moins deux pleins (en faisant le plein complet) pour calculer ta consommation.')) + '</p>') +
+    carnet.fills.slice(-8).reverse().map((f) => '<div class="card"><div class="grow"><b>' + (f.liters || '?') + ' L · ' + (f.price != null ? f.price.toFixed(2) : '?') + '</b><div class="sub">' + esc(new Date(f.date).toLocaleDateString(LG())) + (f.km ? ' · ' + f.km + ' km' : '') + '</div></div><button class="iconbtn small" data-fdel="' + f.date + '" aria-label="' + esc(TRX('Supprimer')) + '">' + ic('trash') + '</button></div>').join('') +
     '<p class="muted small">' + esc(TRX('Ces informations restent sur ce téléphone.')) + '</p>';
   const body = root;
-  DUE.forEach(([k]) => { body.querySelector('#cd_' + k).onchange = (e) => { carnet.dates[k] = e.target.value; saveCarnet(); carnetInto(root); }; });
-  body.querySelector('#cdIcs').onclick = () => { const k = DUE.find(([x]) => carnet.dates[x]); if (!k) { toast('Choisis d\'abord une date.'); return; } DUE.forEach(([x, l]) => { if (carnet.dates[x]) icsDownload(l, new Date(carnet.dates[x] + 'T09:00:00'), 30, null, null, 'Rappel ROUTA'); }); };
+  // date : enregistrée sans redessiner l'écran (le sélecteur de date reste ouvert, rien ne se ferme)
+  DUE.forEach(([k]) => {
+    const inp = body.querySelector('#cd_' + k);
+    const save = () => {
+      const v = inp.value || '';
+      if ((carnet.dates[k] || '') === v) return;
+      if (v) carnet.dates[k] = v; else delete carnet.dates[k];
+      saveCarnet();
+      body.querySelector('#rs_' + k).innerHTML = state(v);
+      body.querySelector('[data-cal="' + k + '"]').hidden = !v;
+      body.querySelector('#cdIcs').hidden = !hasAny();
+    };
+    inp.addEventListener('change', save); inp.addEventListener('blur', save);
+  });
+  const evOf = (k) => ({ t: TRX((DUE.find((x) => x[0] === k) || [k, k])[1]), d: carnet.dates[k] });
+  body.querySelectorAll('[data-cal]').forEach((b) => { b.onclick = () => { if (carnet.dates[b.dataset.cal]) calOpen([evOf(b.dataset.cal)]); }; });
+  body.querySelector('#cdIcs').onclick = () => { const ev = DUE.filter(([k]) => carnet.dates[k]).map(([k]) => evOf(k)); if (ev.length) calOpen(ev); };
   body.querySelector('#fAdd').onclick = () => {
-    const km = parseInt(body.querySelector('#fKm').value, 10) || null, liters = parseFloat(body.querySelector('#fL').value) || null, price = parseFloat(body.querySelector('#fP').value);
-    if (!liters) { toast('Indique au moins les litres.'); return; }
-    carnet.fills.push({ date: Date.now(), km, liters, price: isNaN(price) ? null : price }); saveCarnet(); toast('Plein ajouté.'); carnetInto(root);
+    const km = parseInt(body.querySelector('#fKm').value, 10) || null, liters = parseFloat(String(body.querySelector('#fL').value).replace(',', '.')) || null, price = parseFloat(String(body.querySelector('#fP').value).replace(',', '.'));
+    if (!liters) { toast(esc(TRX('Indique au moins les litres.'))); return; }
+    carnet.fills.push({ date: Date.now(), km, liters, price: isNaN(price) ? null : price }); saveCarnet(); toast(esc(TRX('Plein ajouté.'))); carnetInto(root);
   };
+  body.querySelectorAll('[data-fdel]').forEach((b) => { b.onclick = () => { carnet.fills = carnet.fills.filter((f) => String(f.date) !== b.dataset.fdel); saveCarnet(); carnetInto(root); }; });
   if (X.onCarnet) X.onCarnet(root);
+}
+/* Calendrier : une page dédiée crée le fichier et l'ouvre dans le calendrier du téléphone.
+   Dans l'app iPhone/Android, elle s'ouvre dans le navigateur du téléphone (seul lui sait l'ajouter au calendrier). */
+function calOpen(events) {
+  const lang = (window.ROUTA_I18N && ROUTA_I18N.lang) || 'fr';
+  const data = btoa(unescape(encodeURIComponent(JSON.stringify({ l: lang, e: events })))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  if (native) { location.href = 'https://ackfix.github.io/routa/calendrier.html#' + data; return; }
+  const w = window.open('calendrier.html#' + data, '_blank'); if (!w) location.href = 'calendrier.html#' + data;
 }
 X.carnetInto = carnetInto;
 function openCarnet() {
@@ -1008,7 +1040,7 @@ function carnetReminders() {
   const today = new Date().toISOString().slice(0, 10);
   if (store.get('routa.carnetCheck', '') === today) return;
   store.set('routa.carnetCheck', today);
-  DUE.forEach(([k, l]) => { const v = carnet.dates[k]; if (!v) return; const days = Math.ceil((Date.parse(v) - Date.now()) / 86400000); if (days <= 14) toast('<b>' + l + '</b> : ' + (days < 0 ? 'date dépassée' : 'dans ' + days + ' jours') + '.', { action: 'Carnet', onAction: openCarnet, ms: 9000 }); });
+  DUE.forEach(([k, l]) => { const v = carnet.dates[k]; if (!v) return; const days = Math.ceil((Date.parse(v) - Date.now()) / 86400000); if (days <= 14) toast('<b>' + esc(TRX(l)) + '</b> : ' + esc(days < 0 ? TRX('dépassé') : TRX('dans {n} j', { n: days })), { action: TRX('Mon véhicule'), onAction: openCarnet, ms: 9000 }); });
 }
 
 /* ======================= Ma voiture garée ======================= */
