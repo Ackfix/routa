@@ -150,4 +150,43 @@
     if (k === 'badges') { openBadges(); return true; }
     return open0 ? open0(k) : false;
   };
+
+  /* =========================================================
+     #034 FEUX DE CIRCULATION : emplacement connu (OpenStreetMap), à partir d'un zoom de quartier.
+     ROUTA n'affiche jamais si un feu est rouge ou vert : cette information n'existe pas en temps réel.
+     ========================================================= */
+  const map = A.map;
+  const SIG = { tiles: new Map(), feats: new Map(), busy: false, t: 0 };
+  const tileOf = (lon, lat) => { const n = 1 << 14; const x = Math.floor((lon + 180) / 360 * n); const r = lat * Math.PI / 180; const y = Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n); return [x, y]; };
+  const tileBox = (x, y) => { const n = 1 << 14; const lon = (v) => v / n * 360 - 180; const lat = (v) => { const k = Math.PI - 2 * Math.PI * v / n; return 180 / Math.PI * Math.atan(0.5 * (Math.exp(k) - Math.exp(-k))); }; return [lat(y + 1), lon(x), lat(y), lon(x + 1)]; };
+  const sigOn = () => S.settings.showSignals !== false;
+  function sigData() { return { type: 'FeatureCollection', features: sigOn() ? [...SIG.feats.values()] : [] }; }
+  function sigLayer() {
+    try {
+      if (!map.getSource('routa-signals')) map.addSource('routa-signals', { type: 'geojson', data: sigData() });
+      if (!map.getLayer('routa-signals')) map.addLayer({ id: 'routa-signals', type: 'circle', source: 'routa-signals', minzoom: 15,
+        paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 15, 3, 18, 6], 'circle-color': '#2A2F38', 'circle-stroke-color': '#FFD34D', 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 15, 1.2, 18, 2] } });
+    } catch (e) { /* style pas encore prêt */ }
+  }
+  async function sigLoad() {
+    if (!sigOn() || !A.overpass || SIG.busy || map.getZoom() < 15) return;
+    const b = map.getBounds(); const [x0, y0] = tileOf(b.getWest(), b.getNorth()); const [x1, y1] = tileOf(b.getEast(), b.getSouth());
+    const todo = [];
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) { const k = x + '/' + y; if (!SIG.tiles.has(k)) todo.push([x, y, k]); }
+    if (!todo.length || todo.length > 6) return;
+    SIG.busy = true;
+    try {
+      const boxes = todo.map(([x, y]) => tileBox(x, y));
+      const s0 = Math.min(...boxes.map((q) => q[0])), w0 = Math.min(...boxes.map((q) => q[1])), n0 = Math.max(...boxes.map((q) => q[2])), e0 = Math.max(...boxes.map((q) => q[3]));
+      const els = await A.overpass('[out:json][timeout:20];node["highway"="traffic_signals"](' + [s0, w0, n0, e0].map((v) => v.toFixed(5)).join(',') + ');out 800;');
+      (els || []).forEach((e) => { if (e.lat != null) SIG.feats.set(e.id, { type: 'Feature', geometry: { type: 'Point', coordinates: [e.lon, e.lat] }, properties: {} }); });
+      todo.forEach(([, , k]) => SIG.tiles.set(k, Date.now()));
+      sigLayer(); const src = map.getSource('routa-signals'); if (src) src.setData(sigData());
+    } catch (e) { /* données indisponibles : on réessaiera plus tard */ } finally { SIG.busy = false; }
+  }
+  const sigSched = () => { clearTimeout(SIG.t); SIG.t = setTimeout(sigLoad, 700); };
+  map.on('moveend', sigSched);
+  map.on('styledata', () => { if (!map.getLayer('routa-signals')) setTimeout(() => { sigLayer(); const src = map.getSource('routa-signals'); if (src) src.setData(sigData()); }, 300); });
+  if (map.loaded()) sigLayer(); else map.once('load', sigLayer);
+  X.signalsToggle = (on) => { S.settings.showSignals = on; store.set('routa.settings', S.settings); sigLayer(); const src = map.getSource('routa-signals'); if (src) src.setData(sigData()); if (on) sigLoad(); };
 })();

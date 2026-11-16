@@ -139,6 +139,16 @@ const ALERT_TYPES = window.ROUTA_ALERT_TYPES = {
   brouillard: { label: 'Brouillard', say: 'brouillard, visibilité réduite', cls: 'blue' },
   fermee: { label: 'Route fermée', say: 'route fermée', cls: 'red' }
 };
+/* #032 Fiabilité des signalements : durée de vie selon le type, prolongée par les confirmations, raccourcie par les « plus là » */
+const ALERT_TTL_H = { trou: 24, objet: 2, accident: 1.5, travaux: 24, bouchon: 1, arret: 1.5, glissant: 3, animal: 1, feu: 6, contresens: 0.5, brouillard: 3, fermee: 12 };
+const alertTtl = (type) => (ALERT_TTL_H[type] || 2) * 3600000;
+function alertReliability(a) {
+  const c = a.confirms || 1, d = a.denies || 0, ageH = (Date.now() - Date.parse(a.created_at || 0)) / 3600000;
+  if (c >= 3 && d === 0) return ['ok', 'Fiabilité élevée'];
+  if (d >= c || (ageH > 6 && c < 2)) return ['', 'Fiabilité faible'];
+  return ['warn', 'Fiabilité moyenne'];
+}
+const votedAlerts = new Set(store.get('routa.voted', []));
 const SPOT_CATS = { route: 'Belle route', vue: 'Point de vue', rdv: 'Rassemblement', nuit: 'Parking de nuit', autre: 'Autre' };
 const COLORS = ['#FF8A3D', '#4DA3FF', '#3DDC97', '#C9A2FF', '#FF6B9A', '#FFD34D', '#7FE0C2', '#F2F4F7'];
 const QUICK_MSGS = ['On se retrouve au spot ?', "J'arrive dans 10 min", 'Tu es où ?', 'Belle caisse !', 'Bien reçu', 'Attention devant'];
@@ -165,7 +175,7 @@ const S = {
   lastRead: store.get('routa.lastRead', 0),
   pos: null, prevPos: null, heading: 0, speed: null, acc: null,
   follow: true, watchId: null,
-  drivers: new Map(), alerts: new Map(), spots: new Map(), messages: [],
+  drivers: new Map(), alerts: new Map(), spots: new Map(), closed: new Map(), messages: [],
   markers: { me: null, drivers: new Map(), alerts: new Map(), spots: new Map(), pois: [], dest: null },
   nav: null, preview: null,
   prompted: new Set(), alertNearId: null,
@@ -250,7 +260,7 @@ const DB = {
 
   async loadAll() {
     if (!this.sb) {
-      this.local('alerts').filter((a) => Date.parse(a.expires_at) > Date.now()).forEach((a) => S.alerts.set(a.id, a));
+      this.local('alerts').filter((a) => Date.parse(a.expires_at) > Date.now()).forEach(putAlert);
       this.local('spots').forEach((s) => S.spots.set(s.id, s));
       return;
     }
@@ -262,7 +272,7 @@ const DB = {
       this.sb.rpc('messages_mine', { me: S.me.id, s: this.secret() })
     ]);
     (d.data || []).forEach((r) => S.drivers.set(r.id, r));
-    (a.data || []).forEach((r) => S.alerts.set(r.id, r));
+    (a.data || []).forEach(putAlert);
     (s.data || []).forEach((r) => S.spots.set(r.id, r));
     S.messages = (Array.isArray(m.data) ? m.data : []).reverse();
     S.messages.forEach((x) => { if (!this.msgSince || x.created_at > this.msgSince) this.msgSince = x.created_at; });
@@ -273,7 +283,7 @@ const DB = {
     setInterval(async () => { if (document.hidden) return; await this.liveDrivers(); renderDrivers(); await this.pollMsgs(); }, 5000);
     this.sb.channel('routa-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'alerts' }, (p) => {
-        if (p.eventType === 'DELETE') S.alerts.delete(p.old.id); else S.alerts.set(p.new.id, p.new);
+        if (p.eventType === 'DELETE') { S.alerts.delete(p.old.id); S.closed.delete(p.old.id); } else putAlert(p.new);
         renderAlerts();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'spots' }, (p) => {
@@ -287,6 +297,19 @@ const DB = {
     if (!this.sb) return;
     const { error } = await this.sb.rpc('driver_upsert', { p: row, s: this.secret() });
     if (error) console.warn(error);
+  },
+  /* #067 lieux fermés temporairement : même table, type « lieu_ferme », jamais affichés comme alertes de route */
+  async addClosed(a) {
+    if (!this.sb) { const all = this.local('alerts'); all.push(a); this.saveLocal('alerts', all); S.closed.set(a.id, a); return true; }
+    const { error } = await this.sb.from('alerts').insert(a);
+    if (error) return false;
+    S.closed.set(a.id, a); return true;
+  },
+  async updateClosed(id, patch) {
+    const a = Object.assign({}, S.closed.get(id), patch);
+    S.closed.set(id, a);
+    if (!this.sb) { this.saveLocal('alerts', this.local('alerts').map((x) => x.id === id ? a : x)); return; }
+    await this.sb.from('alerts').update(patch).eq('id', id);
   },
   async addAlert(a) {
     if (!this.sb) { const all = this.local('alerts'); all.push(a); this.saveLocal('alerts', all); S.alerts.set(a.id, a); renderAlerts(); return true; }
@@ -676,6 +699,7 @@ function renderDrivers() {
 setInterval(renderDrivers, 30000);
 
 /* Alertes */
+function putAlert(r) { if (!r || !r.id) return; if (r.type === 'lieu_ferme') S.closed.set(r.id, r); else S.alerts.set(r.id, r); }
 function alertVisible(a) { return a && Date.parse(a.expires_at) > Date.now() && (a.denies || 0) <= (a.confirms || 1); }
 function renderAlerts() {
   const seen = new Set();
@@ -943,7 +967,7 @@ function checkNearAlerts() {
   if (!S.pos) return;
   let best = null;
   S.alerts.forEach((a) => {
-    if (!alertVisible(a) || S.prompted.has(a.id) || a.created_by === S.me.id) return;
+    if (!alertVisible(a) || S.prompted.has(a.id) || votedAlerts.has(a.id) || a.created_by === S.me.id) return;
     const d = dist(S.pos, a);
     if (d > 600) return;
     const moving = (S.speed || 0) > 3;
@@ -955,18 +979,28 @@ function checkNearAlerts() {
     const t = ALERT_TYPES[best.a.type] || ALERT_TYPES.objet;
     S.alertNearId = best.a.id;
     $('alertNearTitle').textContent = t.label;
-    $('alertNearSub').textContent = 'à ' + fmtDist(best.d) + ' · signalé ' + ago(best.a.created_at) + ' · confirmé ' + (best.a.confirms || 1) + ' fois';
+    $('alertNearSub').textContent = I18N.t('à {d} · signalé {t} · confirmé {n} fois').replace('{d}', fmtDist(best.d)).replace('{t}', I18N.t(ago(best.a.created_at))).replace('{n}', best.a.confirms || 1);
     $('alertNear').hidden = false;
     vibrate([60, 40, 60]);
     clearTimeout(checkNearAlerts.t);
     checkNearAlerts.t = setTimeout(() => { $('alertNear').hidden = true; }, 20000);
   }
 }
-function voteAlert(id, yes) {
+function voteAlert(id, yes, quiet) {
   const a = S.alerts.get(id); if (!a) return;
-  if (yes) DB.updateAlert(id, { confirms: (a.confirms || 1) + 1, expires_at: new Date(Date.now() + 2 * 3600000).toISOString() });
-  else DB.updateAlert(id, { denies: (a.denies || 0) + 1 });
-  toast(yes ? 'Merci, alerte confirmée.' : 'Merci, on le signale aux autres.');
+  // un seul vote par alerte et par téléphone, jamais sur sa propre alerte
+  if (a.created_by === S.me.id || votedAlerts.has(id)) { if (!quiet) toast(I18N.t('Tu as déjà donné ton avis sur cette alerte.')); return; }
+  votedAlerts.add(id); store.set('routa.voted', [...votedAlerts].slice(-300));
+  if (yes) {
+    // une confirmation prolonge l'alerte (jamais plus courte qu'avant)
+    const exp = Math.max(Date.parse(a.expires_at) || 0, Date.now() + alertTtl(a.type));
+    DB.updateAlert(id, { confirms: (a.confirms || 1) + 1, expires_at: new Date(exp).toISOString() });
+  } else {
+    const d = (a.denies || 0) + 1, c = a.confirms || 1;
+    // deux « plus là » de plus que de confirmations : l'alerte disparaît pour tout le monde
+    DB.updateAlert(id, d >= 2 && d >= c + 1 ? { denies: d, expires_at: new Date().toISOString() } : { denies: d });
+  }
+  if (!quiet) toast(yes ? 'Merci, alerte confirmée.' : 'Merci, on le signale aux autres.');
 }
 $('alertYes').onclick = () => { $('alertNear').hidden = true; if (S.alertNearId) voteAlert(S.alertNearId, true); };
 $('alertNo').onclick = () => { $('alertNear').hidden = true; if (S.alertNearId) voteAlert(S.alertNearId, false); };
@@ -1616,6 +1650,7 @@ function parseOsm(e, kind) {
   if (kind === 'wc' && !t.name) name = 'WC public';
   if (t.brand && t.name && !t.name.toLowerCase().includes(t.brand.toLowerCase())) name = t.brand + ' · ' + t.name;
   const details = [];
+  const osmClosed = /^(closed|off)$/i.test((t.opening_hours || '').trim());
   if (kind === 'fuel') {
     if (t.opening_hours === '24/7') details.push('24 h/24');
     if (t.shop === 'convenience' || t['shop']) details.push('Shop');
@@ -1670,7 +1705,7 @@ function parseOsm(e, kind) {
     if (t.capacity) details.push(t.capacity + ' places');
     if (t.maxstay) details.push('Max ' + t.maxstay);
   }
-  return { id: 'osm/' + e.type + '/' + e.id, name, lat, lon, details: [...new Set(details)].join(' · '), hours: t.opening_hours || '', tags: t };
+  return { id: 'osm/' + e.type + '/' + e.id, name, lat, lon, details: [...new Set(details)].join(' · '), hours: t.opening_hours || '', tags: t, osmClosed };
 }
 const OVERPASS_CH = 'https://overpass.osm.ch/api/interpreter';
 const OVERPASS_URLS = [CFG.overpassUrl, 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'].filter((u, i, all) => u && all.indexOf(u) === i);
@@ -1927,8 +1962,42 @@ function openPoi(p, kind) {
   body.querySelector('#poiGo').onclick = () => { closeSheet(); chooseDestination({ name: p.name, sub: KIND_LABEL[kind], lat: p.lat, lon: p.lon }); };
   body.querySelector('#poiFav').onclick = () => addFav({ name: p.name, addr: p.addr || '', lat: p.lat, lon: p.lon });
   if (window.ROUTA_X && ROUTA_X.poiExtra) ROUTA_X.poiExtra(p, kind, body);
+  closedBlock(body, p);
   mapErrBtn(body, p, p.name);
   const pb = body.querySelector('#poiPrice'); if (pb) pb.onclick = () => openPriceForm(p);
+}
+/* #067 Lieux temporairement fermés : on n'affirme rien sans source (OpenStreetMap ou signalements confirmés de conducteurs) */
+const CLOSED_TTL = 7 * 86400000;
+function closedFor(p) {
+  return [...S.closed.values()].filter((c) => Date.parse(c.expires_at) > Date.now() && (c.denies || 0) < (c.confirms || 1) && dist(c, p) < 60 && (!c.comment || !p.name || c.comment === p.name)).sort((a, b) => (b.confirms || 1) - (a.confirms || 1))[0] || null;
+}
+function closedBlock(body, p) {
+  const c = closedFor(p);
+  const box = el('<div class="closedbox"></div>');
+  if (p.osmClosed) box.appendChild(el('<div class="banner warnb">' + ic('info') + '<span><b>' + esc(I18N.t('Indiqué fermé')) + '</b> · ' + esc(I18N.t('source : OpenStreetMap, peut ne pas être à jour.')) + '</span></div>'));
+  if (c) {
+    const n = c.confirms || 1;
+    box.appendChild(el('<div class="banner warnb">' + ic('info') + '<span><b>' + esc(I18N.t('Signalé fermé temporairement')) + '</b> · ' + esc(I18N.t('par {n} conducteur(s), {t}. Non vérifié par ROUTA.').replace('{n}', n).replace('{t}', I18N.t(ago(c.created_at)))) + '</span></div>'));
+    if (c.created_by !== S.me.id && !votedAlerts.has(c.id)) {
+      const row = el('<div class="row"><button class="btn soft grow" data-v="1">' + esc(I18N.t('Toujours fermé')) + '</button><button class="btn soft grow" data-v="0">' + esc(I18N.t('C\'est rouvert')) + '</button></div>');
+      row.querySelectorAll('button').forEach((b) => { b.onclick = () => {
+        votedAlerts.add(c.id); store.set('routa.voted', [...votedAlerts].slice(-300));
+        if (b.dataset.v === '1') DB.updateClosed(c.id, { confirms: n + 1, expires_at: new Date(Math.max(Date.parse(c.expires_at), Date.now() + CLOSED_TTL)).toISOString() });
+        else { const d = (c.denies || 0) + 1; DB.updateClosed(c.id, d >= n ? { denies: d, expires_at: new Date().toISOString() } : { denies: d }); }
+        toast(I18N.t('Merci, c\'est noté.')); row.remove();
+      }; });
+      box.appendChild(row);
+    }
+  } else {
+    const b = el('<button class="btn ghost">' + esc(I18N.t('Signaler fermé temporairement')) + '</button>');
+    b.onclick = async () => {
+      const a = { id: uuid(), type: 'lieu_ferme', lat: p.lat, lon: p.lon, comment: (p.name || '').slice(0, 80) || null, created_by: S.me.id, created_name: S.me.pseudo, confirms: 1, denies: 0, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + CLOSED_TTL).toISOString() };
+      if (await DB.addClosed(a)) { toast(I18N.t('Merci ! Les autres conducteurs pourront le confirmer.')); b.remove(); } else toast(I18N.t('Envoi impossible pour le moment. Réessaie plus tard.'));
+    };
+    box.appendChild(b);
+  }
+  // fermeture connue : visible tout de suite, sous le nom du lieu
+  if (c || p.osmClosed) body.insertBefore(box, body.children[1] || null); else body.appendChild(box);
 }
 /* ======================= Tous les établissements ======================= */
 const POI_LAYERS = ['poi_r1', 'poi_r7', 'poi_r20'];
@@ -2204,7 +2273,13 @@ function openReport(at) {
   const vb = $('repVoice'); if (vb) vb.onclick = () => voiceReport(SR, at);
 }
 async function sendAlert(type, p) {
-  const a = { id: uuid(), type, lat: p.lat, lon: p.lon, comment: null, created_by: S.me.id, created_name: S.me.pseudo, confirms: 1, denies: 0, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + (type === 'travaux' ? 24 : 2) * 3600000).toISOString() };
+  // déjà signalé tout près (même type, moins de 150 m, encore actif) : on confirme l'alerte existante au lieu d'en créer une deuxième
+  const dup = [...S.alerts.values()].find((x) => x.type === type && alertVisible(x) && dist(x, p) < 150);
+  if (dup) {
+    if (dup.created_by === S.me.id || votedAlerts.has(dup.id)) { toast(I18N.t('Déjà signalé ici. Merci !')); return; }
+    voteAlert(dup.id, true, true); toast(I18N.t('Déjà signalé ici : ta confirmation a été ajoutée. Merci !')); return;
+  }
+  const a = { id: uuid(), type, lat: p.lat, lon: p.lon, comment: null, created_by: S.me.id, created_name: S.me.pseudo, confirms: 1, denies: 0, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + alertTtl(type)).toISOString() };
   S.prompted.add(a.id);
   if (await DB.addAlert(a)) { vibrate(30); toast('Alerte envoyée : <b>' + esc(ALERT_TYPES[type].label) + '</b>. Merci !'); }
 }
@@ -2228,12 +2303,12 @@ function openAlert(id) {
   const t = ALERT_TYPES[a.type] || ALERT_TYPES.objet;
   const mine = a.created_by === S.me.id;
   const body = openSheet(t.label,
-    '<div class="row wrap"><span class="pill warn">Signalé ' + ago(a.created_at) + '</span><span class="pill ok">Confirmé ' + (a.confirms || 1) + ' fois</span>' + ((a.denies || 0) ? '<span class="pill">Plus là : ' + a.denies + '</span>' : '') + (S.pos ? '<span class="pill">' + fmtDist(dist(S.pos, a)) + '</span>' : '') + '</div>' +
+    '<div class="row wrap"><span class="pill ' + alertReliability(a)[0] + '">' + esc(I18N.t(alertReliability(a)[1])) + '</span><span class="pill warn">' + esc(I18N.t('Signalé {t}').replace('{t}', I18N.t(ago(a.created_at)))) + '</span><span class="pill ok">' + esc(I18N.t('Confirmé {n} fois').replace('{n}', a.confirms || 1)) + '</span>' + ((a.denies || 0) ? '<span class="pill">' + esc(I18N.t('Plus là : {n}').replace('{n}', a.denies)) + '</span>' : '') + (S.pos ? '<span class="pill">' + fmtDist(dist(S.pos, a)) + '</span>' : '') + '</div>' +
     (a.created_name ? '<p class="muted small">Par ' + esc(a.created_name) + '</p>' : '') +
-    '<div class="row"><button class="btn grow" id="aYes">Toujours là</button><button class="btn ghost grow" id="aNo">Plus là</button></div>' +
+    (mine || votedAlerts.has(id) ? '<p class="muted small">' + esc(I18N.t(mine ? 'C\'est ton alerte : les autres conducteurs la confirment.' : 'Tu as déjà donné ton avis sur cette alerte.')) + '</p>' : '<div class="row"><button class="btn grow" id="aYes">Toujours là</button><button class="btn ghost grow" id="aNo">Plus là</button></div>') +
     (mine ? '<button class="btn danger" id="aDel">' + ic('trash') + 'Supprimer mon alerte</button>' : ''), 'alert');
-  body.querySelector('#aYes').onclick = () => { closeSheet(); voteAlert(id, true); };
-  body.querySelector('#aNo').onclick = () => { closeSheet(); voteAlert(id, false); };
+  const yb = body.querySelector('#aYes'); if (yb) yb.onclick = () => { closeSheet(); voteAlert(id, true); };
+  const nb = body.querySelector('#aNo'); if (nb) nb.onclick = () => { closeSheet(); voteAlert(id, false); };
   const del = body.querySelector('#aDel'); if (del) del.onclick = () => { closeSheet(); DB.deleteAlert(id); toast('Alerte supprimée.'); };
 }
 
@@ -2848,6 +2923,7 @@ function openSettings() {
     '<h3>Carte</h3>' +
     '<p class="muted small" style="margin:0">Couleurs de la carte</p>' + segH('stNight', [['auto', 'Comme le téléphone'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
     sw('stPlaces', 'Afficher les établissements sur la carte', S.settings.showPlaces) +
+    sw('stSignals', 'Afficher les feux de circulation', S.settings.showSignals !== false, 'Emplacement seulement : ROUTA ne sait pas s\'ils sont rouges ou verts.') +
     sw('stGoogle', 'Bouton « Voir les avis Google » sur les lieux', S.settings.googleLinks) +
     '<p class="muted small" style="margin:0">' + esc(I18N.t('Curseur GPS')) + '</p><div class="curpick" id="stCur">' + CUR_SHAPES.map(([k, l]) => '<button data-v="' + k + '" class="' + ((S.settings.cursor || 'arrow') === k ? 'on' : '') + '" aria-label="' + esc(I18N.t(l)) + '">' + meHtml(k) + '<span>' + esc(I18N.t(l)) + '</span></button>').join('') + '</div>' +
     '<div class="curcols" id="stCurCol">' + CUR_COLORS.map((c) => '<button data-c="' + c + '" class="' + (curColor() === c ? 'on' : '') + '" style="background:' + c + '" aria-label="' + c + '"></button>').join('') + '</div>' +
@@ -2872,6 +2948,7 @@ function openSettings() {
   ch('stAlert', (v) => { S.settings.speedAlert = v; });
   ch('stSpeedo', (v) => { S.settings.showSpeedo = v; updateSpeed(); });
   ch('stPlaces', (v) => { S.settings.showPlaces = v; applyPlaces(); });
+  ch('stSignals', (v) => { S.settings.showSignals = v; if (window.ROUTA_X && ROUTA_X.signalsToggle) ROUTA_X.signalsToggle(v); });
   ch('stGoogle', (v) => { S.settings.googleLinks = v; });
   ch('stUi', (v) => { S.settings.uiSize = +v; applyUi(); });
   ch('stReminders', (v) => { S.settings.reminders = v; });
