@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ROUTA · Supprimer mon compte</title>
+<meta name="theme-color" content="#0E1116">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0E1116; --card:#171B22; --card2:#1F2530; --line:#2B3241; --fg:#F2F4F7; --muted:#A3ACB9; --accent:#FF8A3D; --alert:#FFC24D; --ok:#3DDC97; --info:#8EC5FF; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 Inter, system-ui, -apple-system, sans-serif; }
+main { max-width: 720px; margin: 0 auto; padding: calc(env(safe-area-inset-top, 0px) + 20px) max(18px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 60px) max(18px, env(safe-area-inset-left, 0px)); }
+.back { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 22px; background: var(--card); color: var(--fg); text-decoration: none; font-weight: 600; }
+h1 { font: 700 32px/1.15 "Space Grotesk", Inter, sans-serif; margin: 22px 0 6px; text-wrap: balance; }
+h2 { font: 700 22px "Space Grotesk", Inter, sans-serif; margin: 36px 0 10px; text-wrap: balance; }
+h3 { font-size: 17px; margin: 18px 0 4px; }
+.lead { color: var(--muted); margin: 0; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
+nav.toc a { height: 40px; padding: 0 14px; border-radius: 20px; background: var(--card); color: var(--fg); text-decoration: none; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; }
+section.card { background: var(--card); border-radius: 18px; padding: 6px 18px 16px; margin: 12px 0; }
+ol, ul { padding-left: 22px; margin: 8px 0; }
+li { margin: 7px 0; }
+b { font-weight: 600; }
+.tip { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--card2); font-size: 15px; }
+.warn { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: #2A2312; border-left: 4px solid var(--alert); font-size: 15px; }
+.key { display: inline-block; padding: 0 8px; border-radius: 6px; background: var(--card2); border: 1px solid var(--line); font-size: 14px; white-space: nowrap; }
+details { background: var(--card); border-radius: 14px; margin: 10px 0; padding: 0 16px; }
+summary { cursor: pointer; padding: 14px 0; font-weight: 600; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; float: right; color: var(--muted); font-weight: 700; }
+details[open] summary::after { content: "–"; }
+details p { margin: 0 0 14px; color: #D9DEE5; }
+a { color: var(--info); }
+a:focus-visible, summary:focus-visible { outline: 3px solid var(--info); outline-offset: 2px; }
+</style>
+<style>
+.lang { display: none; } html[data-l="fr"] .lang.fr, html[data-l="en"] .lang.en, html[data-l="tr"] .lang.tr, html[data-l="de"] .lang.de, html[data-l="it"] .lang.it, html[data-l="pt"] .lang.pt, html[data-l="es"] .lang.es, html[data-l="sq"] .lang.sq, html[data-l="sr"] .lang.sr { display: block; }
+.langbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; } .langbar button { height: 36px; padding: 0 14px; border-radius: 18px; border: 0; background: var(--card); color: var(--fg); font: 600 14px Inter, sans-serif; }
+.key { white-space: normal !important; } .muted { color: var(--muted); font-size: 14px; }
+.langbar button.on { background: var(--accent); color: #0E1116; }
+</style>
+<script>
+(function () { var l = 'fr'; try { l = localStorage.getItem('routa.lang') || ''; } catch (e) {} if (!/^(fr|en|tr|de|it|pt|es|sq|sr)$/.test(l)) { var n = (navigator.language || 'fr').slice(0, 2).toLowerCase(); if (/^(hr|bs|sh|me)$/.test(n)) n = 'sr'; l = /^(en|tr|de|it|pt|es|sq|sr)$/.test(n) ? n : 'fr'; } document.documentElement.setAttribute('data-l', l); document.documentElement.lang = l; })();
+function setL(l) { try { localStorage.setItem('routa.lang', l); } catch (e) {} document.documentElement.setAttribute('data-l', l); document.documentElement.lang = l; document.querySelectorAll('.langbar button').forEach(function (b) { b.classList.toggle('on', b.dataset.l === l); }); }
+</script>
+</head>
+<body>
+<main>
+<div class="langbar"><button data-l="fr" onclick="setL('fr')">Français</button><button data-l="en" onclick="setL('en')">English</button><button data-l="de" onclick="setL('de')">Deutsch</button><button data-l="it" onclick="setL('it')">Italiano</button><button data-l="pt" onclick="setL('pt')">Português</button><button data-l="es" onclick="setL('es')">Español</button><button data-l="sq" onclick="setL('sq')">Shqip</button><button data-l="sr" onclick="setL('sr')">Srpski</button><button data-l="tr" onclick="setL('tr')">Türkçe</button></div>
+
+<div class="lang fr">
+<a class="back" href="confidentialite.html">‹ Confidentialité</a>
+<h1>Supprimer mon compte ROUTA</h1>
+<p class="lead">Tu peux supprimer ton profil et tes données à tout moment.</p>
+<h2>Dans l'app (le plus rapide)</h2>
+<section class="card"><ol><li>Ouvre <span class="key">Menu › Réglages</span> (ou <span class="key">Menu › Mon profil</span>).</li><li>Touche <b>Supprimer mes données</b>, puis touche encore pour confirmer.</li></ol><p>Effacé : ton profil, ta position, tes messages, tes alertes, spots, notes, prix et rassemblements. Définitif.</p></section>
+<h2>Sans l'app (ou pour effacer aussi tes avis envoyés)</h2>
+<section class="card"><p>Écris à <a href="mailto:admin@ackfix.com?subject=Suppression%20de%20mon%20compte%20ROUTA">admin@ackfix.com</a> avec l'objet « Suppression de mon compte ROUTA ». Indique ton <b>pseudo</b> et ton <b>code ami</b> (visible dans <span class="key">Menu › Mon profil</span>) pour qu'on retrouve ton profil. Nous supprimons tes données dans un délai de <b>30 jours</b> et nous te confirmons par e-mail.</p><p class="muted">ROUTA ne demande ni nom, ni e-mail, ni téléphone : sans ton pseudo ou ton code ami, nous ne pouvons pas savoir quel profil est le tien.</p></section>
+</div>
+
+<div class="lang en">
+<a class="back" href="confidentialite.html">‹ Privacy</a>
+<h1>Delete my ROUTA account</h1>
+<p class="lead">You can delete your profile and your data at any time.</p>
+<h2>In the app (fastest)</h2>
+<section class="card"><ol><li>Open <span class="key">Menu › Settings</span> (or <span class="key">Menu › My profile</span>).</li><li>Tap <b>Delete my data</b>, then tap again to confirm.</li></ol><p>Erased: your profile, position, messages, alerts, spots, ratings, prices and meetups. This is final.</p></section>
+<h2>Without the app (or to also erase feedback you sent)</h2>
+<section class="card"><p>Write to <a href="mailto:admin@ackfix.com?subject=Delete%20my%20ROUTA%20account">admin@ackfix.com</a> with the subject "Delete my ROUTA account". Give your <b>nickname</b> and your <b>friend code</b> (shown in <span class="key">Menu › My profile</span>) so we can find your profile. We delete your data within <b>30 days</b> and confirm by e-mail.</p><p class="muted">ROUTA asks for no name, e-mail or phone number: without your nickname or friend code we cannot tell which profile is yours.</p></section>
+</div>
+
+<div class="lang de">
+<a class="back" href="confidentialite.html">‹ Datenschutz</a>
+<h1>Mein ROUTA-Konto löschen</h1>
+<p class="lead">Du kannst dein Profil und deine Daten jederzeit löschen.</p>
+<h2>In der App (am schnellsten)</h2>
+<section class="card"><ol><li>Öffne <span class="key">Menü › Einstellungen</span> (oder <span class="key">Menü › Mein Profil</span>).</li><li>Tippe auf <b>Meine Daten löschen</b> und tippe zur Bestätigung noch einmal.</li></ol><p>Gelöscht werden: dein Profil, deine Position, Nachrichten, Meldungen, Spots, Bewertungen, Preise und Treffen. Endgültig.</p></section>
+<h2>Ohne die App (oder um auch gesendete Rückmeldungen zu löschen)</h2>
+<section class="card"><p>Schreib an <a href="mailto:admin@ackfix.com?subject=ROUTA-Konto%20l%C3%B6schen">admin@ackfix.com</a> mit dem Betreff «ROUTA-Konto löschen». Nenne deinen <b>Spitznamen</b> und deinen <b>Freundescode</b> (sichtbar unter <span class="key">Menü › Mein Profil</span>), damit wir dein Profil finden. Wir löschen deine Daten innerhalb von <b>30 Tagen</b> und bestätigen per E-Mail.</p><p class="muted">ROUTA verlangt weder Namen noch E-Mail noch Telefonnummer: ohne Spitznamen oder Freundescode können wir dein Profil nicht erkennen.</p></section>
+</div>
+
+<div class="lang it">
+<a class="back" href="confidentialite.html">‹ Privacy</a>
+<h1>Elimina il mio account ROUTA</h1>
+<p class="lead">Puoi eliminare il tuo profilo e i tuoi dati in qualsiasi momento.</p>
+<h2>Nell'app (il più rapido)</h2>
+<section class="card"><ol><li>Apri <span class="key">Menu › Impostazioni</span> (o <span class="key">Menu › Il mio profilo</span>).</li><li>Tocca <b>Elimina i miei dati</b>, poi tocca di nuovo per confermare.</li></ol><p>Cancellati: profilo, posizione, messaggi, segnalazioni, spot, valutazioni, prezzi e ritrovi. Definitivo.</p></section>
+<h2>Senza l'app (o per cancellare anche i pareri inviati)</h2>
+<section class="card"><p>Scrivi a <a href="mailto:admin@ackfix.com?subject=Elimina%20il%20mio%20account%20ROUTA">admin@ackfix.com</a> con oggetto «Elimina il mio account ROUTA». Indica il tuo <b>nickname</b> e il tuo <b>codice amico</b> (visibile in <span class="key">Menu › Il mio profilo</span>) per ritrovare il profilo. Cancelliamo i tuoi dati entro <b>30 giorni</b> e confermiamo via e-mail.</p><p class="muted">ROUTA non chiede nome, e-mail né telefono: senza nickname o codice amico non possiamo sapere quale profilo sia il tuo.</p></section>
+</div>
+
+<div class="lang pt">
+<a class="back" href="confidentialite.html">‹ Privacidade</a>
+<h1>Eliminar a minha conta ROUTA</h1>
+<p class="lead">Podes eliminar o teu perfil e os teus dados a qualquer momento.</p>
+<h2>Na app (o mais rápido)</h2>
+<section class="card"><ol><li>Abre <span class="key">Menu › Definições</span> (ou <span class="key">Menu › O meu perfil</span>).</li><li>Toca em <b>Eliminar os meus dados</b> e toca de novo para confirmar.</li></ol><p>Apagados: perfil, posição, mensagens, alertas, spots, avaliações, preços e encontros. Definitivo.</p></section>
+<h2>Sem a app (ou para apagar também os comentários enviados)</h2>
+<section class="card"><p>Escreve para <a href="mailto:admin@ackfix.com?subject=Eliminar%20a%20minha%20conta%20ROUTA">admin@ackfix.com</a> com o assunto «Eliminar a minha conta ROUTA». Indica o teu <b>pseudónimo</b> e o teu <b>código de amigo</b> (visível em <span class="key">Menu › O meu perfil</span>) para encontrarmos o perfil. Eliminamos os teus dados em <b>30 dias</b> e confirmamos por e-mail.</p><p class="muted">O ROUTA não pede nome, e-mail nem telefone: sem o pseudónimo ou o código de amigo não sabemos qual é o teu perfil.</p></section>
+</div>
+
+<div class="lang es">
+<a class="back" href="confidentialite.html">‹ Privacidad</a>
+<h1>Eliminar mi cuenta de ROUTA</h1>
+<p class="lead">Puedes eliminar tu perfil y tus datos en cualquier momento.</p>
+<h2>En la app (lo más rápido)</h2>
+<section class="card"><ol><li>Abre <span class="key">Menú › Ajustes</span> (o <span class="key">Menú › Mi perfil</span>).</li><li>Toca <b>Eliminar mis datos</b> y vuelve a tocar para confirmar.</li></ol><p>Se borra: tu perfil, posición, mensajes, alertas, spots, valoraciones, precios y quedadas. Definitivo.</p></section>
+<h2>Sin la app (o para borrar también tus opiniones enviadas)</h2>
+<section class="card"><p>Escribe a <a href="mailto:admin@ackfix.com?subject=Eliminar%20mi%20cuenta%20ROUTA">admin@ackfix.com</a> con el asunto «Eliminar mi cuenta ROUTA». Indica tu <b>apodo</b> y tu <b>código de amigo</b> (visible en <span class="key">Menú › Mi perfil</span>) para encontrar tu perfil. Eliminamos tus datos en un plazo de <b>30 días</b> y lo confirmamos por correo.</p><p class="muted">ROUTA no pide nombre, correo ni teléfono: sin tu apodo o código de amigo no podemos saber cuál es tu perfil.</p></section>
+</div>
+
+<div class="lang sq">
+<a class="back" href="confidentialite.html">‹ Privatësia</a>
+<h1>Fshi llogarinë time ROUTA</h1>
+<p class="lead">Mund ta fshish profilin dhe të dhënat e tua në çdo kohë.</p>
+<h2>Në aplikacion (më shpejt)</h2>
+<section class="card"><ol><li>Hap <span class="key">Menuja › Cilësimet</span> (ose <span class="key">Menuja › Profili im</span>).</li><li>Prek <b>Fshi të dhënat e mia</b>, pastaj prek përsëri për ta konfirmuar.</li></ol><p>Fshihen: profili, pozicioni, mesazhet, sinjalizimet, spotet, vlerësimet, çmimet dhe takimet. Përfundimtare.</p></section>
+<h2>Pa aplikacionin (ose për të fshirë edhe mendimet e dërguara)</h2>
+<section class="card"><p>Shkruaj te <a href="mailto:admin@ackfix.com?subject=Fshi%20llogarin%C3%AB%20time%20ROUTA">admin@ackfix.com</a> me subjektin «Fshi llogarinë time ROUTA». Trego <b>pseudonimin</b> dhe <b>kodin e mikut</b> (të dukshëm te <span class="key">Menuja › Profili im</span>) që ta gjejmë profilin. I fshijmë të dhënat brenda <b>30 ditëve</b> dhe e konfirmojmë me e-mail.</p><p class="muted">ROUTA nuk kërkon emër, e-mail apo telefon: pa pseudonimin ose kodin e mikut nuk mund ta dimë cili është profili yt.</p></section>
+</div>
+
+<div class="lang sr">
+<a class="back" href="confidentialite.html">‹ Privatnost</a>
+<h1>Obriši moj ROUTA nalog</h1>
+<p class="lead">Svoj profil i podatke možeš da obrišeš u bilo kom trenutku.</p>
+<h2>U aplikaciji (najbrže)</h2>
+<section class="card"><ol><li>Otvori <span class="key">Meni › Podešavanja</span> (ili <span class="key">Meni › Moj profil</span>).</li><li>Dodirni <b>Obriši moje podatke</b>, pa dodirni ponovo da potvrdiš.</li></ol><p>Briše se: profil, pozicija, poruke, upozorenja, spotovi, ocene, cene i okupljanja. Neopozivo.</p></section>
+<h2>Bez aplikacije (ili da obrišemo i poslate povratne informacije)</h2>
+<section class="card"><p>Piši na <a href="mailto:admin@ackfix.com?subject=Obri%C5%A1i%20moj%20ROUTA%20nalog">admin@ackfix.com</a> sa naslovom «Obriši moj ROUTA nalog». Navedi svoj <b>nadimak</b> i <b>kod prijatelja</b> (vidljiv u <span class="key">Meni › Moj profil</span>) da bismo pronašli profil. Podatke brišemo u roku od <b>30 dana</b> i potvrđujemo e-poštom.</p><p class="muted">ROUTA ne traži ime, e-poštu ni telefon: bez nadimka ili koda prijatelja ne možemo znati koji je tvoj profil.</p></section>
+</div>
+
+<div class="lang tr">
+<a class="back" href="confidentialite.html">‹ Gizlilik</a>
+<h1>ROUTA hesabımı sil</h1>
+<p class="lead">Profilini ve verilerini istediğin zaman silebilirsin.</p>
+<h2>Uygulamada (en hızlısı)</h2>
+<section class="card"><ol><li><span class="key">Menü › Ayarlar</span> (veya <span class="key">Menü › Profilim</span>) bölümünü aç.</li><li><b>Verilerimi sil</b> düğmesine dokun, onaylamak için tekrar dokun.</li></ol><p>Silinenler: profilin, konumun, mesajların, uyarıların, spotların, puanların, fiyatların ve buluşmaların. Geri alınamaz.</p></section>
+<h2>Uygulama olmadan (veya gönderdiğin görüşleri de silmek için)</h2>
+<section class="card"><p><a href="mailto:admin@ackfix.com?subject=ROUTA%20hesab%C4%B1m%C4%B1%20sil">admin@ackfix.com</a> adresine «ROUTA hesabımı sil» konusuyla yaz. Profilini bulabilmemiz için <b>takma adını</b> ve <b>arkadaş kodunu</b> (<span class="key">Menü › Profilim</span> içinde görünür) belirt. Verilerini <b>30 gün</b> içinde sileriz ve e-postayla onaylarız.</p><p class="muted">ROUTA ad, e-posta veya telefon istemez: takma ad veya arkadaş kodu olmadan hangi profilin senin olduğunu bilemeyiz.</p></section>
+</div>
+
+<script>document.querySelectorAll('.langbar button').forEach(function (b) { b.classList.toggle('on', b.dataset.l === document.documentElement.getAttribute('data-l')); });</script>
+</main>
+</body>
+</html>
