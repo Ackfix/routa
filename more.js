@@ -5,7 +5,7 @@
   if (!A || !X) return;
   const { S, CFG, esc, el, toast, openSheet, dist, fmtDist, store } = A;
   const T = (s, v) => { let o = (A.I18N && A.I18N.t) ? A.I18N.t(s) : s; if (v) Object.keys(v).forEach((k) => { o = o.split('{' + k + '}').join(v[k]); }); return o; };
-  const LANG = () => (A.I18N && A.I18N.lang) || 'fr';
+  const LANG = () => { const l = (A.I18N && A.I18N.lang) || 'fr'; return l === 'sr' ? 'sr-Latn' : l; };
   const nf = (n) => (+n || 0).toLocaleString(LANG(), { maximumFractionDigits: 0 });
   const ICO = (d) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>';
   const IC = {

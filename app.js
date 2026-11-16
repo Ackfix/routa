@@ -877,7 +877,7 @@ function startGps(force) {
   gpsWeakT = setTimeout(() => { if (!S.fixAt || Date.now() - S.fixAt > 15000) setGeoState('weak'); }, 15000);
   S.watchId = navigator.geolocation.watchPosition((p) => {
     const c = p.coords;
-    const now = { lat: c.latitude, lon: c.longitude, t: p.timestamp };
+    const now = { lat: c.latitude, lon: c.longitude, t: p.timestamp, alt: c.altitude != null && !isNaN(c.altitude) ? c.altitude : null, acc: c.accuracy };
     S.acc = c.accuracy;
     S.fixAt = Date.now();
     gpsRetryN = 0;
@@ -3274,7 +3274,8 @@ function openMenu() {
       ['vehicle', ic(v.icon), 'Véhicule · ' + v.label],
       X.open && ['carnet', XI.book || ic('info'), 'Carnet du véhicule'],
       X.open && ['parked', XI.park || ic('parking'), 'Parking'],
-      XO('drive') && xt('drive')
+      XO('drive') && xt('drive'),
+      XO('activity') && xt('activity')
     ]],
     ['Pro', [
       X.openPro && ['pro', PROI, 'Temps de conduite'],
@@ -3286,7 +3287,7 @@ function openMenu() {
     ]]
   ];
   // #008 : fonctions classées Premium (étiquette seulement pendant les tests, rien n'est verrouillé)
-  const PREM_TILES = ['plan', 'convoy', 'events', 'smart'];
+  const PREM_TILES = ['plan', 'convoy', 'events', 'smart', 'activity'];
   const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + (PREM_TILES.includes(t[0]) ? '<i class="prem tileprem">Premium</i>' : '') + t[1] + '<span>' + t[2] + '</span></button>';
   const body = openSheet('Menu',
     '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
