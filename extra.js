@@ -973,25 +973,34 @@ function consumption() {
   const km = f[f.length - 1].km - f[0].km; const l = f.slice(1).reduce((s, x) => s + x.liters, 0);
   return km > 0 ? (l / km * 100) : null;
 }
-function openCarnet() {
+/* Entretien et suivi : affiché directement dans « Mon véhicule » (plus d'écran séparé) */
+function carnetInto(root) {
+  if (!root) return;
   const cons = consumption();
   const spent = carnet.fills.reduce((s, x) => s + (x.price || 0), 0);
-  const body = openSheet('Carnet du véhicule',
-    '<h3>Rappels</h3>' + DUE.map(([k, l]) => { const v = carnet.dates[k] || ''; const days = v ? Math.ceil((Date.parse(v) - Date.now()) / 86400000) : null; return '<label class="field" for="cd_' + k + '">' + l + (days != null ? ' <span class="pill ' + (days < 0 ? 'warn' : days <= 30 ? 'warn' : 'ok') + '">' + (days < 0 ? 'dépassé' : 'dans ' + days + ' j') + '</span>' : '') + '<input id="cd_' + k + '" type="date" value="' + esc(v) + '"></label>'; }).join('') +
+  root.innerHTML = '<h3>' + esc(TRX('Entretien et suivi')) + '</h3>' +
+    '<h3>' + esc(TRX('Rappels')) + '</h3>' + DUE.map(([k, l]) => { const v = carnet.dates[k] || ''; const days = v ? Math.ceil((Date.parse(v) - Date.now()) / 86400000) : null; return '<label class="field" for="cd_' + k + '">' + l + (days != null ? ' <span class="pill ' + (days < 0 ? 'warn' : days <= 30 ? 'warn' : 'ok') + '">' + (days < 0 ? 'dépassé' : 'dans ' + days + ' j') + '</span>' : '') + '<input id="cd_' + k + '" type="date" value="' + esc(v) + '"></label>'; }).join('') +
     '<button class="btn soft block" id="cdIcs">' + IC.event + 'Ajouter les rappels au calendrier</button>' +
     '<h3>Pleins</h3>' +
     '<div class="row"><label class="field grow" for="fKm">Km au compteur<input id="fKm" type="number" inputmode="numeric"></label><label class="field grow" for="fL">Litres<input id="fL" type="number" step="0.01" inputmode="decimal"></label><label class="field grow" for="fP">Prix total<input id="fP" type="number" step="0.05" inputmode="decimal"></label></div>' +
     '<button class="btn block" id="fAdd">Ajouter le plein</button>' +
     (cons ? '<div class="card"><div class="grow"><b>Consommation moyenne : ' + cons.toFixed(1) + ' L/100 km</b><div class="sub">' + carnet.fills.length + ' pleins · ' + spent.toFixed(2) + ' au total</div></div></div>' : '<p class="muted small">Note au moins deux pleins (en faisant le plein complet) pour calculer ta consommation.</p>') +
     carnet.fills.slice(-8).reverse().map((f) => '<div class="card"><div class="grow"><b>' + (f.liters || '?') + ' L · ' + (f.price != null ? f.price.toFixed(2) : '?') + '</b><div class="sub">' + new Date(f.date).toLocaleDateString('fr-CH') + (f.km ? ' · ' + f.km + ' km' : '') + '</div></div></div>').join('') +
-    '<p class="muted small">Ton carnet reste sur ce téléphone.</p>', 'carnet');
-  DUE.forEach(([k]) => { body.querySelector('#cd_' + k).onchange = (e) => { carnet.dates[k] = e.target.value; saveCarnet(); openCarnet(); }; });
+    '<p class="muted small">' + esc(TRX('Ces informations restent sur ce téléphone.')) + '</p>';
+  const body = root;
+  DUE.forEach(([k]) => { body.querySelector('#cd_' + k).onchange = (e) => { carnet.dates[k] = e.target.value; saveCarnet(); carnetInto(root); }; });
   body.querySelector('#cdIcs').onclick = () => { const k = DUE.find(([x]) => carnet.dates[x]); if (!k) { toast('Choisis d\'abord une date.'); return; } DUE.forEach(([x, l]) => { if (carnet.dates[x]) icsDownload(l, new Date(carnet.dates[x] + 'T09:00:00'), 30, null, null, 'Rappel ROUTA'); }); };
   body.querySelector('#fAdd').onclick = () => {
-    const km = parseInt($('fKm').value, 10) || null, liters = parseFloat($('fL').value) || null, price = parseFloat($('fP').value);
+    const km = parseInt(body.querySelector('#fKm').value, 10) || null, liters = parseFloat(body.querySelector('#fL').value) || null, price = parseFloat(body.querySelector('#fP').value);
     if (!liters) { toast('Indique au moins les litres.'); return; }
-    carnet.fills.push({ date: Date.now(), km, liters, price: isNaN(price) ? null : price }); saveCarnet(); toast('Plein ajouté.'); openCarnet();
+    carnet.fills.push({ date: Date.now(), km, liters, price: isNaN(price) ? null : price }); saveCarnet(); toast('Plein ajouté.'); carnetInto(root);
   };
+  if (X.onCarnet) X.onCarnet(root);
+}
+X.carnetInto = carnetInto;
+function openCarnet() {
+  A.openK('vehicle');
+  setTimeout(() => { const c = document.getElementById('vehCarnet'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 250);
 }
 function carnetReminders() {
   const today = new Date().toISOString().slice(0, 10);
@@ -1114,7 +1123,6 @@ X.tiles = () => [
   ['chargers', IC.plug, 'Bornes libres'],
   ['parkfree', IC.park, 'Parkings libres'],
   ['cols', IC.mount, 'Cols et météo'],
-  ['carnet', IC.book, 'Carnet du véhicule'],
   ['parked', IC.car, 'Ma voiture garée']
 ];
 X.icons = IC;

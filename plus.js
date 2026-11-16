@@ -373,8 +373,8 @@
       '<div class="limgrid">' + [[cs.length, T('pays')], [cols.length, T('cols et routes')], [Math.round(V.km), 'km']].map(([n, l]) => '<div class="limcell"><div class="limv">' + n + '</div><div class="sub">' + esc(l) + '</div></div>').join('') + '</div>' +
       '<h3>' + esc(T('Pays traversés')) + '</h3>' +
       (cs.length ? '<div class="row wrap">' + cs.map(([cc]) => '<span class="pill">' + flag(cc) + ' ' + esc(T((C[cc] && C[cc].name) || cc)) + '</span>').join('') + '</div>' : '<p class="muted small">' + esc(T('Les pays où tu roules avec ROUTA s\'ajoutent ici tout seuls.')) + '</p>') +
-      '<h3>' + esc(T('Mes étapes')) + '</h3>' +
-      '<button class="btn block" id="vyAdd">' + esc('+ ' + T('Ajouter une étape')) + '</button>' +
+      '<h3>' + esc(T('Mes voyages')) + '</h3>' +
+      '<button class="btn block" id="vyAdd">' + esc('+ ' + T('Ajouter un voyage')) + '</button>' +
       (V.notes || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((n) => '<button class="card tap" data-note="' + esc(n.id) + '"><div class="ico" style="background:#FFB86B">' + IC.globe + '</div><div class="grow"><b>' + esc(n.place) + '</b><div class="sub">' + esc([n.date ? new Date(n.date + 'T12:00').toLocaleDateString(A.I18N && A.I18N.lang === 'sr' ? 'sr-Latn' : (A.I18N && A.I18N.lang) || 'fr', { day: 'numeric', month: 'long', year: 'numeric' }) : '', n.cc ? flag(n.cc) + ' ' + T((C[n.cc] && C[n.cc].name) || n.cc) : ''].filter(Boolean).join(' · ')) + '</div>' + (n.note ? '<div class="sub">' + esc(n.note) + '</div>' : '') + '</div></button>').join('') +
       '<h3>' + esc(T('Cols, routes et points de vue')) + '</h3>' +
       (cols.length ? cols.slice(0, 40).map(([id, c]) => '<button class="card tap" data-id="' + esc(id) + '"><div class="ico" style="background:#8EC5FF">' + IC.globe + '</div><div class="grow"><b>' + esc(c.n) + '</b><div class="sub">' + esc(new Date(c.at).toLocaleDateString(A.I18N && A.I18N.lang ? A.I18N.lang : 'fr')) + '</div></div></button>').join('') : '<p class="muted small">' + esc(T('Passe par un col ou une belle route de la liste « Spots » : elle s\'ajoute ici.')) + '</p>') +
@@ -392,13 +392,13 @@
     };
   }
 
-  /* Étapes ajoutées à la main : lieu, date, pays, note */
+  /* Voyages ajoutés à la main : lieu, date, pays, note */
   function openNote(id) {
     const C = window.ROUTA_COUNTRIES || {};
     V.notes = V.notes || [];
     const n = V.notes.find((x) => x.id === id) || { id: 'n' + Date.now(), place: '', date: new Date().toISOString().slice(0, 10), cc: S.country || '', note: '' };
     const ccs = Object.keys(C).sort((a, b) => T(C[a].name || a).localeCompare(T(C[b].name || b)));
-    const body = openSheet(T(id ? 'Modifier l\'étape' : 'Ajouter une étape'),
+    const body = openSheet(T(id ? 'Modifier le voyage' : 'Ajouter un voyage'),
       '<label class="field" for="vnPlace">' + esc(T('Lieu')) + '<input id="vnPlace" type="text" maxlength="80" value="' + esc(n.place) + '" placeholder="' + esc(T('Ville, col, lieu…')) + '"></label>' +
       (S.pos ? '<button class="btn soft block" id="vnHere">' + esc(T('Utiliser ma position actuelle')) + '</button>' : '') +
       '<label class="field" for="vnDate">' + esc(T('Date')) + '<input id="vnDate" type="date" value="' + esc(n.date || '') + '"></label>' +

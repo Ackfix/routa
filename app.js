@@ -2896,8 +2896,10 @@ function openVehicle(after, editId) {
     '<button class="btn block" id="vehSave">Enregistrer</button>' +
     '<button class="btn soft block" id="vehAdd">' + ic('plus') + 'Ajouter un autre véhicule <span class="prem">Premium</span></button>' +
     (base.rental && editId !== 'new' && editId !== 'rental' ? '<button class="btn soft block" id="vehRentEnd">' + esc(I18N.t('Fin de la location : revenir à mon véhicule')) + '</button>' : editId === 'rental' ? '<p class="muted small">' + esc(I18N.t('Véhicule de location : ton véhicule principal est gardé, tu pourras y revenir en un geste.')) + '</p>' : '<button class="btn soft block" id="vehRent">' + ic('car') + esc(I18N.t('Véhicule de location (temporaire)')) + ' <span class="prem">Premium</span></button>') +
+    (editId === 'new' || editId === 'rental' ? '' : '<div id="vehCarnet"></div>') +
     (list.length > 1 && editId !== 'new' ? '<button class="btn ghost" id="vehDel">Retirer ce véhicule</button>' : ''), 'vehicle');
   { const vl = body.querySelector('#vehLic'); if (vl) vl.onclick = () => openLicence(); }
+  if (window.ROUTA_X && ROUTA_X.carnetInto) ROUTA_X.carnetInto(body.querySelector('#vehCarnet'));
   const drawAsst = () => {
     const TB = TYPE_BRANDS[V.type];
     if (TB) { // autres véhicules que la voiture : seulement les marques de ce type, modèle libre
@@ -2921,14 +2923,29 @@ function openVehicle(after, editId) {
     if (V.brand || free) h += '<label class="field" for="vaModel">Modèle' + (free ? '<input id="vaModel" type="text" maxlength="30" value="' + esc(V.model || '') + '" placeholder="' + (two ? 'Ex. : MT-07' : 'Ex. : 2008') + '">' : '<select id="vaModel">' + opt('', '—', !V.model) + models.map((x) => opt(x, x, x === V.model)).join('') + '</select>') + '</label>';
     if (V.model) h += '<label class="field" for="vaYear">Année<select id="vaYear">' + opt('', '—', !V.year) + Array.from({ length: yNow - 1979 }, (_, i) => yNow + 1 - i).map((y) => opt(String(y), String(y), String(V.year) === String(y))).join('') + '</select></label>';
     if (V.year) h += '<h3>Motorisation</h3><div class="seg energyseg" id="vaEnergy">' + ENERGIES.map(([k, l]) => '<button data-v="' + k + '" class="' + (V.energy === k ? 'on' : '') + '">' + esc(k === 'essence' && I18N.lang !== 'fr' ? I18N.t('Essence (moteur)') : I18N.t(l)) + '</button>').join('') + '</div>';
-    if (V.energy) h += '<label class="field" for="vaVersion">Version (facultatif)<input id="vaVersion" type="text" maxlength="40" value="' + esc(V.version || '') + '" placeholder="Ex. : 1.2 PureTech 130 GT"></label>';
+    // Version : choisie avec des listes (puissance, boîte, finition) plutôt qu'écrite à la main
+    if (V.energy) {
+      const PS = [60, 70, 75, 80, 90, 100, 110, 115, 120, 130, 136, 140, 150, 156, 160, 170, 180, 190, 200, 204, 220, 245, 250, 265, 300, 340, 400, 450, 500];
+      const TRIMS = ['Base', 'Comfort', 'Style', 'Business', 'Sport', 'GT', 'GT Line', 'Premium', 'Luxe', 'Executive', 'R-Line', 'AMG Line', 'M Sport', 'S line', 'ST', 'RS', 'GTI', 'Allure', 'Active', 'Edition'];
+      h += '<h3>' + esc(I18N.t('Version')) + '</h3><div class="row">' +
+        '<label class="field grow" for="vaPs">' + esc(I18N.t('Puissance')) + '<select id="vaPs">' + opt('', '—', !V.ps) + PS.map((p) => opt(String(p), p + ' ch', String(V.ps) === String(p))).join('') + opt('__o', I18N.t('Autre'), V.ps && !PS.includes(+V.ps)) + '</select></label>' +
+        '<label class="field grow" for="vaGear">' + esc(I18N.t('Boîte')) + '<select id="vaGear">' + opt('', '—', !V.gear) + opt('man', I18N.t('Manuelle'), V.gear === 'man') + opt('auto', I18N.t('Automatique'), V.gear === 'auto') + '</select></label></div>' +
+        (V.ps && !PS.includes(+V.ps) ? '<label class="field" for="vaPsO">' + esc(I18N.t('Puissance (ch)')) + '<input id="vaPsO" type="number" inputmode="numeric" value="' + esc(V.ps === '__o' ? '' : V.ps) + '"></label>' : '') +
+        '<label class="field" for="vaTrim">' + esc(I18N.t('Finition')) + '<select id="vaTrim">' + opt('', '—', !V.trim) + TRIMS.map((t) => opt(t, t, V.trim === t)).join('') + opt('__o', I18N.t('Autre'), V.trim && !TRIMS.includes(V.trim)) + '</select></label>' +
+        (V.trim && !TRIMS.includes(V.trim) ? '<label class="field" for="vaTrimO">' + esc(I18N.t('Finition')) + '<input id="vaTrimO" type="text" maxlength="30" value="' + esc(V.trim === '__o' ? '' : V.trim) + '"></label>' : '');
+    }
     h += '<p class="muted small">' + (free ? '' : '<button class="txtlink" id="vaManual">Je ne trouve pas mon véhicule</button> · ') + '<button class="txtlink" id="vaMissing">Signaler un véhicule manquant</button></p>';
     $('vehAsst').innerHTML = h;
     const on = (id, ev, fn) => { const e = $(id); if (e) e[ev] = fn; };
     on('vaBrand', free ? 'oninput' : 'onchange', (e) => { V.brand = e.target.value.trim(); if (!free) { V.model = ''; V.year = ''; drawAsst(); } });
     on('vaModel', free ? 'oninput' : 'onchange', (e) => { V.model = e.target.value.trim(); if (!free) drawAsst(); else if (V.model && !$('vaYear')) drawAsst(); });
     on('vaYear', 'onchange', (e) => { V.year = e.target.value; drawAsst(); });
-    on('vaVersion', 'oninput', (e) => { V.version = e.target.value.trim(); });
+    const verUpd = () => { V.version = [V.ps && V.ps !== '__o' ? V.ps + ' ch' : '', V.gear === 'auto' ? I18N.t('Automatique') : V.gear === 'man' ? I18N.t('Manuelle') : '', V.trim && V.trim !== '__o' ? V.trim : ''].filter(Boolean).join(' · '); };
+    on('vaPs', 'onchange', (e) => { V.ps = e.target.value; verUpd(); drawAsst(); });
+    on('vaPsO', 'oninput', (e) => { V.ps = e.target.value.trim() || '__o'; verUpd(); });
+    on('vaGear', 'onchange', (e) => { V.gear = e.target.value; verUpd(); });
+    on('vaTrim', 'onchange', (e) => { V.trim = e.target.value; verUpd(); drawAsst(); });
+    on('vaTrimO', 'oninput', (e) => { V.trim = e.target.value.trim() || '__o'; verUpd(); });
     on('vaManual', 'onclick', () => { V.manual = true; drawAsst(); });
     on('vaMissing', 'onclick', () => openFeedback({ kind: 'idee', page: 'véhicule manquant', text: I18N.t('Véhicule manquant :') + ' ' + [V.brand, V.model, V.year].filter(Boolean).join(' ') }));
     $('vehAsst').querySelectorAll('#vaEnergy button').forEach((b) => { b.onclick = () => {
@@ -3403,7 +3420,6 @@ function openMenu() {
     ]],
     ['Mes déplacements', [
       ['vehicle', ic(v.icon), esc(I18N.t('Mon véhicule')) + ' · ' + esc(I18N.t(v.label))],
-      X.open && ['carnet', XI.book || ic('info'), 'Carnet du véhicule'],
       X.open && ['parked', XI.park || ic('parking'), 'Parking'],
       XO('drive') && xt('drive'),
       XO('activity') && xt('activity'),

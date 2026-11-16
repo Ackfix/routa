@@ -70,9 +70,9 @@
   setTimeout(smartReminders, 12000);
   setInterval(smartReminders, 3 * 3600000);
   /* champs ajoutés dans le carnet : kilométrage actuel et prochain service */
-  function carnetExtra() {
-    const body = document.getElementById('sheetBody');
-    if (!body || S.sheetView !== 'carnet' || body.querySelector('#cxSvc')) return;
+  function carnetExtra(root) {
+    const body = root || document.getElementById('sheetBody');
+    if (!body || body.querySelector('#cxSvc')) return;
     const ref = body.querySelector('#cdIcs'); if (!ref) return;
     const c = carnet(); const est = kmEstimate();
     const box = el('<div><h3>' + esc(T('Kilométrage')) + '</h3><div class="row"><label class="field grow" for="cxOdo">' + esc(T('Compteur actuel (km)')) + '<input id="cxOdo" type="number" inputmode="numeric" placeholder="' + (est != null ? esc(String(est)) : '') + '"></label><label class="field grow" for="cxSvc">' + esc(T('Prochain service à (km)')) + '<input id="cxSvc" type="number" inputmode="numeric" value="' + (c.serviceKm || '') + '"></label></div>' +
@@ -81,7 +81,7 @@
     box.querySelector('#cxOdo').onchange = (e) => { const v = parseInt(e.target.value, 10); if (v > 0) { const cc = carnet(); cc.odo = { km: v, at: Date.now() }; store.set('routa.carnet', cc); toast(T('Kilométrage enregistré.')); } };
     box.querySelector('#cxSvc').onchange = (e) => { const v = parseInt(e.target.value, 10); const cc = carnet(); cc.serviceKm = v > 0 ? v : null; store.set('routa.carnet', cc); toast(T('Rappel de service enregistré.')); };
   }
-  if (sb) new MutationObserver(() => carnetExtra()).observe(sb, { childList: true });
+  X.onCarnet = carnetExtra;
 
   /* =========================================================
      17 · DÉFIS ET BADGES
