@@ -80,8 +80,7 @@ button{height:46px;border-radius:12px;border:0;background:var(--accent);color:#1
     var names = Object.keys(P).sort(function (a, b) { return P[b].n - P[a].n; });
     if (!names.length) { box.innerHTML = '<span class="muted">Pas encore de données.</span>'; return; }
     box.innerHTML = names.map(function (n) {
-      var vs = Object.keys(P[n].v).sort(function (a, b) { return P[n].v[b] - P[n].v[a]; });
-      return '<div class="zone"><b>' + esc(n) + '</b><b>' + esc(P[n].n) + '</b></div>' + vs.map(function (c) { return '<div class="zone" style="padding-left:14px;font-size:13px"><span class="muted">' + esc(c) + '</span><span>' + esc(P[n].v[c]) + '</span></div>'; }).join('');
+      return '<div class="zone"><b>' + esc(n) + '</b><b>' + esc(P[n].n) + '</b></div>';
     }).join('');
   }
   async function places(zs) {
@@ -134,8 +133,8 @@ button{height:46px;border-radius:12px;border:0;background:var(--accent);color:#1
         '<h2>Conducteurs</h2><div class="grid">' + card(d.profils, 'profils créés') + card(d.actifs_24h, 'actifs ces 24 h') + card(d.actifs_7j, 'actifs sur 7 jours') + card(d.actifs_30j, 'actifs sur 30 jours') + '</div>' +
         '<h2>Dernière activité par jour (14 jours)</h2><div class="card bars">' + (days.length ? days.map(function (x) { return '<div class="bar"><span>' + esc(x.j.slice(5).split('-').reverse().join('.')) + '</span><i style="width:' + Math.max(4, Math.round(x.n / max * 100)) + '%"></i><b>' + esc(x.n) + '</b></div>'; }).join('') : '<span class="muted">Pas encore de données.</span>') + '</div>' +
         '<p class="muted">Chaque conducteur compte le jour de sa dernière ouverture de l\'app.</p>' +
-        '<h2>Pays et villes les plus actifs (30 jours)</h2><div class="card" id="zn"><span class="muted">Chargement…</span></div>' +
-        '<p class="muted">Villes déduites de la zone d\'activité des conducteurs (environ 10 km), jamais de position exacte.</p>' +
+        '<h2>Pays les plus actifs (30 jours)</h2><div class="card" id="zn"><span class="muted">Chargement…</span></div>' +
+        '<p class="muted">Pays déduits de la zone d\'activité des conducteurs, jamais de position exacte.</p>' +
         '<p><button id="rf">Actualiser</button></p></div><div id="p2" hidden></div>';
       tabs();
       document.getElementById('rf').onclick = load;
