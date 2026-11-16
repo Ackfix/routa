@@ -914,7 +914,7 @@ X.arrived = (dest) => {
 X.parkingsNear = async (dest) => {
   const body = openSheet(TRX('Parkings près de la destination'), '<p class="muted">' + esc(TRX('Recherche des parkings…')) + '</p>', 'parkdest');
   let els = [];
-  try { els = await A.overpass('[out:json][timeout:20];nwr["amenity"="parking"]["access"!~"private|customers|no"](around:700,' + dest.lat.toFixed(5) + ',' + dest.lon.toFixed(5) + ');out center 60;'); } catch (e) { els = null; }
+  try { els = await Promise.race([A.overpass('[out:json][timeout:20];nwr["amenity"="parking"]["access"!~"private|customers|no"](around:700,' + dest.lat.toFixed(5) + ',' + dest.lon.toFixed(5) + ');out center 60;', !!(A.inCH && A.inCH(dest))), new Promise((_, rej) => setTimeout(() => rej(new Error('lent')), 25000))]); } catch (e) { els = null; }
   if (S.sheetView !== 'parkdest') return;
   if (!els) { body.innerHTML = '<p class="muted">' + esc(TRX('Données indisponibles pour le moment. Réessaie plus tard.')) + '</p>'; return; }
   const list = els.map((e) => { const c = e.center || e; const t = e.tags || {}; return { name: t.name || (t.parking === 'underground' ? TRX('Parking souterrain') : t.parking === 'multi-storey' ? TRX('Parking couvert') : TRX('Parking')), lat: c.lat, lon: c.lon, t }; })
