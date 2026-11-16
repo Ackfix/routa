@@ -3284,7 +3284,7 @@ function openProfile() {
     '<button class="btn block" id="pfSave">Enregistrer</button>' +
     '<button class="btn block" id="pfFeedback">' + ic('msg') + 'Signaler un problème ou une idée</button>' +
     '<a class="btn soft block" href="aide.html" style="text-decoration:none">' + ic('info') + 'Aide et installation (iPhone, Android)</a>' +
-    '<div class="banner">' + ic('info') + '<span>' + (S.online ? 'Mode en ligne : alertes, spots, conducteurs et messages partagés.' : 'Mode solo : tes alertes et spots restent sur ce téléphone.') + ' Version ' + VERSION + '. Carte © OpenStreetMap, OpenFreeMap. Itinéraires OSRM et Valhalla. Recherche Photon.</span></div>' +
+    '<div class="banner">' + ic('info') + '<span>' + esc(I18N.t(S.online ? 'Mode en ligne : alertes, spots et positions partagés.' : 'Mode solo : tes alertes et spots restent sur ce téléphone.')) + ' ' + esc(I18N.t('Version')) + ' ' + VERSION + '.</span></div>' +
     '<p class="muted small"><a href="confidentialite.html" style="color:var(--info)">Confidentialité et règles d\'utilisation</a></p>', 'profile');
   const save = f.bind(body);
   body.querySelector('#pfSave').onclick = () => { if (save()) { toast('Profil enregistré.'); closeSheet(); } };
@@ -3316,7 +3316,7 @@ function openSettings() {
     '<p class="muted small"><a href="confidentialite.html" style="color:var(--info)">Confidentialité et règles d\'utilisation</a></p>' +
     '<button class="btn ghost" id="pfReset">Réinitialiser mon profil sur ce téléphone</button>' +
     '<button class="btn danger block" id="pfWipe">Supprimer mes données</button>' +
-    '<p class="muted small">Version ' + VERSION + '.</p>', 'settings');
+    '<p class="muted small">' + esc(I18N.t('Version')) + ' ' + VERSION + '.</p>', 'settings');
   const ch = (id, fn) => { const e = body.querySelector('#' + id); if (e) e.onchange = (ev) => { fn(ev.target.checked !== undefined && ev.target.type === 'checkbox' ? ev.target.checked : ev.target.value); saveSettings(); }; };
   ch('stVoice', (v) => { S.settings.voice = v; if (v) unlockVoice(); $('btnMute').classList.toggle('muted', !v); });
   ch('stAlert', (v) => { S.settings.speedAlert = v; });
@@ -3423,7 +3423,7 @@ function openCredits() {
     ['Valhalla / OSRM', I18N.t('Itinéraires'), 'https://valhalla.github.io/valhalla/'],
     ['Photon (komoot)', I18N.t('Recherche d\'adresses'), 'https://photon.komoot.io'],
     ['Mapzen / AWS Terrain Tiles', I18N.t('Relief'), 'https://registry.opendata.aws/terrain-tiles/'],
-    ['Wikipédia', 'CC BY-SA', 'https://www.wikipedia.org']
+    ['Wikipedia', 'CC BY-SA', 'https://www.wikipedia.org']
   ];
   openSheet(I18N.t('Crédits de la carte'), L.map(([n, d, u]) => '<a class="card tap" href="' + esc(u) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span class="grow"><b>' + esc(n) + '</b><span class="sub">' + esc(d) + '</span></span></a>').join(''), 'credits');
 }
