@@ -549,8 +549,38 @@ X.preview = (R, dest, body) => {
   }
   box.appendChild(viaBox(dest, R));
   if (!/parking/i.test(dest.sub || '')) { const pb = el('<button class="btn soft block">' + ic('parking') + esc(TRX('Parkings près de la destination')) + '</button>'); pb.onclick = () => X.parkingsNear(dest); box.appendChild(pb); }
+  if ((R.duration || 0) > 7200 && (!R.mode || R.mode === 'car')) { const bb = el('<button class="btn soft block">' + ic('truckstop') + esc(TRX('Pauses conseillées sur le trajet')) + ' <span class="prem">Premium</span></button>'); bb.onclick = () => X.smartBreaks(R, dest); box.appendChild(bb); }
   go.parentNode.insertBefore(box, go.nextSibling);
   routeWeather(R, box);
+};
+/* #041 (Premium, étiquette seulement) : pauses environ toutes les 2 h de conduite (conseil TCS), aires réelles OSM ajoutables comme étape */
+X.smartBreaks = async (R, dest) => {
+  const body = openSheet(TRX('Pauses conseillées'), '<p class="muted">' + esc(TRX('Recherche des aires sur ton trajet…')) + '</p>', 'breaks');
+  const C = R.coords, cum = [0];
+  for (let i = 1; i < C.length; i++) cum.push(cum[i - 1] + dist(C[i - 1], C[i]));
+  const tot = cum[cum.length - 1] || 1, dur = R.duration, stops = [];
+  for (let t = 7200; t < dur - 1200; t += 7200) { const target = tot * t / dur; let i = cum.findIndex((d) => d >= target); if (i < 0) i = C.length - 1; stops.push({ t, i, lat: C[i].lat, lon: C[i].lon }); }
+  if (!stops.length) { body.innerHTML = '<p class="muted">' + esc(TRX('Trajet court : pas de pause particulière à prévoir.')) + '</p>'; return; }
+  const v = A.veh ? A.veh() : {}, ev = !!v.ev;
+  const around = (k) => stops.map((p) => k + '(around:9000,' + p.lat.toFixed(4) + ',' + p.lon.toFixed(4) + ');').join('');
+  const q = '[out:json][timeout:25];(' + around('nwr["highway"~"^(services|rest_area)$"]') + ');out center tags 200;';
+  let els = null;
+  try { els = await Promise.race([A.overpass(q, stops.every((p) => A.inCH && A.inCH(p))), new Promise((_, rej) => setTimeout(() => rej(new Error('lent')), 30000))]); } catch (e) { els = null; }
+  if (S.sheetView !== 'breaks') return;
+  if (!els) { body.innerHTML = '<p class="muted">' + esc(TRX('Données indisponibles pour le moment. Réessaie plus tard.')) + '</p>'; return; }
+  const items = els.map((e) => { const c = e.center || e; const t = e.tags || {}; return { lat: c.lat, lon: c.lon, t, name: t.name || (t.highway === 'services' ? TRX('Aire de service') : TRX('Aire de repos')) }; }).filter((x) => x.lat != null);
+  const per = stops.map((p) => {
+    const near = items.map((x) => Object.assign({}, x, { d: dist(x, p), onRoute: (() => { let m = Infinity; for (let j = Math.max(0, p.i - 400); j < Math.min(C.length, p.i + 400); j += 3) m = Math.min(m, dist(x, C[j])); return m; })() }))
+      .filter((x) => x.onRoute < 1500).sort((a, b) => (b.t.highway === 'services') - (a.t.highway === 'services') || a.d - b.d);
+    const seen = new Set(); return near.filter((x) => { const k = x.name + Math.round(x.lat * 100); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 3);
+  });
+  const fmtT = (sec) => { const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return h + ' h' + (m ? ' ' + String(m).padStart(2, '0') : ''); };
+  const feat = (t) => [t.highway === 'services' ? TRX('Restauration et carburant') : '', t.toilets === 'yes' || t.amenity === 'toilets' ? TRX('Toilettes') : '', ev && t['charging_station'] === 'yes' ? TRX('Recharge') : ''].filter(Boolean).join(' · ');
+  const list = [];
+  body.innerHTML = '<p class="muted small">' + esc(TRX('Le TCS conseille de ne pas conduire plus de 2 heures d\'affilée et de s\'arrêter dès les premiers signes de fatigue.')) + '</p>' + stops.map((p, k) => '<h3>' + esc(TRX('Pause vers {t} de route', { t: fmtT(p.t) })) + ' · km ' + Math.round(R.total * p.t / dur / 1000) + '</h3>' +
+    (per[k].length ? per[k].map((x) => { list.push(x); return '<button class="card tap" data-i="' + (list.length - 1) + '"><span class="ico" style="background:#2E7D5B">' + ic('truckstop') + '</span><span class="grow"><b>' + esc(x.name) + '</b><span class="sub">' + esc([fmtDist(x.d) + ' ' + TRX('du point de pause'), feat(x.t)].filter(Boolean).join(' · ')) + '</span></span><span class="val small">' + esc(TRX('Ajouter')) + '</span></button>'; }).join('') : '<p class="muted small">' + esc(TRX('Aucune aire connue près de ce point : prévois un arrêt dans une localité proche.')) + '</p>')).join('') +
+    '<p class="muted small">' + esc(TRX('Source : OpenStreetMap. Les équipements peuvent être incomplets.')) + '</p>';
+  body.querySelectorAll('[data-i]').forEach((b) => { b.onclick = () => { const x = list[+b.dataset.i]; X.addVia({ name: x.name, lat: x.lat, lon: x.lon }, dest); }; });
 };
 setInterval(() => {
   if (!S.nav || !S.pos || !X.via.length) return;
