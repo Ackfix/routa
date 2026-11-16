@@ -249,7 +249,7 @@ window.ROUTA_I18N_ROWS = (window.ROUTA_I18N_ROWS || []).concat([
 ["Disponibilité en direct : TomTom (pas encore connue pour toutes les bornes).", "Live availability: TomTom (not yet known for every charger).", "Canlı durum: TomTom (henüz her şarj noktası için bilinmiyor)."],
 ["Aucune borne trouvée dans ce coin.", "No chargers found around here.", "Bu çevrede şarj noktası bulunamadı."],
 ["Service de bornes indisponible pour le moment.", "Charger service unavailable right now.", "Şarj noktası hizmeti şu anda kullanılamıyor."],
-["Disponibilité", "Availability", "Durum"],
+["Disponibilité", "Availability", "Hazır bekleme"],
 ["Recherche…", "Searching…", "Aranıyor…"],
 ["Pas de données en direct pour cette borne.", "No live data for this charger.", "Bu şarj noktası için canlı veri yok."],
 ["en ce moment", "right now", "şu anda"],
