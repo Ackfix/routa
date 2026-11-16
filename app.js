@@ -945,6 +945,14 @@ document.addEventListener('visibilitychange', () => {
 if (navigator.permissions && navigator.permissions.query) {
   navigator.permissions.query({ name: 'geolocation' }).then((ps) => { ps.onchange = () => { if (ps.state === 'granted') startGps(true); else if (ps.state === 'denied') setGeoState('denied'); }; }).catch(() => {});
 }
+function estSpeedH(H, now, acc) {
+  let o = null; const tN = H[H.length - 1].t;
+  for (let i = 0; i < H.length - 1; i++) if ((tN - H[i].t) / 1000 >= 2.5) o = H[i];
+  if (!o) return S.pos ? estSpeed(S.pos, now) || null : null;
+  const span = (tN - o.t) / 1000, d = dist(o, now);
+  if (d < Math.max(8, acc * 1.2)) return 0;
+  return d / span;
+}
 function estSpeed(a, b) { const dt = (b.t - a.t) / 1000; const d = dist(a, b); if (dt < 0.8 || d < Math.max(15, 2 * (S.acc || 0))) return 0; return d / dt; }
 /* Vitesse fiable : pas de vitesse « fantôme » à l'arrêt (relevés figés, GPS qui saute sur place) */
 function filterSpeed(c, now) {
@@ -952,7 +960,9 @@ function filterSpeed(c, now) {
   if (H.length) { const iv = Date.now() - H[H.length - 1].t; if (iv > 200 && iv < 20000) S.fixIv = S.fixIv ? S.fixIv * 0.7 + iv * 0.3 : iv; }
   H.push({ lat: now.lat, lon: now.lon, t: Date.now(), acc: c.accuracy || 0 });
   while (H.length > 2 && Date.now() - H[0].t > 10000) H.shift();
-  let raw = (c.speed != null && c.speed >= 0 && !((c.accuracy || 0) > 60 && c.speed > 0)) ? c.speed : (S.pos ? estSpeed(S.pos, now) : null);
+  // sans vitesse donnée par le téléphone (ou -1 sur iPhone), on la calcule sur les 2,5 à 10 dernières secondes :
+  // entre deux relevés à 1 s d'intervalle on ne bouge que de quelques mètres, ce qui donnait 0 km/h à basse vitesse
+  let raw = (c.speed != null && c.speed >= 0 && !((c.accuracy || 0) > 60 && c.speed > 0)) ? c.speed : estSpeedH(H, now, c.accuracy || 0);
   if (raw == null) return S.speed == null ? null : S.speed;
   if (raw > 70) raw = S.speed || 0; // saut de position (GPS retrouvé) : pas une vraie vitesse
   if (raw > 0 && H.length >= 3) {
