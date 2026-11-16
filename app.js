@@ -171,6 +171,16 @@ const VEHICLES = {
   bus: { label: 'Car / bus', icon: 'bus', heavy: true, costing: 'bus', dims: { height: 3.8, width: 2.55, length: 13.5, weight: 19 } },
   camion: { label: 'Poids lourd', icon: 'truck', heavy: true, costing: 'truck', hgv: true, dims: { height: 4, width: 2.55, length: 16.5, weight: 40 } }
 };
+/* Marques par type de véhicule (constructeurs réels) : la liste ne montre que celles du type choisi ; modèle libre */
+const TYPE_BRANDS = {
+  moto: ['Aprilia', 'BMW', 'Ducati', 'Harley-Davidson', 'Honda', 'Husqvarna', 'Kawasaki', 'KTM', 'Kymco', 'Moto Guzzi', 'Peugeot', 'Piaggio', 'Royal Enfield', 'Suzuki', 'SYM', 'Triumph', 'Vespa', 'Yamaha'],
+  cyclo: ['Aprilia', 'Honda', 'Kymco', 'MBK', 'NIU', 'Peugeot', 'Piaggio', 'Silence', 'SYM', 'Vespa', 'Yamaha'],
+  camping: ['Adria', 'Bürstner', 'Carthago', 'Challenger', 'Chausson', 'Dethleffs', 'Frankia', 'Hobby', 'Hymer', 'Knaus', 'Laika', 'LMC', 'Malibu', 'Morelo', 'Pilote', 'Pössl', 'Rapido', 'Sunlight', 'Weinsberg', 'Westfalia'],
+  remorque: ['Adria', 'Bürstner', 'Caravelair', 'Dethleffs', 'Eriba', 'Fendt', 'Hobby', 'Knaus', 'LMC', 'Sterckeman', 'Tabbert', 'Weinsberg'],
+  minibus: ['Citroën', 'Fiat', 'Ford', 'Iveco', 'Mercedes-Benz', 'Opel', 'Peugeot', 'Renault', 'Toyota', 'Volkswagen'],
+  bus: ['Irizar', 'Iveco Bus', 'MAN', 'Mercedes-Benz', 'Neoplan', 'Otokar', 'Scania', 'Setra', 'Solaris', 'Temsa', 'Van Hool', 'VDL', 'Volvo'],
+  camion: ['DAF', 'Fuso', 'Hino', 'Isuzu', 'Iveco', 'MAN', 'Mercedes-Benz', 'Renault Trucks', 'Scania', 'Tatra', 'Volvo']
+};
 const DIM_LABELS = [['height', 'Hauteur', 'm'], ['width', 'Largeur', 'm'], ['length', 'Longueur', 'm'], ['weight', 'Poids total', 't']];
 
 /* ======================= État ======================= */
@@ -2843,6 +2853,20 @@ function openVehicle(after, editId) {
     (base.rental && editId !== 'new' && editId !== 'rental' ? '<button class="btn soft block" id="vehRentEnd">' + esc(I18N.t('Fin de la location : revenir à mon véhicule')) + '</button>' : editId === 'rental' ? '<p class="muted small">' + esc(I18N.t('Véhicule de location : ton véhicule principal est gardé, tu pourras y revenir en un geste.')) + '</p>' : '<button class="btn soft block" id="vehRent">' + ic('car') + esc(I18N.t('Véhicule de location (temporaire)')) + ' <span class="prem">Premium</span></button>') +
     (list.length > 1 && editId !== 'new' ? '<button class="btn ghost" id="vehDel">Retirer ce véhicule</button>' : ''), 'vehicle');
   const drawAsst = () => {
+    const TB = TYPE_BRANDS[V.type];
+    if (TB) { // autres véhicules que la voiture : seulement les marques de ce type, modèle libre
+      const other = V.brand && !TB.includes(V.brand);
+      let h2 = '<label class="field" for="vaBrandT">' + esc(I18N.t('Marque')) + '<select id="vaBrandT">' + opt('', '—', !V.brand) + TB.map((b) => opt(b, b, V.brand === b)).join('') + opt('__other', I18N.t('Autre marque'), other) + '</select></label>';
+      if (other || V.brandOther) h2 += '<label class="field" for="vaBrandO">' + esc(I18N.t('Autre marque')) + '<input id="vaBrandO" type="text" maxlength="30" value="' + esc(other ? V.brand : '') + '"></label>';
+      h2 += '<label class="field" for="vaModelT">' + esc(I18N.t('Modèle')) + '<input id="vaModelT" type="text" maxlength="30" value="' + esc(V.model || '') + '"></label>';
+      h2 += '<p class="muted small"><button class="txtlink" id="vaMissing">' + esc(I18N.t('Signaler un véhicule manquant')) + '</button></p>';
+      $('vehAsst').innerHTML = h2;
+      $('vaBrandT').onchange = (e) => { if (e.target.value === '__other') { V.brandOther = true; V.brand = ''; } else { V.brandOther = false; V.brand = e.target.value; } drawAsst(); };
+      const bo = $('vaBrandO'); if (bo) bo.oninput = (e) => { V.brand = e.target.value.trim(); };
+      $('vaModelT').oninput = (e) => { V.model = e.target.value.trim(); };
+      $('vaMissing').onclick = () => openFeedback({ kind: 'idee', page: 'véhicule manquant', text: I18N.t('Véhicule manquant :') + ' ' + [V.brand, V.model].filter(Boolean).join(' ') });
+      return;
+    }
     const brands = Object.keys(DB0).sort((a, b) => a.localeCompare(b));
     const models = V.brand && DB0[V.brand] ? DB0[V.brand] : [];
     const two = !!(VEHICLES[V.type] || {}).two;
@@ -2882,6 +2906,7 @@ function openVehicle(after, editId) {
       V.type = k === 'voiture' ? (V.energy === 'electrique' ? 'electrique' : (V.energy === 'hybride' || V.energy === 'phev') ? 'hybride' : 'voiture') : k;
       V.dims = Object.assign({}, (VEHICLES[V.type] || {}).dims || {});
       body.querySelectorAll('#vehGrid .typebtn').forEach((x) => x.classList.toggle('sel', x === b));
+      const tb = TYPE_BRANDS[V.type]; if (tb && V.brand && !tb.includes(V.brand) && !V.brandOther) { V.brand = ''; V.model = ''; V.year = ''; }
       drawAsst(); drawDims();
     };
   });

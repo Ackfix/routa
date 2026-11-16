@@ -1293,6 +1293,13 @@ function frHgvBan(now) {
   return (offDay && h < 22) || (offNext && h >= 22);
 }
 function proSave() { const cut = Date.now() - 15 * 24 * H; PRO.segs = PRO.segs.filter((s) => !s.e || s.e > cut); store.set('routa.pro', PRO); }
+const PA_ICO = { drive: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2"/><path d="M12 3.5v6.5M4 13.5l6.2-.8M20 13.5l-6.2-.8"/></svg>', break: '<svg viewBox="0 0 24 24"><path d="M5 9h11v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M12 3v3"/></svg>', work: '<svg viewBox="0 0 24 24"><path d="M14 6a4 4 0 0 0 5 5l-8 8a2 2 0 0 1-3-3z"/></svg>', rest: '<svg viewBox="0 0 24 24"><path d="M3 18v-6h18v6M3 14h18M7 12V9h4v3"/></svg>' };
+function proFavs() { const f = (PRO.favs || []).filter((k) => PRO_RULES[k]); return f.length ? f : Object.keys(PRO_RULES); }
+/* App fermée pendant la conduite automatique : on ne compte pas le temps où ROUTA ne voyait rien comme de la conduite */
+(function proResume() {
+  const c = PRO.segs[PRO.segs.length - 1];
+  if (PRO.on && PRO.auto && c && !c.e && c.a === 'drive' && PRO.lastTick && Date.now() - PRO.lastTick > 5 * MIN) { c.e = PRO.lastTick; PRO.segs.push({ a: 'break', s: PRO.lastTick, e: null }); store.set('routa.pro', PRO); }
+})();
 function proCur() { const s = PRO.segs[PRO.segs.length - 1]; return s && !s.e ? s : null; }
 function proSet(a, at) {
   at = at || Date.now();
@@ -1363,7 +1370,7 @@ function proTick(force) {
   if (cc === 'CH' && v.isHgv && kmh > 8 && (h >= 22 || h < 5 || sunday)) proWarn('ban' + new Date().toDateString() + (h >= 22 || h < 5 ? 'n' : 's'), TRX('Poids lourd : la circulation est interdite en Suisse la nuit (22 h – 5 h) et le dimanche, sauf autorisation.'));
   if (force && S.sheetView === 'pro') openPro();
 }
-setInterval(() => proTick(false), 5000);
+setInterval(() => { proTick(false); if (PRO.on) { PRO.lastTick = Date.now(); store.set('routa.pro', PRO); } }, 5000);
 
 function openPro() {
   const reg = proRegime(), st = PRO.on ? proStats() : null, cur = proCur();
@@ -1371,21 +1378,26 @@ function openPro() {
   const R = PRO_RULES[reg];
   const body = openSheet('Temps de conduite (pro)',
     '<label class="switch" for="proOn"><span><b>Activer le mode pro</b><br><span class="muted small">Compteur de conduite et de pauses sur la carte</span></span><input type="checkbox" id="proOn"' + (PRO.on ? ' checked' : '') + '></label>' +
-    '<div class="seg" id="proReg">' + Object.keys(PRO_RULES).map((k) => '<button data-r="' + k + '" class="' + (k === reg ? 'on' : '') + '">' + PRO_RULES[k].label + '</button>').join('') + '</div>' +
+    (PRO.on && cur ? '<div class="prostatus pa-' + cur.a + '"><span class="psl">' + esc(TRX('En ce moment')) + '</span><b>' + esc(TRX(ACT[cur.a])) + '</b><span>' + esc(TRX('depuis {t}', { t: fmtClock(new Date(cur.s)) })) + ' · ' + hm(Date.now() - cur.s) + '</span></div>' : '') +
+    '<label class="field" for="proRegSel"><span>' + esc(TRX('Mode de règles')) + '</span><select id="proRegSel">' + proFavs().map((k) => '<option value="' + k + '"' + (k === reg ? ' selected' : '') + '>' + esc(PRO_RULES[k].label) + '</option>').join('') + '</select></label>' +
+    '<details class="proedit"><summary>' + esc(TRX('Personnaliser la liste des modes')) + '</summary>' + Object.keys(PRO_RULES).map((k) => '<label class="switch" for="prf_' + k + '"><span><b>' + esc(PRO_RULES[k].label) + '</b></span><input type="checkbox" id="prf_' + k + '"' + (proFavs().includes(k) ? ' checked' : '') + '></label>').join('') + '</details>' +
     '<p class="muted small">' + esc(TRX(R.sub)) + '</p>' +
     (PRO.on ? (
-      '<div class="proacts">' + Object.keys(ACT).map((a) => '<button data-a="' + a + '" class="' + (cur && cur.a === a ? 'on' : '') + '">' + ACT[a] + '</button>').join('') + '</div>' +
+      '<div class="proacts big">' + Object.keys(ACT).map((a) => '<button data-a="' + a + '" class="pa-' + a + (cur && cur.a === a ? ' on' : '') + '" aria-pressed="' + (cur && cur.a === a ? 'true' : 'false') + '"><span class="paico">' + PA_ICO[a] + '</span>' + esc(TRX(ACT[a])) + '</button>').join('') + '</div>' +
       '<label class="switch" for="proAuto"><span><b>Détection automatique</b><br><span class="muted small">Conduite dès 8 km/h, pause après 3 min à l\'arrêt</span></span><input type="checkbox" id="proAuto"' + (PRO.auto ? ' checked' : '') + '></label>' +
       '<div class="procard"><div class="prorow"><b>Conduite continue</b><span>' + hm(st.cont) + ' / 4 h 30</span></div>' + bar(st.cont, R.cont) + '<span class="muted small">' + (reg === 'otr2' ? TRX('Puis pause de 45 min (ou 15 + 30 min, ou 30 min / 2 × 20 min si elle est prise plus tôt).') : TRX('Puis pause de 45 min (ou 15 + 30 min).')) + '</span></div>' +
       '<div class="procard"><div class="prorow"><b>Conduite aujourd\'hui</b><span>' + hm(st.day) + ' / ' + hm(R.day) + '</span></div>' + bar(st.day, R.day) + (R.dayExt ? '<span class="muted small">10 h possibles deux fois par semaine.</span>' : '') + '</div>' +
       '<div class="procard"><div class="prorow"><b>Conduite cette semaine</b><span>' + hm(st.week) + ' / ' + hm(R.week) + '</span></div>' + bar(st.week, R.week) +
         (R.twoWeeks ? '<span class="muted small">' + TRX('Sur deux semaines : {t}', { t: hm(st.two) + ' / ' + hm(R.twoWeeks) }) + '</span>' : '') + '</div>' +
       (st.restBy ? '<div class="procard"><b>' + TRX('Repos journalier') + '</b><span class="muted small">' + TRX('11 h de repos à commencer au plus tard vers {t} (9 h possibles trois fois par semaine).', { t: fmtClock(new Date(st.restBy)) }) + '</span></div>' : '') +
-      '<div class="row wrap"><button class="btn soft grow" id="proPark">Parkings proches</button><button class="btn soft grow" id="proLog">Relevé 14 jours</button></div>'
+      '<div class="row wrap"><button class="btn soft grow" id="proPark">Parkings proches</button><button class="btn soft grow" id="proLog">Relevé 14 jours</button></div>' +
+      '<p class="muted small">' + esc(TRX('Tout est gardé sur ce téléphone, même après la fermeture de l\'app : mode, temps de conduite, pauses et réglages.')) + '</p><button class="btn ghost block" id="proReset">' + esc(TRX('Remettre les compteurs à zéro')) + '</button>'
     ) : '') +
     '<p class="muted small">' + (reg === 'ue' ? TRX('Aide au respect du règlement (CE) 561/2006. Ne remplace pas le tachygraphe : en cas de contrôle, seul celui-ci fait foi.') : TRX('Aide au respect de l\'{r}. Ne remplace ni le tachygraphe ni le livret de travail : en cas de contrôle, seuls ceux-ci font foi.', { r: reg === 'otr1' ? 'OTR 1 (RS 822.221)' : 'OTR 2 (RS 822.222)' })) + '</p>', 'pro');
   body.querySelector('#proOn').onchange = (e) => { PRO.on = e.target.checked; if (!PRO.on) proSet(null); proSave(); proTick(); openPro(); };
-  body.querySelectorAll('#proReg button').forEach((b) => { b.onclick = () => { PRO.regime = b.dataset.r; proSave(); proTick(); openPro(); }; });
+  body.querySelector('#proRegSel').onchange = (e) => { PRO.regime = e.target.value; proSave(); proTick(); openPro(); };
+  Object.keys(PRO_RULES).forEach((k) => { const c = body.querySelector('#prf_' + k); if (c) c.onchange = () => { let f = proFavs().filter((x) => x !== k); if (c.checked) f.push(k); f = Object.keys(PRO_RULES).filter((x) => f.includes(x)); if (!f.length) { c.checked = true; return; } PRO.favs = f; if (!f.includes(proRegime())) PRO.regime = f[0]; proSave(); openPro(); }; });
+  const rs = body.querySelector('#proReset'); if (rs) rs.onclick = () => { if (rs.dataset.sure) { PRO.segs = []; proSave(); proTick(); toast(esc(TRX('Compteurs remis à zéro.'))); openPro(); } else { rs.dataset.sure = '1'; rs.textContent = TRX('Touche encore pour confirmer : tout sera effacé'); rs.classList.add('danger'); } };
   body.querySelectorAll('.proacts button').forEach((b) => { b.onclick = () => { PRO.auto = b.dataset.a === 'drive' ? PRO.auto : false; proSet(b.dataset.a); openPro(); }; });
   const au = body.querySelector('#proAuto'); if (au) au.onchange = (e) => { PRO.auto = e.target.checked; proSave(); };
   const pk = body.querySelector('#proPark'); if (pk) pk.onclick = () => A.openK && A.openK('parking');
