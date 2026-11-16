@@ -634,3 +634,5 @@ body.navsoft .tripchip { display: none; }
 .actv { font-size: 22px; font-weight: 800; }
 .acttrace { display: block; width: 100%; max-height: 260px; margin: 10px 0; background: var(--bg); border-radius: 16px; }
 .acttrace path { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+#smEx { overflow: visible; margin-right: 0; padding-right: 0; }
+#smEx .chip { white-space: normal; height: auto; min-height: 36px; padding: 8px 12px; text-align: left; box-shadow: none; border: 1px solid var(--line); max-width: 100%; }
