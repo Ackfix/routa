@@ -2773,7 +2773,7 @@ function openDrivers() {
   const keepScroll = S.sheetView === 'drivers' ? $('sheetBody').scrollTop : 0;
   const body = openSheet('Conducteurs autour', '<h3>' + esc(I18N.t('Visibilité sur la carte')) + '</h3>' + visSeg('dvVis') +
     (!S.online ? '<div class="banner">' + ic('info') + '<span>Mode solo : active le mode en ligne (voir le guide) pour voir les autres conducteurs.</span></div>' : '') +
-    (list.length ? list.map((d, i) => '<div class="card"><div class="ico" style="background:' + esc(d.color || '#FF8A3D') + ';border-radius:22px">' + esc(initials(d.pseudo)) + '</div><button class="grow" data-open="' + i + '" style="background:none;border:0;text-align:left;padding:0"><b>' + esc(d.pseudo) + '</b><div class="sub">' + esc(d.car || 'Voiture inconnue') + ' · ' + (d.dist != null ? (d.fuzzy ? 'env. ' : '') + fmtDist(d.dist) : '') + (d.speed ? ' · ' + d.speed + ' km/h' : '') + '</div></button><button class="btn small" data-bump="' + i + '">Bump</button></div>').join('')
+    (list.length ? list.map((d, i) => '<div class="card"><div class="ico" style="background:' + esc(d.color || '#FF8A3D') + ';border-radius:22px">' + esc(initials(d.pseudo)) + '</div><button class="grow" data-open="' + i + '" style="background:none;border:0;text-align:left;padding:0"><b>' + esc(d.pseudo) + '</b><div class="sub">' + esc(d.car || 'Voiture inconnue') + ' · ' + (d.dist != null ? (d.fuzzy ? 'env. ' : '') + fmtDist(d.dist) : '') + (d.speed ? ' · ' + d.speed + ' km/h' : '') + '</div></button></div>').join('')
       : '<div class="empty">Personne de visible pour le moment.</div>'), 'drivers');
   body.scrollTop = keepScroll;
   bindVisSeg(body, 'dvVis');
@@ -2784,11 +2784,9 @@ function openDriver(id) {
   const d = driversList().find((x) => x.id === id); if (!d) { toast("Ce conducteur n'est plus visible."); return; }
   const body = openSheet(d.pseudo,
     '<div class="row"><div class="ico" style="background:' + esc(d.color || '#FF8A3D') + ';border-radius:22px">' + esc(initials(d.pseudo)) + '</div><div class="grow"><b>' + esc(d.car || 'Voiture inconnue') + '</b><div class="sub">' + (d.fuzzy ? 'Zone approximative · ' : '') + (d.dist != null ? fmtDist(d.dist) : '') + ' · vu ' + ago(d.updated_at) + '</div></div></div>' +
-    '<button class="btn block" id="dBump">Bump</button>' +
     '<button class="btn soft block" id="dJoin">' + ic('nav') + 'Le rejoindre</button>' +
     '<button class="btn ghost" id="dReport">' + esc(I18N.t('Signaler ce pseudo')) + '</button>', 'driver');
   body.querySelector('#dReport').onclick = () => openFeedback({ kind: 'autre', page: 'signalement pseudo ' + d.id, text: I18N.t('Pseudo signalé :') + ' ' + (d.pseudo || '') + (d.car ? ' (' + d.car + ')' : '') + '\n' });
-  body.querySelector('#dBump').onclick = () => bump(d);
   body.querySelector('#dJoin').onclick = () => { closeSheet(); chooseDestination({ name: d.pseudo, sub: d.car || '', lat: d.vlat, lon: d.vlon }); };
 }
 function canBump() {
@@ -2809,6 +2807,7 @@ function nameOf(id) {
 function onIncoming(m) {
   if (S.messages.some((x) => x.id === m.id)) return;
   if (window.ROUTA_X && ROUTA_X.onMsg && ROUTA_X.onMsg(m)) return;
+  return; // bumps et messages entre conducteurs supprimés : rien n'est affiché
   S.messages.push(m);
   updateBadge();
   const who = m.from_name || nameOf(m.from_id);
@@ -3437,11 +3436,9 @@ function openMenu() {
   const PROI = '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg>';
   const groups = [
     ['Communauté', [
-      ['messages', ic('msg'), 'Bumps' + (n ? ' <span class="badge">' + n + '</span>' : '')],
-      ['drivers', XI.users || ic('msg'), 'Conducteurs autour'],
-      XO('ranking') && xt('ranking'),
       XO('shareme') && xt('shareme'),
-      XO('badges') && xt('badges')
+      XO('badges') && xt('badges'),
+      XO('ranking') && xt('ranking')
     ]],
     ['Mes déplacements', [
       ['vehicle', ic(v.icon), esc(I18N.t('Mon véhicule')) + ' · ' + esc(I18N.t(v.label))],
@@ -3465,7 +3462,6 @@ function openMenu() {
       X.open && ['convoy', XI.convoy || ic('car'), X.convoy ? 'Convoi · ' + esc(X.convoy.name) : 'Convoi'],
       X.open && ['events', XI.event || ic('spot'), 'Rassemblements'],
       ['spots', ic('spot'), 'Spots, routes et cols'],
-      XO('cols') && xt('cols'),
       XO('plan') && xt('plan'),
       XO('checklists') && xt('checklists'),
       XO('voyage') && xt('voyage')
