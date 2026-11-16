@@ -558,7 +558,7 @@ function openMapView() {
     '<label class="switch" for="mvTransit"><span><b>Transports publics</b><br><span class="muted small">Arrêts de bus, tram, métro et gares. Touche un arrêt pour voir les lignes et les prochains départs.</span></span><input id="mvTransit" type="checkbox"' + (S.settings.showTransit ? ' checked' : '') + '></label>' +
     '<label class="switch" for="mvPlaces"><span>Afficher les établissements (restos, magasins…) en zoomant</span><input id="mvPlaces" type="checkbox"' + (S.settings.showPlaces ? ' checked' : '') + '></label>' +
     '<label class="switch" for="mvStreets"><span><b>Noms des rues</b><br><span class="muted small">Les grands axes et les villes restent toujours affichés.</span></span><input id="mvStreets" type="checkbox"' + (S.settings.showStreets === false ? '' : ' checked') + '></label>' +
-    '<h3>Couleurs</h3>' + seg('mvNight', [['auto', I18N.t('Comme le téléphone')], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
+    '<h3>Couleurs</h3>' + seg('mvNight', [['auto', I18N.t('Automatique')], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
     '<h3>Pendant la navigation</h3>' + seg('mvNav', [['route', 'Dans le sens de la route'], ['north', 'Nord en haut']], S.settings.navNorth ? 'north' : 'route') +
     '<div class="banner">' + ic('info') + '<span><b>Tourner la carte :</b> pose deux doigts et tourne-les (sur ordinateur : clic droit et glisser). <b>Incliner :</b> glisse deux doigts vers le haut ou le bas. La boussole montre le nord : touche-la pour remettre le nord en haut.</span></div>' +
     '<p class="muted small">Images satellite : swisstopo (Suisse), IGN (France), Sentinel-2 cloudless – EOX (monde).</p>', 'mapview');
@@ -617,17 +617,86 @@ function myView() {
 /* Mon marqueur */
 /* En suivi, le curseur reste fixe à l'écran (la carte glisse dessous) : il ne disparaît plus et reste calé sur la route.
    Hors suivi, c'est un marqueur posé sur la carte. */
-/* Curseur GPS personnalisable (forme et couleur, dans Réglages › Carte) */
-const CUR_COLORS = ['#4DA3FF', '#FF8A3D', '#3DDC97', '#E5484D', '#A78BFA', '#F5C542'];
-const CUR_SHAPES = [['arrow', 'Flèche'], ['car', 'Voiture'], ['dot', 'Point']];
+/* Curseur GPS personnalisable (Réglages › Carte › Curseur GPS) : forme, couleur, taille, halo — étiquette Premium */
+const CUR_COLORS = [
+  ['#4DA3FF', 'Bleu'], ['#38BDF8', 'Ciel'], ['#22D3EE', 'Cyan'], ['#14B8A6', 'Turquoise'], ['#3DDC97', 'Vert'], ['#84CC16', 'Vert pomme'],
+  ['#15803D', 'Vert foncé'], ['#F5C542', 'Jaune'], ['#FF8A3D', 'Orange'], ['#E5484D', 'Rouge'], ['#9F1239', 'Bordeaux'], ['#F472B6', 'Rose'],
+  ['#A78BFA', 'Violet'], ['#4F46E5', 'Indigo'], ['#1E3A8A', 'Bleu marine'], ['#92400E', 'Marron'], ['#C8A165', 'Beige'], ['#FFFFFF', 'Blanc'],
+  ['#C0C6CF', 'Argent'], ['#6B7280', 'Gris'], ['#374151', 'Anthracite'], ['#111111', 'Noir']
+];
+const isHex = (c) => /^#[0-9a-f]{6}$/i.test(c || '');
 const hexA = (h, a) => 'rgba(' + [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(',') + ',' + a + ')';
-const curColor = () => (CUR_COLORS.includes(S.settings.cursorColor) ? S.settings.cursorColor : CUR_COLORS[0]);
-const carTop = (c) => '<path fill="' + c + '" stroke="#fff" stroke-width="1.6" d="M9 2.5h6c1.7 0 3 1.3 3 3V19c0 1.4-1.1 2.5-2.5 2.5h-7C7.1 21.5 6 20.4 6 19V5.5c0-1.7 1.3-3 3-3z"/><path fill="rgba(0,0,0,.45)" d="M8.2 8.4c2.5-1 5.1-1 7.6 0l-.8 3H9z"/><path fill="rgba(0,0,0,.35)" d="M9 16.4h6l.6 2.2c-2.4.6-4.8.6-7.2 0z"/>';
-function meHtml(shape, color) {
-  const st = shape || S.settings.cursor || 'arrow', c = color || curColor();
-  const halo = ' style="background:' + hexA(c, 0.22) + '"';
-  if (st === 'car') return '<div class="mk-me cur-car"' + halo + '><i style="background:transparent;border:0;box-shadow:none"><svg aria-hidden="true" viewBox="0 0 24 24" style="width:100%;height:100%">' + carTop(c) + '</svg></i></div>';
-  return '<div class="mk-me cur-' + st + '"' + halo + '><i style="background:' + c + '">' + (st === 'dot' ? '' : '<svg aria-hidden="true" viewBox="0 0 24 24">' + P.nav + '</svg>') + '</i></div>';
+const lum = (h) => { const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+const curColor = () => (isHex(S.settings.cursorColor) ? S.settings.cursorColor : '#4DA3FF');
+/* Formes vues du dessus, pointe vers l'avant (en haut) : elles tournent avec la direction */
+const CDK = 'rgba(0,0,0,.42)';
+const TOP = {
+  car: (c, k) => '<path fill="' + c + '" stroke="' + k + '" stroke-width="1.5" d="M9 2.5h6c1.7 0 3 1.3 3 3V19c0 1.4-1.1 2.5-2.5 2.5h-7C7.1 21.5 6 20.4 6 19V5.5c0-1.7 1.3-3 3-3z"/><path fill="' + CDK + '" d="M8.2 8.4c2.5-1 5.1-1 7.6 0l-.8 3H9z"/><path fill="' + CDK + '" d="M9 16.4h6l.6 2.2c-2.4.6-4.8.6-7.2 0z"/>',
+  sport: (c, k) => '<path fill="' + c + '" stroke="' + k + '" stroke-width="1.4" d="M12 2c2.6 0 4.6 1.6 5 4.5l.8 7.5-.3 6c-.1 1.4-1.2 2.5-2.6 2.5H9.1c-1.4 0-2.5-1.1-2.6-2.5l-.3-6L7 6.5C7.4 3.6 9.4 2 12 2z"/><path fill="' + CDK + '" d="M8.6 9.2c2.2-.9 4.6-.9 6.8 0l-.6 3H9.2z"/><path fill="' + CDK + '" d="M9.4 17h5.2l.4 1.6c-2 .5-4 .5-6 0z"/><path fill="none" stroke="' + k + '" stroke-width="1.3" d="M6.6 20.8h10.8"/>',
+  suv: (c, k) => '<rect x="5.5" y="2" width="13" height="20" rx="2.6" fill="' + c + '" stroke="' + k + '" stroke-width="1.5"/><path fill="' + CDK + '" d="M7.6 6.6c2.9-1 5.9-1 8.8 0l-.7 3.2H8.3z"/><path fill="none" stroke="' + CDK + '" stroke-width="1.2" d="M8.6 11.5v6M15.4 11.5v6"/><path fill="' + CDK + '" d="M8 19h8v1.2H8z"/>',
+  van: (c, k) => '<rect x="6" y="1.5" width="12" height="21" rx="2.4" fill="' + c + '" stroke="' + k + '" stroke-width="1.5"/><path fill="' + CDK + '" d="M7.7 4.8c2.9-.8 5.7-.8 8.6 0l-.6 2.6H8.3z"/><path fill="none" stroke="' + CDK + '" stroke-width="1" d="M8 10h8M8 14h8M8 18h8"/>',
+  truck: (c, k) => '<rect x="7" y="1.5" width="10" height="5.6" rx="1.8" fill="' + c + '" stroke="' + k + '" stroke-width="1.4"/><path fill="' + CDK + '" d="M8.3 3.2h7.4l-.4 1.7H8.7z"/><rect x="6.3" y="8.1" width="11.4" height="14.4" rx="1" fill="' + c + '" stroke="' + k + '" stroke-width="1.4"/><path fill="none" stroke="' + CDK + '" stroke-width="1" d="M8.2 11h7.6M8.2 15h7.6M8.2 19h7.6"/>',
+  bus: (c, k) => '<rect x="6.5" y="1.5" width="11" height="21" rx="2.2" fill="' + c + '" stroke="' + k + '" stroke-width="1.4"/><path fill="' + CDK + '" d="M7.9 3.6h8.2v2.2H7.9z"/><path fill="' + CDK + '" d="M9.3 9h5.4v2.6H9.3zM9.3 15h5.4v2.6H9.3z"/>',
+  camper: (c, k) => '<rect x="5.6" y="1.5" width="12.8" height="21" rx="3" fill="' + c + '" stroke="' + k + '" stroke-width="1.5"/><path fill="' + CDK + '" d="M7.6 4.4c2.9-.9 5.9-.9 8.8 0l-.6 2.6H8.2z"/><rect x="9" y="11" width="6" height="4.4" rx="1" fill="' + CDK + '"/><path fill="none" stroke="' + CDK + '" stroke-width="1" d="M7.6 8.6h8.8"/>',
+  moto: (c, k) => '<path fill="none" stroke="' + k + '" stroke-width="3.4" stroke-linecap="round" d="M6.5 7.6h11"/><path fill="none" stroke="' + c + '" stroke-width="1.8" stroke-linecap="round" d="M6.5 7.6h11"/><path fill="' + c + '" stroke="' + k + '" stroke-width="1.4" d="M12 2.5c1.5 0 2.4 1.2 2.4 2.7v13.6c0 1.5-.9 2.7-2.4 2.7s-2.4-1.2-2.4-2.7V5.2c0-1.5.9-2.7 2.4-2.7z"/><ellipse cx="12" cy="13.5" rx="1.3" ry="2.6" fill="' + CDK + '"/>',
+  bike: (c, k) => '<path fill="none" stroke="' + k + '" stroke-width="4" stroke-linecap="round" d="M12 3v5.5M12 15.5V21M12 8.5v7M8 7.4h8"/><path fill="none" stroke="' + c + '" stroke-width="2.3" stroke-linecap="round" d="M12 3v5.5M12 15.5V21M12 8.5v7M8 7.4h8"/>'
+};
+/* Formes « badge » : un rond de couleur avec un symbole */
+const BADGE = {
+  arrow: (k) => '<path fill="' + k + '" d="M12 2l7 18-7-4-7 4z"/>',
+  chevron: (k) => '<path fill="none" stroke="' + k + '" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-8 7 8"/>',
+  dot: () => '',
+  walk: (k) => '<g fill="none" stroke="' + k + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="1.6" fill="' + k + '"/><path d="M11 21l2-6-3-3 1-5 4 3 3 1M10 12l-2 4"/></g>',
+  star: (k) => '<path fill="' + k + '" d="M12 2.5l2.8 6 6.5.7-4.9 4.4 1.4 6.4L12 16.8 6.2 20l1.4-6.4-4.9-4.4 6.5-.7z"/>'
+};
+const CUR_GROUPS = [
+  ['Flèches et points', [['arrow', 'Flèche'], ['chevron', 'Chevron'], ['dot', 'Point'], ['star', 'Étoile']]],
+  ['Voitures', [['car', 'Berline'], ['sport', 'Sportive'], ['suv', 'SUV / 4x4'], ['van', 'Utilitaire']]],
+  ['Grands véhicules', [['truck', 'Camion'], ['bus', 'Bus / car'], ['camper', 'Camping-car']]],
+  ['Deux-roues et à pied', [['moto', 'Moto'], ['bike', 'Vélo'], ['walk', 'Piéton']]]
+];
+const CUR_SIZES = [['0.85', 'Petit'], ['1', 'Normal'], ['1.2', 'Grand']];
+function meHtml(shape, color, size, halo) {
+  let st = shape || S.settings.cursor || 'arrow'; if (!TOP[st] && !BADGE[st]) st = 'arrow';
+  const c = isHex(color) ? color : curColor();
+  const sz = +(size || S.settings.cursorSize || 1) || 1;
+  const hl = halo != null ? halo : S.settings.cursorHalo !== false;
+  const ink = lum(c) > 0.72 ? '#111111' : '#FFFFFF';      // symbole lisible sur un curseur clair (blanc, argent, jaune)
+  const edge = lum(c) > 0.72 ? '#1F2937' : '#FFFFFF';     // contour des véhicules : foncé si la couleur est claire
+  const wrap = ' style="background:' + (hl ? hexA(c, 0.22) : 'transparent') + '"';
+  const sc = sz !== 1 ? ' style="transform:scale(' + sz + ')"' : '';
+  if (TOP[st]) return '<div class="mk-me cur-top cur-' + st + '"' + wrap + '><i' + sc + '><svg aria-hidden="true" viewBox="0 0 24 24" style="width:100%;height:100%">' + TOP[st](c, edge) + '</svg></i></div>';
+  return '<div class="mk-me cur-' + st + '"' + wrap + '><i style="background:' + c + (lum(c) > 0.72 ? ';border-color:#1F2937' : '') + (sz !== 1 ? ';transform:scale(' + sz + ')' : '') + '">' + (st === 'dot' ? '' : '<svg aria-hidden="true" viewBox="0 0 24 24">' + BADGE[st](ink) + '</svg>') + '</i></div>';
+}
+/* Page de personnalisation complète du curseur */
+function openCursor() {
+  const cur = () => S.settings.cursor || 'arrow';
+  const body = openSheet(I18N.t('Mon curseur GPS'),
+    '<div class="curhead"><div class="curprev" id="curPrev"></div><div><span class="prem">Premium</span><p class="muted small">' + esc(I18N.t('Choisis la forme, la couleur et la taille de ton curseur sur la carte.')) + '</p></div></div>' +
+    CUR_GROUPS.map(([g, list]) => '<h3>' + esc(I18N.t(g)) + '</h3><div class="curpick">' + list.map(([k, l]) => '<button data-v="' + k + '" aria-label="' + esc(I18N.t(l)) + '"><span class="cp"></span><span>' + esc(I18N.t(l)) + '</span></button>').join('') + '</div>').join('') +
+    '<h3>' + esc(I18N.t('Couleur')) + '</h3><div class="curcols" id="curCols">' + CUR_COLORS.map(([c, l]) => { const n = I18N.t(l + ' (couleur)').replace(/ \(couleur\)$/, ''); return '<button data-c="' + c + '" style="background:' + c + '" aria-label="' + esc(n) + '" title="' + esc(n) + '"></button>'; }).join('') +
+    '<label class="curcustom" title="' + esc(I18N.t('Autre couleur')) + '"><input type="color" id="curPick" value="' + curColor() + '" aria-label="' + esc(I18N.t('Autre couleur')) + '"><span>+</span></label></div>' +
+    '<h3>' + esc(I18N.t('Taille')) + '</h3><div class="seg" id="curSize">' + CUR_SIZES.map(([v, l]) => '<button data-v="' + v + '">' + esc(I18N.t(l)) + '</button>').join('') + '</div>' +
+    '<label class="switch" for="curHalo"><span>' + esc(I18N.t('Halo autour du curseur')) + '</span><input id="curHalo" type="checkbox"' + (S.settings.cursorHalo !== false ? ' checked' : '') + '></label>' +
+    '<button class="btn block" id="curDone">' + esc(I18N.t('Terminé')) + '</button>' +
+    '<button class="btn ghost" id="curReset">' + esc(I18N.t('Revenir au curseur d\'origine')) + '</button>', 'cursor');
+  body.querySelector('#curDone').onclick = () => openSettings();
+  const draw = () => {
+    body.querySelector('#curPrev').innerHTML = meHtml();
+    body.querySelectorAll('.curpick button').forEach((b) => { b.classList.toggle('on', b.dataset.v === cur()); b.querySelector('.cp').innerHTML = meHtml(b.dataset.v); });
+    body.querySelectorAll('#curCols button').forEach((b) => b.classList.toggle('on', b.dataset.c.toLowerCase() === curColor().toLowerCase()));
+    const custom = !CUR_COLORS.some(([c]) => c.toLowerCase() === curColor().toLowerCase());
+    const lab = body.querySelector('.curcustom'); lab.classList.toggle('on', custom); lab.style.background = custom ? curColor() : '';
+    body.querySelectorAll('#curSize button').forEach((b) => b.classList.toggle('on', +b.dataset.v === (+S.settings.cursorSize || 1)));
+  };
+  const save = () => { saveSettings(); draw(); applyCursor(); };
+  body.querySelectorAll('.curpick button').forEach((b) => { b.onclick = () => { S.settings.cursor = b.dataset.v; save(); }; });
+  body.querySelectorAll('#curCols button').forEach((b) => { b.onclick = () => { S.settings.cursorColor = b.dataset.c; save(); }; });
+  body.querySelector('#curPick').oninput = (e) => { if (isHex(e.target.value)) { S.settings.cursorColor = e.target.value; save(); } };
+  body.querySelectorAll('#curSize button').forEach((b) => { b.onclick = () => { S.settings.cursorSize = +b.dataset.v; save(); }; });
+  body.querySelector('#curHalo').onchange = (e) => { S.settings.cursorHalo = e.target.checked; save(); };
+  body.querySelector('#curReset').onclick = () => { delete S.settings.cursor; delete S.settings.cursorColor; delete S.settings.cursorSize; delete S.settings.cursorHalo; body.querySelector('#curHalo').checked = true; save(); };
+  draw();
 }
 function applyCursor() {
   const pk = $('mePuck'); if (pk) pk.remove();
@@ -3021,12 +3090,11 @@ function openSettings() {
     sw('stAlert', 'Alerte vocale si je dépasse la limite', S.settings.speedAlert) +
     sw('stSpeedo', 'Afficher le compteur de vitesse', S.settings.showSpeedo !== false) +
     '<h3>Carte</h3>' +
-    '<p class="muted small" style="margin:0">Couleurs de la carte</p>' + segH('stNight', [['auto', 'Comme le téléphone'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
+    '<p class="muted small" style="margin:0">Couleurs de la carte</p>' + segH('stNight', [['auto', 'Automatique'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
     sw('stPlaces', 'Afficher les établissements sur la carte', S.settings.showPlaces) +
     sw('stSignals', 'Afficher les feux de circulation', S.settings.showSignals !== false, 'Emplacement seulement : ROUTA ne sait pas s\'ils sont rouges ou verts.') +
     sw('stGoogle', 'Bouton « Voir les avis Google » sur les lieux', S.settings.googleLinks) +
-    '<p class="muted small" style="margin:0">' + esc(I18N.t('Curseur GPS')) + '</p><div class="curpick" id="stCur">' + CUR_SHAPES.map(([k, l]) => '<button data-v="' + k + '" class="' + ((S.settings.cursor || 'arrow') === k ? 'on' : '') + '" aria-label="' + esc(I18N.t(l)) + '">' + meHtml(k) + '<span>' + esc(I18N.t(l)) + '</span></button>').join('') + '</div>' +
-    '<div class="curcols" id="stCurCol">' + CUR_COLORS.map((c) => '<button data-c="' + c + '" class="' + (curColor() === c ? 'on' : '') + '" style="background:' + c + '" aria-label="' + c + '"></button>').join('') + '</div>' +
+    '<button class="card tap curbtn" id="stCursor"><span class="cp">' + meHtml() + '</span><span class="grow"><b>' + esc(I18N.t('Curseur GPS')) + ' <span class="prem">Premium</span></b><span class="sub">' + esc(I18N.t('Forme, couleur, taille et halo')) + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     '<label class="field" for="stUi">Taille des boutons et de l\'affichage<select id="stUi">' + [['0.85', 'Petite'], ['1', 'Normale'], ['1.15', 'Grande'], ['1.3', 'Très grande']].map(([v, l]) => '<option value="' + v + '"' + (String(+S.settings.uiSize || 1) === String(+v) ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
     '<button class="btn soft block" id="stMapView">' + ic('layers') + 'Plan, satellite, trafic et transports</button>' +
     '<h3>Véhicule</h3>' +
@@ -3055,9 +3123,7 @@ function openSettings() {
   ch('stReadMsgs', (v) => { S.settings.readMsgs = v; });
   body.querySelectorAll('#stNight button').forEach((b) => { b.onclick = () => { S.settings.night = b.dataset.v; saveSettings(); applyNight(); body.querySelectorAll('#stNight button').forEach((x) => x.classList.toggle('on', x === b)); }; });
   body.querySelectorAll('#stNavNorth button').forEach((b) => { b.onclick = () => { S.settings.navNorth = b.dataset.v === 'north'; saveSettings(); body.querySelectorAll('#stNavNorth button').forEach((x) => x.classList.toggle('on', x === b)); if (S.nav) { S.follow = true; followCam(); } updateCompass(); }; });
-  const drawCur = () => { body.querySelectorAll('#stCur button').forEach((x) => { x.classList.toggle('on', x.dataset.v === (S.settings.cursor || 'arrow')); x.firstChild.outerHTML = meHtml(x.dataset.v); }); body.querySelectorAll('#stCurCol button').forEach((x) => x.classList.toggle('on', x.dataset.c === curColor())); };
-  body.querySelectorAll('#stCur button').forEach((b) => { b.onclick = () => { S.settings.cursor = b.dataset.v; saveSettings(); drawCur(); applyCursor(); }; });
-  body.querySelectorAll('#stCurCol button').forEach((b) => { b.onclick = () => { S.settings.cursorColor = b.dataset.c; saveSettings(); drawCur(); applyCursor(); }; });
+  body.querySelector('#stCursor').onclick = openCursor;
   body.querySelector('#stMapView').onclick = openMapView;
   body.querySelector('#stVeh').onclick = () => openVehicle();
   body.querySelector('#stProfile').onclick = openProfile;
