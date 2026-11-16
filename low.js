@@ -25,7 +25,7 @@
     city: ICO('<path d="M4 21V10l5-3v14M9 21V4l6 3v14M15 21v-9l5 2v7"/>'),
     book: ICO('<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>')
   };
-  const PREM = ' <span class="prem">PRO</span>';
+  const PREM = ''; // Explorer autour : gratuit
   const here = () => S.pos || (() => { const m = A.map.getCenter(); return { lat: m.lat, lon: m.lng }; })();
   async function getJson(u, ms) { const ac = new AbortController(); const t = setTimeout(() => ac.abort(), ms || 10000); try { const r = await fetch(u, { signal: ac.signal }); if (!r.ok) throw new Error('http ' + r.status); return await r.json(); } finally { clearTimeout(t); } }
   async function osm(filters, radius, c, limit) {

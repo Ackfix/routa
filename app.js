@@ -717,7 +717,7 @@ function meHtml(shape, color, size, halo) {
 function openCursor() {
   const cur = () => S.settings.cursor || 'arrow';
   const body = openSheet(I18N.t('Mon curseur GPS'),
-    '<div class="curhead"><div class="curprev" id="curPrev"></div><div><span class="prem">PRO</span><p class="muted small">' + esc(I18N.t('Choisis la forme, la couleur et la taille de ton curseur sur la carte.')) + '</p></div></div>' +
+    '<div class="curhead"><div class="curprev" id="curPrev"></div><div><p class="muted small">' + esc(I18N.t('Choisis la forme, la couleur et la taille de ton curseur sur la carte.')) + '</p></div></div>' +
     CUR_GROUPS.map(([g, list]) => '<h3>' + esc(I18N.t(g)) + '</h3><div class="curpick">' + list.map(([k, l]) => '<button data-v="' + k + '" aria-label="' + esc(I18N.t(l)) + '"><span class="cp"></span><span>' + esc(I18N.t(l)) + '</span></button>').join('') + '</div>').join('') +
     '<h3>' + esc(I18N.t('Couleur')) + '</h3><div class="curcols" id="curCols">' + CUR_COLORS.map(([c, l]) => { const n = I18N.t(l + ' (couleur)').replace(/ \(couleur\)$/, ''); return '<button data-c="' + c + '" style="background:' + c + '" aria-label="' + esc(n) + '" title="' + esc(n) + '"></button>'; }).join('') +
     '</div>' +
@@ -3295,6 +3295,7 @@ function openSettings() {
   const sw = (id, label, on, sub) => '<label class="switch" for="' + id + '"><span>' + label + (sub ? '<br><span class="muted small">' + sub + '</span>' : '') + '</span><input id="' + id + '" type="checkbox"' + (on ? ' checked' : '') + '></label>';
   const segH = (id, opts, cur) => '<div class="seg" id="' + id + '">' + opts.map(([k, v]) => '<button data-v="' + k + '" class="' + (k === cur ? 'on' : '') + '">' + esc(I18N.t(v)) + '</button>').join('') + '</div>';
   const body = openSheet('Réglages',
+    '<button class="card tap curbtn" id="stCursor"><span class="cp">' + meHtml() + '</span><span class="grow"><b>' + esc(I18N.t('Curseur GPS')) + '</b><span class="sub">' + esc(I18N.t('Forme, couleur et taille')) + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     '<h3>Navigation</h3>' +
     sw('stVoice', 'Guidage vocal', S.settings.voice) +
     '<p class="muted small" style="margin:0">Pendant la navigation, la carte tourne :</p>' + segH('stNavNorth', [['route', 'Dans le sens de la route'], ['north', 'Nord en haut']], S.settings.navNorth ? 'north' : 'route') +
@@ -3308,7 +3309,6 @@ function openSettings() {
     sw('stPlaces', 'Afficher les établissements sur la carte', S.settings.showPlaces) +
     sw('stSignals', 'Afficher les feux de circulation', S.settings.showSignals !== false, 'Emplacement seulement : ROUTA ne sait pas s\'ils sont rouges ou verts.') +
     sw('stGoogle', 'Bouton « Voir les avis Google » sur les lieux', S.settings.googleLinks) +
-    '<button class="card tap curbtn" id="stCursor"><span class="cp">' + meHtml() + '</span><span class="grow"><b>' + esc(I18N.t('Curseur GPS')) + ' <span class="prem">PRO</span></b><span class="sub">' + esc(I18N.t('Forme, couleur, taille et halo')) + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     '<button class="btn soft block" id="stMapView">' + ic('layers') + 'Plan, satellite, trafic et transports</button>' +
     '<h3>Véhicule</h3>' +
     '<button class="btn soft block" id="stVeh">' + ic(veh().icon) + esc(I18N.t('Mon véhicule')) + ' · ' + esc(vehSummary()) + '</button>' +
@@ -3493,7 +3493,7 @@ function openMenu() {
     ]]
   ];
   // #008 : fonctions classées Premium (étiquette seulement pendant les tests, rien n'est verrouillé)
-  const PREM_TILES = ['plan', 'convoy', 'events', 'smart', 'checklists', 'spots', 'cols', 'explore', 'voyage', 'pro', 'tour', 'bans', 'prolog', 'truckstop', 'restrictions'];
+  const PREM_TILES = ['plan', 'convoy', 'events', 'checklists', 'spots', 'cols', 'voyage', 'pro', 'tour', 'bans', 'prolog', 'truckstop', 'restrictions'];
   const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + (PREM_TILES.includes(t[0]) ? '<i class="prem tileprem">PRO</i>' : '') + t[1] + '<span>' + t[2] + '</span></button>';
   const body = openSheet('Menu',
     '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
