@@ -190,10 +190,9 @@
       label = per === '24h' ? T('Dernières 24 h') : per === '7d' ? T('7 derniers jours') : T('30 derniers jours');
       html += statsHtml(agg, label) + (agg.n ? '<button class="btn primary block" id="drStory">' + esc(T('Partager en story')) + '</button>' : '');
     }
-    html += '<button class="btn soft block" id="drRank">' + esc(T('Classement entre amis')) + '</button>';
     const recOff = monthDrives(-1).length ? -1 : monthDrives(0).length ? 0 : null;
     if (recOff != null) html += '<button class="btn soft block" id="drRecap">' + esc(T('Récap · {m}', { m: monthName(recOff) })) + '</button>';
-    if (all.length) html += '<button class="btn soft block" id="drAna">' + esc(T('Analyses détaillées')) + ' <span class="prem">Premium</span></button>';
+    if (all.length) html += '<button class="btn soft block" id="drAna">' + esc(T('Analyses détaillées')) + ' <span class="prem">PRO</span></button>';
     html += '<details class="card" style="display:block"><summary style="cursor:pointer;font-weight:700">' + esc(T('Réglages du calcul de carburant')) + '</summary>' +
       '<div class="row" style="margin-top:10px"><label class="field grow" for="drCons">' + esc(T('Consommation (l/100 km)')) + '<input id="drCons" type="number" inputmode="decimal" step="0.1" min="2" max="60" value="' + CFGD.cons + '"></label>' +
       '<label class="field grow" for="drPrice">' + esc(T('Prix du litre ({c})', { c: curr() })) + '<input id="drPrice" type="number" inputmode="decimal" step="0.01" min="0.5" max="5" value="' + priceL().toFixed(2) + '"></label></div></details>' +
@@ -201,7 +200,7 @@
     const body = openSheet(T('Suivi de conduite'), html, 'drive');
     body.querySelectorAll('[data-p]').forEach((b) => { b.onclick = () => openDrive(b.dataset.p); });
     body.querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => openTrip(+b.dataset.t); });
-    body.querySelector('#drRank').onclick = openRank;
+    { const rk = body.querySelector('#drRank'); if (rk) rk.onclick = openRank; }
     const rc = body.querySelector('#drRecap'); if (rc) rc.onclick = () => openRecap(recOff);
     const an = body.querySelector('#drAna'); if (an) an.onclick = openAnalysis;
     const st = body.querySelector('#drStory'); if (st) st.onclick = () => story(agg, label, { list: all.filter((d) => d.s > Date.now() - PER.find((x) => x[0] === per)[2]) });

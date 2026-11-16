@@ -94,7 +94,7 @@ async function openRanking(scope) {
   const meCard = mine >= RANK_MIN
     ? '<div class="card"><div class="grow"><b>' + esc(TRX('Toi : {n} points', { n: mine })) + '</b><div class="sub">' + esc(TRX('{r} du classement', { r: myRank + (((window.ROUTA_I18N && ROUTA_I18N.lang) || 'fr') === 'fr' ? (myRank === 1 ? 'er' : 'e') : '.') })) + '</div></div></div>'
     : '<div class="card" style="display:block"><b>' + esc(TRX('Toi : {n} points', { n: mine })) + '</b><div class="sub">' + esc(TRX('Encore {n} points pour apparaître dans le classement.', { n: RANK_MIN - mine })) + '</div><div style="height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:8px"><i style="display:block;height:100%;width:' + pct + '%;background:var(--accent);border-radius:4px"></i></div></div>';
-  body.innerHTML = '<div class="seg" id="rkSeg"><button data-s="all" class="' + (scope === 'all' ? 'on' : '') + '">Tout le monde</button><button data-s="friends" class="' + (scope === 'friends' ? 'on' : '') + '">Mes amis</button></div>' + meCard +
+  body.innerHTML = meCard +
     (failed ? '<div class="empty">' + esc(TRX('Le classement n\'est pas disponible pour le moment. Réessaie plus tard.')) + '</div>'
       : rows.length ? rows.slice(0, 50).map((r, i) => '<div class="card' + (r.id === S.me.id ? ' meRow' : '') + '"><div class="rank">' + (r.rank || i + 1) + '</div><div class="ico" style="background:' + esc(r.color || '#FF8A3D') + ';border-radius:22px">' + esc(initials(r.pseudo)) + '</div><div class="grow"><b>' + esc(r.pseudo || 'Conducteur') + '</b>' + (r.car ? '<div class="sub">' + esc(r.car) + '</div>' : '') + '</div><div class="val">' + (r.points || 0) + '</div></div>').join('')
       : '<div class="empty">' + esc(TRX('Personne n\'a encore 100 points ici.')) + '</div>') +
@@ -118,6 +118,7 @@ async function acceptFriend(r) {
 }
 function refuseFriend(r) { pendingReq = pendingReq.filter((x) => x.id !== r.id); saveReq(); updateTileBadge(); }
 function handleFriendMsg(m, live) {
+  if (m.kind === 'friend_req' || m.kind === 'friend_ok') return true; // amis supprimés : ces anciens messages sont ignorés
   if (m.kind === 'friend_req' && m.to_id === S.me.id) {
     if (isFriendId(m.from_id)) return true;
     if (!pendingReq.some((x) => x.id === m.from_id)) { pendingReq.push({ id: m.from_id, pseudo: m.from_name || 'Conducteur', car: m.body || '', at: m.created_at }); saveReq(); }
@@ -146,6 +147,7 @@ function sweepMessages() {
   if (keep.length !== S.messages.length) S.messages.splice(0, S.messages.length, ...keep);
 }
 function openFriends() {
+  A.openK('drivers'); return; // amis supprimés : la liste des conducteurs remplace cet écran
   sweepMessages();
   const fr = S.me.friends || [];
   const body = openSheet('Amis et conducteurs',
@@ -550,10 +552,10 @@ X.preview = (R, dest, body) => {
   }
   box.appendChild(viaBox(dest, R));
   if (!/parking/i.test(dest.sub || '')) { const pb = el('<button class="btn soft block">' + ic('parking') + esc(TRX('Parkings près de la destination')) + '</button>'); pb.onclick = () => X.parkingsNear(dest); box.appendChild(pb); }
-  if (R.total > 30000 && (!R.mode || R.mode === 'car')) { const rb = el('<button class="btn soft block">' + ic(A.veh && A.veh().ev ? 'charge' : 'fuel') + esc(TRX('Autonomie sur ce trajet')) + ' <span class="prem">Premium</span></button>'); rb.onclick = () => X.rangeAssist(R, dest); box.appendChild(rb); }
-  if (X.cityStops && (R.duration || 0) > 18000 && (!R.mode || R.mode === 'car')) { const cb = el('<button class="btn soft block">' + esc(TRX('Villes-étapes')) + ' <span class="prem">Premium</span></button>'); cb.onclick = () => X.cityStops(R, dest); box.appendChild(cb); }
-  if (X.planSave) { const pb2 = el('<button class="btn soft block">' + '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>' + esc(TRX('Planifier ce voyage')) + ' <span class="prem">Premium</span></button>'); pb2.onclick = () => X.planSave(R, dest); box.appendChild(pb2); }
-  if ((R.duration || 0) > 7200 && (!R.mode || R.mode === 'car')) { const bb = el('<button class="btn soft block">' + ic('truckstop') + esc(TRX('Pauses conseillées sur le trajet')) + ' <span class="prem">Premium</span></button>'); bb.onclick = () => X.smartBreaks(R, dest); box.appendChild(bb); }
+  if (R.total > 30000 && (!R.mode || R.mode === 'car')) { const rb = el('<button class="btn soft block">' + ic(A.veh && A.veh().ev ? 'charge' : 'fuel') + esc(TRX('Autonomie sur ce trajet')) + ' <span class="prem">PRO</span></button>'); rb.onclick = () => X.rangeAssist(R, dest); box.appendChild(rb); }
+  if (X.cityStops && (R.duration || 0) > 18000 && (!R.mode || R.mode === 'car')) { const cb = el('<button class="btn soft block">' + esc(TRX('Villes-étapes')) + ' <span class="prem">PRO</span></button>'); cb.onclick = () => X.cityStops(R, dest); box.appendChild(cb); }
+  if (X.planSave) { const pb2 = el('<button class="btn soft block">' + '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>' + esc(TRX('Planifier ce voyage')) + ' <span class="prem">PRO</span></button>'); pb2.onclick = () => X.planSave(R, dest); box.appendChild(pb2); }
+  if ((R.duration || 0) > 7200 && (!R.mode || R.mode === 'car')) { const bb = el('<button class="btn soft block">' + ic('truckstop') + esc(TRX('Pauses conseillées sur le trajet')) + ' <span class="prem">PRO</span></button>'); bb.onclick = () => X.smartBreaks(R, dest); box.appendChild(bb); }
   if (X.borderCheck && (!R.mode || R.mode === 'car')) X.borderCheck(R, dest, box);
   go.parentNode.insertBefore(box, go.nextSibling);
 };
@@ -838,7 +840,7 @@ async function routeWeather(R, box) {
     const snow = w.some((x) => (x.current.snowfall || 0) > 0 || /Neige/.test(WMO(x.current.weather_code)));
     const ice = min <= 1;
     const html = '<div class="banner' + (snow || ice ? ' warnb' : '') + '">' + IC.mount + '<span><b>Météo sur le trajet :</b> ' + Math.round(min) + '° à ' + Math.round(max) + '°, ' + WMO(w[w.length - 1].current.weather_code).toLowerCase() + ' à l\'arrivée.' + (snow ? ' <b>Neige sur une partie du trajet.</b>' : ice ? ' <b>Risque de verglas.</b>' : '') + '</span></div>';
-    const node = el(html); const more = el('<button class="linkbtn wxmore">' + esc(TRX('Météo détaillée aux heures de passage')) + ' <span class="prem">Premium</span></button>');
+    const node = el(html); const more = el('<button class="linkbtn wxmore">' + esc(TRX('Météo détaillée aux heures de passage')) + ' <span class="prem">PRO</span></button>');
     more.onclick = () => X.routeWeatherDetail(R); node.querySelector('span').appendChild(more);
     box.insertBefore(node, box.firstChild);
   } catch (e) { /* météo indisponible */ }
@@ -1115,7 +1117,6 @@ setTimeout(() => {
 /* ======================= Menu ======================= */
 function updateTileBadge() { const b = $('menuBadge'); if (b && pendingReq.length && b.hidden) { b.hidden = false; b.textContent = pendingReq.length; } }
 X.tiles = () => [
-  ['friends', IC.users, 'Amis' + (pendingReq.length ? ' <span class="badge">' + pendingReq.length + '</span>' : '')],
   ['convoy', IC.convoy, X.convoy ? 'Convoi · ' + esc(X.convoy.name) : 'Convoi'],
   ['events', IC.event, 'Rassemblements'],
   ['ranking', IC.trophy, 'Classement · ' + (S.me.points || 0) + ' pts'],
@@ -1181,6 +1182,7 @@ setInterval(routeHazard, 3000);
 /* ======================= Un ami est tout près ======================= */
 const friendSeen = new Map();
 function checkFriendsNear() {
+  return; // plus d'amis : plus d'alerte
   if (!S.pos || !S.me) return;
   S.drivers.forEach((d) => {
     if (!d || !Array.isArray(d.friends) || !d.friends.includes(S.me.id) || d.lat == null) return;

@@ -25,7 +25,7 @@
     city: ICO('<path d="M4 21V10l5-3v14M9 21V4l6 3v14M15 21v-9l5 2v7"/>'),
     book: ICO('<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>')
   };
-  const PREM = ' <span class="prem">Premium</span>';
+  const PREM = ' <span class="prem">PRO</span>';
   const here = () => S.pos || (() => { const m = A.map.getCenter(); return { lat: m.lat, lon: m.lng }; })();
   async function getJson(u, ms) { const ac = new AbortController(); const t = setTimeout(() => ac.abort(), ms || 10000); try { const r = await fetch(u, { signal: ac.signal }); if (!r.ok) throw new Error('http ' + r.status); return await r.json(); } finally { clearTimeout(t); } }
   async function osm(filters, radius, c, limit) {
@@ -334,13 +334,13 @@
       const cnt = {}; same.forEach((d) => { cnt[d.c1] = (cnt[d.c1] || []).concat([d.p1]); });
       const top = Object.entries(cnt).sort((a, b) => b[1].length - a[1].length)[0];
       if (top && top[1].length >= 3 && dist(c, top[1][0]) > 2000) {
-        msg = T('Tu vas souvent à {c} à cette heure-ci.', { c: top[0] }) + ' <span class="prem">Premium</span>';
+        msg = T('Tu vas souvent à {c} à cette heure-ci.', { c: top[0] }) + ' <span class="prem">PRO</span>';
         act = () => chooseDestination({ name: top[0], lat: top[1][0].lat, lon: top[1][0].lon });
       }
     }
     if (!msg) return;
     store.set('routa.tipAt', Date.now());
-    toast(msg.indexOf('<span') > 0 ? esc(msg.split(' <span')[0]) + ' <span class="prem">Premium</span>' : esc(msg), act ? { action: T('Itinéraire'), onAction: act, ms: 9000 } : { ms: 8000 });
+    toast(msg.indexOf('<span') > 0 ? esc(msg.split(' <span')[0]) + ' <span class="prem">PRO</span>' : esc(msg), act ? { action: T('Itinéraire'), onAction: act, ms: 9000 } : { ms: 8000 });
   }
   setTimeout(tipTick, 25000); setInterval(tipTick, 30 * 60000);
 

@@ -717,7 +717,7 @@ function meHtml(shape, color, size, halo) {
 function openCursor() {
   const cur = () => S.settings.cursor || 'arrow';
   const body = openSheet(I18N.t('Mon curseur GPS'),
-    '<div class="curhead"><div class="curprev" id="curPrev"></div><div><span class="prem">Premium</span><p class="muted small">' + esc(I18N.t('Choisis la forme, la couleur et la taille de ton curseur sur la carte.')) + '</p></div></div>' +
+    '<div class="curhead"><div class="curprev" id="curPrev"></div><div><span class="prem">PRO</span><p class="muted small">' + esc(I18N.t('Choisis la forme, la couleur et la taille de ton curseur sur la carte.')) + '</p></div></div>' +
     CUR_GROUPS.map(([g, list]) => '<h3>' + esc(I18N.t(g)) + '</h3><div class="curpick">' + list.map(([k, l]) => '<button data-v="' + k + '" aria-label="' + esc(I18N.t(l)) + '"><span class="cp"></span><span>' + esc(I18N.t(l)) + '</span></button>').join('') + '</div>').join('') +
     '<h3>' + esc(I18N.t('Couleur')) + '</h3><div class="curcols" id="curCols">' + CUR_COLORS.map(([c, l]) => { const n = I18N.t(l + ' (couleur)').replace(/ \(couleur\)$/, ''); return '<button data-c="' + c + '" style="background:' + c + '" aria-label="' + esc(n) + '" title="' + esc(n) + '"></button>'; }).join('') +
     '</div>' +
@@ -1113,7 +1113,7 @@ function pushPresence(force) {
   const invisible = S.me.vis === 'invisible';
   DB.presence({
     id: S.me.id, code: S.me.code, pseudo: S.me.pseudo, car: S.me.car || null, color: S.me.color,
-    visibility: S.me.vis, friends: (S.me.friends || []).map((f) => f.id),
+    visibility: S.me.vis, friends: [],
     lat: invisible || !S.pos ? null : S.pos.lat, lon: invisible || !S.pos ? null : S.pos.lon,
     heading: Math.round(S.heading || 0), speed: S.speed == null ? null : Math.round(S.speed * 3.6),
     updated_at: new Date().toISOString()
@@ -2739,7 +2739,7 @@ function openAddSpot(at) {
 }
 
 /* ======================= Conducteurs & messages ======================= */
-function visLabel(v) { return v === 'invisible' ? 'Invisible' : v === 'tous' ? 'Visible · tous' : 'Visible · amis'; }
+function visLabel(v) { return v === 'invisible' ? 'Invisible' : 'Visible'; }
 function setAvatar() {
   const b = $('btnProfile');
   b.firstChild.nodeType === 3 ? (b.firstChild.nodeValue = initials(S.me.pseudo)) : b.insertBefore(document.createTextNode(initials(S.me.pseudo)), b.firstChild);
@@ -2747,19 +2747,20 @@ function setAvatar() {
   const m = $('fabMenu'); if (m) { m.textContent = initials(S.me.pseudo); m.style.background = S.me.color; }
 }
 function updateVisChip() {
+  if (S.me && S.me.vis === 'amis') { S.me.vis = 'invisible'; saveMe(); }
   const dot = $('visDot');
-  dot.className = 'dot' + (S.me.vis === 'tous' ? ' on' : S.me.vis === 'amis' ? ' friends' : '');
+  dot.className = 'dot' + (S.me.vis === 'tous' ? ' on' : '');
   $('visLabel').textContent = visLabel(S.me.vis);
 }
 function visSeg(id) {
-  return '<div class="seg" id="' + id + '">' + [['invisible', 'Invisible'], ['amis', 'Mes amis'], ['tous', 'Tout le monde']].map(([k, v]) => '<button data-v="' + k + '" class="' + (S.me.vis === k ? 'on' : '') + '">' + v + '</button>').join('') + '</div>';
+  return '<div class="seg" id="' + id + '">' + [['tous', 'Visible'], ['invisible', 'Invisible']].map(([k, v]) => '<button data-v="' + k + '" class="' + (S.me.vis === k ? 'on' : '') + '">' + v + '</button>').join('') + '</div>';
 }
 function bindVisSeg(root, id, after) {
   root.querySelectorAll('#' + id + ' button').forEach((b) => {
     b.onclick = () => {
       S.me.vis = b.dataset.v; saveMe(); updateVisChip(); pushPresence(true);
       root.querySelectorAll('#' + id + ' button').forEach((x) => x.classList.toggle('on', x === b));
-      toast(S.me.vis === 'invisible' ? 'Tu es invisible.' : S.me.vis === 'amis' ? 'Seuls tes amis te voient.' : 'Tes amis te voient précisément, les autres voient une zone approximative.');
+      toast(S.me.vis === 'invisible' ? 'Tu es invisible.' : 'Les autres conducteurs voient seulement une zone d\'environ 1 km autour de toi.');
       if (after) after();
     };
   });
@@ -2770,7 +2771,7 @@ function openDrivers() {
   const body = openSheet('Conducteurs autour', '<h3>Qui me voit ?</h3>' + visSeg('dvVis') +
     (!S.online ? '<div class="banner">' + ic('info') + '<span>Mode solo : active le mode en ligne (voir le guide) pour voir les autres conducteurs.</span></div>' : '') +
     (list.length ? list.map((d, i) => '<div class="card"><div class="ico" style="background:' + esc(d.color || '#FF8A3D') + ';border-radius:22px">' + esc(initials(d.pseudo)) + '</div><button class="grow" data-open="' + i + '" style="background:none;border:0;text-align:left;padding:0"><b>' + esc(d.pseudo) + '</b><div class="sub">' + esc(d.car || 'Voiture inconnue') + ' · ' + (d.dist != null ? (d.fuzzy ? 'env. ' : '') + fmtDist(d.dist) : '') + (d.speed ? ' · ' + d.speed + ' km/h' : '') + '</div></button><button class="btn small" data-bump="' + i + '">Bump</button></div>').join('')
-      : '<div class="empty">Personne de visible pour le moment. Partage ton code ami <b class="code" style="font-size:16px">' + esc(S.me.code) + '</b> à tes potes pour qu\'ils t\'ajoutent.</div>'), 'drivers');
+      : '<div class="empty">Personne de visible pour le moment.</div>'), 'drivers');
   body.scrollTop = keepScroll;
   bindVisSeg(body, 'dvVis');
   body.querySelectorAll('[data-bump]').forEach((b) => { b.onclick = () => bump(list[+b.dataset.bump]); });
@@ -2778,17 +2779,14 @@ function openDrivers() {
 }
 function openDriver(id) {
   const d = driversList().find((x) => x.id === id); if (!d) { toast("Ce conducteur n'est plus visible."); return; }
-  const isFriend = (S.me.friends || []).some((f) => f.id === id);
   const body = openSheet(d.pseudo,
     '<div class="row"><div class="ico" style="background:' + esc(d.color || '#FF8A3D') + ';border-radius:22px">' + esc(initials(d.pseudo)) + '</div><div class="grow"><b>' + esc(d.car || 'Voiture inconnue') + '</b><div class="sub">' + (d.fuzzy ? 'Zone approximative · ' : '') + (d.dist != null ? fmtDist(d.dist) : '') + ' · vu ' + ago(d.updated_at) + '</div></div></div>' +
     '<button class="btn block" id="dBump">Bump</button>' +
     '<button class="btn soft block" id="dJoin">' + ic('nav') + 'Le rejoindre</button>' +
-    (isFriend ? '' : '<button class="btn ghost" id="dFriend">Demander en ami</button>') +
     '<button class="btn ghost" id="dReport">' + esc(I18N.t('Signaler ce pseudo')) + '</button>', 'driver');
   body.querySelector('#dReport').onclick = () => openFeedback({ kind: 'autre', page: 'signalement pseudo ' + d.id, text: I18N.t('Pseudo signalé :') + ' ' + (d.pseudo || '') + (d.car ? ' (' + d.car + ')' : '') + '\n' });
   body.querySelector('#dBump').onclick = () => bump(d);
   body.querySelector('#dJoin').onclick = () => { closeSheet(); chooseDestination({ name: d.pseudo, sub: d.car || '', lat: d.vlat, lon: d.vlon }); };
-  const fr = body.querySelector('#dFriend'); if (fr) fr.onclick = async () => { if (window.ROUTA_X && ROUTA_X.requestFriend) await ROUTA_X.requestFriend(d); else addFriend({ id: d.id, pseudo: d.pseudo }); openDriver(id); };
 }
 function canBump() {
   const now = Date.now(); const list = store.get('routa.bumps', []).filter((t) => now - t < 15 * 60000);
@@ -2888,14 +2886,14 @@ function openVehicle(after, editId) {
   const opt = (v, l, sel) => '<option value="' + esc(v) + '"' + (sel ? ' selected' : '') + '>' + esc(l) + '</option>';
   const yNow = new Date().getFullYear();
   const body = openSheet('Mon véhicule',
-    (list.length > 1 || editId === 'new' ? '<h3>Mes véhicules <span class="prem">Premium</span></h3>' + list.map((x) => '<button class="card tap vehcard' + (x.id === V.id ? ' sel' : '') + '" data-vid="' + esc(x.id) + '"><span class="ico">' + ic((VEHICLES[x.type] || VEHICLES.voiture).icon) + '</span><span class="grow"><b>' + esc(vehName(x)) + '</b><span class="sub">' + esc([x.year, x.energy && (x.energy === 'essence' && I18N.lang !== 'fr' ? I18N.t('Essence (moteur)') : I18N.t((ENERGIES.find((e) => e[0] === x.energy) || [0, ''])[1])), x.rental ? I18N.t('location') : '', x.id === curId ? I18N.t('Véhicule actif') : ''].filter(Boolean).join(' · ')) + '</span></span></button>').join('') : '') +
+    (list.length > 1 || editId === 'new' ? '<h3>Mes véhicules <span class="prem">PRO</span></h3>' + list.map((x) => '<button class="card tap vehcard' + (x.id === V.id ? ' sel' : '') + '" data-vid="' + esc(x.id) + '"><span class="ico">' + ic((VEHICLES[x.type] || VEHICLES.voiture).icon) + '</span><span class="grow"><b>' + esc(vehName(x)) + '</b><span class="sub">' + esc([x.year, x.energy && (x.energy === 'essence' && I18N.lang !== 'fr' ? I18N.t('Essence (moteur)') : I18N.t((ENERGIES.find((e) => e[0] === x.energy) || [0, ''])[1])), x.rental ? I18N.t('location') : '', x.id === curId ? I18N.t('Véhicule actif') : ''].filter(Boolean).join(' · ')) + '</span></span></button>').join('') : '') +
     '<p class="muted small">Le trajet, les alertes et les lieux proposés s\'adaptent à ton véhicule.</p>' +
     '<button class="card tap" id="vehLic"><span class="ico">' + ic('info') + '</span><span class="grow"><b>' + esc(I18N.t('Mon permis de conduire')) + '</b><span class="sub">' + esc(licSummary() || I18N.t('Catégories, pays, date')) + '</span></span></button>' +
     '<h3>Type</h3><div class="vehgrid" id="vehGrid">' + KINDS.map(([k, v]) => '<button class="typebtn' + (k === kind() ? ' sel' : '') + '" data-v="' + k + '">' + ic(v.icon) + esc(v.label) + '</button>').join('') + '</div>' +
     '<div id="vehAsst"></div><div id="vehDims"></div>' +
     '<button class="btn block" id="vehSave">Enregistrer</button>' +
-    '<button class="btn soft block" id="vehAdd">' + ic('plus') + 'Ajouter un autre véhicule <span class="prem">Premium</span></button>' +
-    (base.rental && editId !== 'new' && editId !== 'rental' ? '<button class="btn soft block" id="vehRentEnd">' + esc(I18N.t('Fin de la location : revenir à mon véhicule')) + '</button>' : editId === 'rental' ? '<p class="muted small">' + esc(I18N.t('Véhicule de location : ton véhicule principal est gardé, tu pourras y revenir en un geste.')) + '</p>' : '<button class="btn soft block" id="vehRent">' + ic('car') + esc(I18N.t('Véhicule de location (temporaire)')) + ' <span class="prem">Premium</span></button>') +
+    '<button class="btn soft block" id="vehAdd">' + ic('plus') + 'Ajouter un autre véhicule <span class="prem">PRO</span></button>' +
+    (base.rental && editId !== 'new' && editId !== 'rental' ? '<button class="btn soft block" id="vehRentEnd">' + esc(I18N.t('Fin de la location : revenir à mon véhicule')) + '</button>' : editId === 'rental' ? '<p class="muted small">' + esc(I18N.t('Véhicule de location : ton véhicule principal est gardé, tu pourras y revenir en un geste.')) + '</p>' : '<button class="btn soft block" id="vehRent">' + ic('car') + esc(I18N.t('Véhicule de location (temporaire)')) + ' <span class="prem">PRO</span></button>') +
     (editId === 'new' || editId === 'rental' ? '' : '<div id="vehCarnet"></div>') +
     (list.length > 1 && editId !== 'new' ? '<button class="btn ghost" id="vehDel">Retirer ce véhicule</button>' : ''), 'vehicle');
   { const vl = body.querySelector('#vehLic'); if (vl) vl.onclick = () => openLicence(); }
@@ -3198,7 +3196,7 @@ function profileForm(isNew) {
     html:
       '<label class="field" for="pfName">Pseudo<input id="pfName" type="text" maxlength="20" value="' + esc(S.me.pseudo || '') + '" placeholder="Ex. : Pilote_GT"></label>' +
       '<h3>Qui peut me voir sur la carte ?</h3>' + visSeg('pfVis') +
-      '<p class="muted small">Tes amis voient ta position exacte. Les autres voient seulement une zone d\'environ 1 km.</p>',
+      '<p class="muted small">Visible : les autres conducteurs voient seulement une zone d\'environ 1 km autour de toi. Invisible : personne ne te voit.</p>',
     bind(root) {
       root.querySelectorAll('#pfColors .swatch').forEach((b) => { b.onclick = () => { color = b.dataset.c; root.querySelectorAll('#pfColors .swatch').forEach((x) => x.classList.toggle('sel', x === b)); }; });
       root.querySelectorAll('#pfVis button').forEach((b) => { b.onclick = () => { S.me.vis = b.dataset.v; root.querySelectorAll('#pfVis button').forEach((x) => x.classList.toggle('on', x === b)); }; });
@@ -3247,9 +3245,6 @@ function openProfile() {
   const body = openSheet('Mon profil', '<button class="card tap menuprof" id="pfSettings"><span class="ico">' + ic('gear') + '</span><span class="grow"><b>' + esc(I18N.t('Réglages')) + '</b><span class="sub">' + esc(I18N.t('Navigation, carte, véhicule, notifications, confidentialité et compte')) + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     '<button class="btn soft block" id="pfVeh">' + ic(veh().icon) + esc(I18N.t('Mon véhicule')) + ' · ' + esc(vehSummary()) + '</button>' + f.html +
     '<button class="btn block" id="pfSave">Enregistrer</button>' +
-    '<h3>Mon code ami</h3><div class="card"><div class="grow"><div class="code">' + esc(S.me.code) + '</div><div class="sub">Donne-le à tes potes : ils l\'entrent dans « Ajouter un ami ».</div></div><button class="iconbtn small" id="pfCopy" aria-label="Copier le code">' + ic('copy') + '</button></div>' +
-    '<h3>Ajouter un ami</h3><form id="frForm" class="row"><label class="field grow" for="frCode"><span class="sr">Code ami</span><input id="frCode" type="text" maxlength="6" placeholder="Code à 6 caractères" autocapitalize="characters" autocomplete="off"></label><button class="btn" type="submit">Ajouter</button></form>' +
-    ((S.me.friends || []).length ? (S.me.friends.map((fr, i) => '<div class="card"><div class="grow"><b>' + esc(fr.pseudo) + '</b><div class="sub">Peut te voir quand tu es visible</div></div><button class="iconbtn small" data-rm="' + i + '" aria-label="Retirer ' + esc(fr.pseudo) + '">' + ic('trash') + '</button></div>').join('')) : '<div class="empty">Pas encore d\'amis.</div>') +
     '<button class="btn block" id="pfFeedback">' + ic('msg') + 'Signaler un problème ou une idée</button>' +
     '<a class="btn soft block" href="aide.html" style="text-decoration:none">' + ic('info') + 'Aide et installation (iPhone, Android)</a>' +
     '<div class="banner">' + ic('info') + '<span>' + (S.online ? 'Mode en ligne : alertes, spots, conducteurs et messages partagés.' : 'Mode solo : tes alertes et spots restent sur ce téléphone.') + ' Version ' + VERSION + '. Carte © OpenStreetMap, OpenFreeMap. Itinéraires OSRM et Valhalla. Recherche Photon.</span></div>' +
@@ -3259,18 +3254,6 @@ function openProfile() {
   body.querySelector('#pfFeedback').onclick = () => openFeedback();
   body.querySelector('#pfVeh').onclick = () => openVehicle();
   body.querySelector('#pfSettings').onclick = () => openSettings();
-  body.querySelector('#pfCopy').onclick = async () => { try { await navigator.clipboard.writeText(S.me.code); toast('Code copié.'); } catch (e) { toast('Ton code : <b>' + esc(S.me.code) + '</b>'); } };
-  body.querySelector('#frForm').onsubmit = async (e) => {
-    e.preventDefault();
-    const code = $('frCode').value.trim().toUpperCase();
-    if (code.length !== 6) { toast('Le code fait 6 caractères.'); return; }
-    if (code === S.me.code) { toast("C'est ton propre code."); return; }
-    if (!S.online) { toast('Ajouter des amis demande le mode en ligne.'); return; }
-    const d = await DB.findByCode(code);
-    if (!d) { toast('Code introuvable. Ton ami doit avoir ouvert l\'app au moins une fois.'); return; }
-    addFriend({ id: d.id, pseudo: d.pseudo }); openProfile();
-  };
-  body.querySelectorAll('[data-rm]').forEach((b) => { b.onclick = () => { S.me.friends.splice(+b.dataset.rm, 1); saveMe(); pushPresence(true); openProfile(); }; });
 }
 /* ======================= Réglages (accès direct depuis « Mon profil ») ======================= */
 function openSettings() {
@@ -3290,7 +3273,7 @@ function openSettings() {
     sw('stPlaces', 'Afficher les établissements sur la carte', S.settings.showPlaces) +
     sw('stSignals', 'Afficher les feux de circulation', S.settings.showSignals !== false, 'Emplacement seulement : ROUTA ne sait pas s\'ils sont rouges ou verts.') +
     sw('stGoogle', 'Bouton « Voir les avis Google » sur les lieux', S.settings.googleLinks) +
-    '<button class="card tap curbtn" id="stCursor"><span class="cp">' + meHtml() + '</span><span class="grow"><b>' + esc(I18N.t('Curseur GPS')) + ' <span class="prem">Premium</span></b><span class="sub">' + esc(I18N.t('Forme, couleur, taille et halo')) + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
+    '<button class="card tap curbtn" id="stCursor"><span class="cp">' + meHtml() + '</span><span class="grow"><b>' + esc(I18N.t('Curseur GPS')) + ' <span class="prem">PRO</span></b><span class="sub">' + esc(I18N.t('Forme, couleur, taille et halo')) + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     '<button class="btn soft block" id="stMapView">' + ic('layers') + 'Plan, satellite, trafic et transports</button>' +
     '<h3>Véhicule</h3>' +
     '<button class="btn soft block" id="stVeh">' + ic(veh().icon) + esc(I18N.t('Mon véhicule')) + ' · ' + esc(vehSummary()) + '</button>' +
@@ -3300,7 +3283,7 @@ function openSettings() {
     sw('stMoments', I18N.t('ROUTA Moments'), !!S.settings.moments, I18N.t('À l\'arrivée, une courte anecdote sur un lieu proche (Wikipédia). Désactivé par défaut.')) +
     sw('stTips', I18N.t('Conseils discrets'), S.settings.tips !== false, I18N.t('De temps en temps, un petit message utile (météo, verglas, trajet habituel). Jamais de son.')) +
     '<h3>Confidentialité et compte</h3>' +
-    '<button class="btn soft block" id="stProfile">' + ic('user') + 'Pseudo, visibilité et amis</button>' +
+    '<button class="btn soft block" id="stProfile">' + ic('user') + 'Pseudo et visibilité</button>' +
     '<p class="muted small"><a href="confidentialite.html" style="color:var(--info)">Confidentialité et règles d\'utilisation</a></p>' +
     '<button class="btn ghost" id="pfReset">Réinitialiser mon profil sur ce téléphone</button>' +
     '<button class="btn danger block" id="pfWipe">Supprimer mes données</button>' +
@@ -3328,7 +3311,7 @@ function openSettings() {
   body.querySelector('#pfReset').onclick = () => {
     const b = body.querySelector('#pfReset');
     if (b.dataset.confirm) { try { localStorage.removeItem('routa.me'); } catch (e2) { /* */ } location.reload(); }
-    else { b.dataset.confirm = '1'; b.textContent = 'Touche encore pour confirmer (ton code ami changera)'; }
+    else { b.dataset.confirm = '1'; b.textContent = 'Touche encore pour confirmer'; }
   };
   body.querySelector('#pfWipe').onclick = async () => {
     const b = body.querySelector('#pfWipe');
@@ -3413,7 +3396,7 @@ function openMenu() {
   const groups = [
     ['Communauté', [
       ['messages', ic('msg'), 'Bumps' + (n ? ' <span class="badge">' + n + '</span>' : '')],
-      X.open && ['friends', XI.users || ic('msg'), 'Amis et conducteurs' + (fr ? ' <span class="badge">' + fr + '</span>' : '')],
+      ['drivers', XI.users || ic('msg'), 'Conducteurs autour'],
       XO('ranking') && xt('ranking'),
       XO('shareme') && xt('shareme'),
       XO('badges') && xt('badges')
@@ -3455,13 +3438,13 @@ function openMenu() {
     ]]
   ];
   // #008 : fonctions classées Premium (étiquette seulement pendant les tests, rien n'est verrouillé)
-  const PREM_TILES = ['plan', 'convoy', 'events', 'smart', 'checklists', 'spots', 'cols', 'explore', 'voyage'];
-  const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + (PREM_TILES.includes(t[0]) ? '<i class="prem tileprem">Premium</i>' : '') + t[1] + '<span>' + t[2] + '</span></button>';
+  const PREM_TILES = ['plan', 'convoy', 'events', 'smart', 'checklists', 'spots', 'cols', 'explore', 'voyage', 'pro', 'tour', 'bans', 'prolog', 'truckstop', 'restrictions'];
+  const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + (PREM_TILES.includes(t[0]) ? '<i class="prem tileprem">PRO</i>' : '') + t[1] + '<span>' + t[2] + '</span></button>';
   const body = openSheet('Menu',
     '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     '<button class="card tap menuprof" data-k="settings"><span class="ico">' + ic('gear') + '</span><span class="grow"><b>' + esc(I18N.t('Réglages')) + '</b><span class="sub">' + esc(I18N.t('Navigation, carte, véhicule, notifications, confidentialité et compte')) + '</span></span></button>' +
     '<button class="card tap menusos" data-k="country"><span class="sosdot big">SOS</span><span class="grow"><b>Urgences et infos pays</b><span class="sub">' + ($('ctryLabel').textContent === 'Infos pays' ? 'Numéros d\'urgence, règles, vignettes' : esc($('ctryLabel').textContent)) + '</span></span></button>' +
-    groups.map(([g, ts]) => { const list = ts.filter(Boolean); if (!list.length) return ''; return '<h3 class="menuh' + (g === 'Pro' ? ' menupro' : '') + '">' + (g === 'Pro' ? esc(I18N.t('Outils pour les professionnels de la route')) + ' <span class="prem">Premium</span>' : g) + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
+    groups.map(([g, ts]) => { const list = ts.filter(Boolean); if (!list.length) return ''; return '<h3 class="menuh' + (g === 'Pro' ? ' menupro' : '') + '">' + (g === 'Pro' ? esc(I18N.t('Outils pour les professionnels de la route')) : g) + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
     '<button class="card tap menufb" data-k="feedback"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg></span><span class="grow"><b>Donner mon avis</b><span class="sub">Un bug, un truc pas clair, une idée : dis-le-nous</span></span></button>' +
     '<div class="menulinks">' + (X.canInstall && X.canInstall() ? '<button data-k="install">Installer l\'app</button>' : '') + '<button data-k="share">Partager ROUTA</button><button data-k="help">Aide</button><button data-k="privacy">Confidentialité</button></div>' +
     langSeg() +

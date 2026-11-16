@@ -15,7 +15,7 @@
   const fmtDay = (d) => { try { return new Date(d + 'T12:00:00').toLocaleDateString(LANG(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return d; } };
   const pad = (n) => String(n).padStart(2, '0');
   const isoDay = (t) => { const d = new Date(t); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
-  const PREM = ' <span class="prem">Premium</span>';
+  const PREM = ' <span class="prem">PRO</span>';
 
   /* ---------- enregistrer le trajet affiché ---------- */
   X.planSave = (R, dest) => {
