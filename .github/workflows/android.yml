@@ -3,7 +3,7 @@ name: Android (ROUTA)
 on:
   workflow_dispatch:
   push:
-    branches: [android-build]
+    branches: [build-android]
 
 permissions:
   contents: write
