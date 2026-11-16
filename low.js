@@ -289,6 +289,36 @@
     body.querySelectorAll('[data-i]').forEach((b) => { b.onclick = () => { const c = list[+b.dataset.i]; X.addVia({ name: c.name, lat: c.lat, lon: c.lon }, dest); }; });
   };
 
+
+  /* ---------- #023 conseils discrets (gratuit) et #069 conseils personnalisés (Premium) : visuels, rares, désactivables ---------- */
+  async function tipTick() {
+    if (S.settings.tips === false || S.nav || !S.pos || document.hidden) return;
+    if (Date.now() - store.get('routa.tipAt', 0) < 36 * 3600000) return;
+    const c = S.pos, m = new Date().getMonth(), h = new Date().getHours();
+    let msg = null, act = null;
+    try {
+      const w = await getJson('https://api.open-meteo.com/v1/forecast?latitude=' + c.lat.toFixed(3) + '&longitude=' + c.lon.toFixed(3) + '&current=temperature_2m&hourly=precipitation_probability&forecast_hours=2&timeformat=unixtime');
+      const t = w.current && w.current.temperature_2m, pp = Math.max(...((w.hourly && w.hourly.precipitation_probability) || [0]));
+      if (t != null && t <= 2 && (m >= 9 || m <= 3)) msg = T('Il fait {t}° : attention au verglas, surtout sur les ponts et à l\'ombre.', { t: Math.round(t) });
+      else if (pp >= 70) msg = T('Pluie probable dans l\'heure près de toi : garde plus de distance.');
+    } catch (e) { /* météo indisponible */ }
+    if (!msg) {
+      const D = store.get('routa.drives', []).filter((d) => d.s > Date.now() - 60 * 86400000 && d.p1 && d.c1);
+      const wd = new Date().getDay();
+      const same = D.filter((d) => { const x = new Date(d.s); return x.getDay() === wd && Math.abs(x.getHours() - h) <= 1; });
+      const cnt = {}; same.forEach((d) => { cnt[d.c1] = (cnt[d.c1] || []).concat([d.p1]); });
+      const top = Object.entries(cnt).sort((a, b) => b[1].length - a[1].length)[0];
+      if (top && top[1].length >= 3 && dist(c, top[1][0]) > 2000) {
+        msg = T('Tu vas souvent à {c} à cette heure-ci.', { c: top[0] }) + ' <span class="prem">Premium</span>';
+        act = () => chooseDestination({ name: top[0], lat: top[1][0].lat, lon: top[1][0].lon });
+      }
+    }
+    if (!msg) return;
+    store.set('routa.tipAt', Date.now());
+    toast(msg.indexOf('<span') > 0 ? esc(msg.split(' <span')[0]) + ' <span class="prem">Premium</span>' : esc(msg), act ? { action: T('Itinéraire'), onAction: act, ms: 9000 } : { ms: 8000 });
+  }
+  setTimeout(tipTick, 25000); setInterval(tipTick, 30 * 60000);
+
   /* ---------- branchement au menu ---------- */
   const tiles0 = X.tiles;
   X.tiles = () => (tiles0 ? tiles0() : []).concat([['explore', IC.compass, T('Explorer autour')], ['repair', IC.wrench, T('Garages et équipement')], ['breakdown', IC.sos, T('En panne')], ['checklists', IC.list, T('Checklists de voyage')]]);

@@ -641,3 +641,7 @@ body.navsoft .tripchip { display: none; }
 .clrow input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
 .clrow span { flex: 1; }
 .clrow input:checked + span { text-decoration: line-through; opacity: .6; }
+/* #036 conduite simplifiée */
+body.navlite.navigating #navThen, body.navlite.navigating .fabs-right, body.navlite.navigating .prochip, body.navlite.navigating .limitnext, body.navlite.navigating #btnOverview { display: none !important; }
+/* mention « infos indicatives » sous les listes */
+.sheet-note { margin: 0; padding: 8px max(14px, var(--sar, 0px)) calc(8px + var(--sab, 0px)); font-size: 11.5px; line-height: 1.35; color: var(--muted, #9AA3AF); border-top: 1px solid var(--line); background: var(--surface, #171B22); }

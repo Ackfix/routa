@@ -189,6 +189,9 @@ const saveMe = () => store.set('routa.me', S.me);
 const saveSettings = () => store.set('routa.settings', S.settings);
 const applyUi = () => { try { document.documentElement.style.setProperty('--ui', String(+S.settings.uiSize || 1)); } catch (e) { /* */ } };
 applyUi();
+/* #036 : interface de conduite simplifiée (moins de boutons pendant la navigation, l'essentiel reste) */
+const applyLite = () => document.body.classList.toggle('navlite', !!S.settings.navLite);
+applyLite();
 function veh() {
   const v = VEHICLES[S.vehicle.type] || VEHICLES.voiture;
   const dims = Object.assign({}, v.dims || {}, v.heavy ? (S.vehicle.dims || {}) : {});
@@ -1101,6 +1104,20 @@ $('alertYes').onclick = () => { $('alertNear').hidden = true; if (S.alertNearId)
 $('alertNo').onclick = () => { $('alertNear').hidden = true; if (S.alertNearId) voteAlert(S.alertNearId, false); };
 
 /* ======================= Feuille du bas ======================= */
+const DISCLAIM = 'Tout est indicatif (lieux, limitations, vignettes, météo, pannes, conseils…). Fie-toi toujours à la réalité sur place : panneaux, loi, police, avis. ACKFIX décline toute responsabilité : tu restes seul responsable de tes choix.';
+/* Avertissement unique au premier lancement : ROUTA informe, chacun décide */
+function openNotice(force) {
+  if (!force && store.get('routa.notice1', false)) return;
+  const b = openSheet(I18N.t('À savoir avant de rouler'),
+    '<p>' + esc(I18N.t('ROUTA donne des informations indicatives (distances, lieux, garages, parkings, aires, météo, limitations, suggestions). Elles viennent de sources publiques et peuvent être fausses ou dépassées.')) + '</p>' +
+    '<p>' + esc(I18N.t('Ce ne sont pas des recommandations : vérifie les avis, la loi et les panneaux sur place (feu, accès, stationnement…). La signalisation et la police font toujours foi.')) + '</p>' +
+    '<p><b>' + esc(I18N.t('Tu restes seul responsable de tes choix et de ta conduite.')) + '</b></p>' +
+    '<p>' + esc(I18N.t('ACKFIX décline toute responsabilité dans les limites permises par la loi.')) + '</p>' +
+    '<p class="muted small"><a href="confidentialite.html" style="color:var(--info)">' + esc(I18N.t('Règles d\'utilisation complètes')) + '</a></p>' +
+    '<button class="btn primary block" id="ntOk">' + esc(I18N.t('J\'ai compris')) + '</button>', 'notice');
+  b.querySelector('#ntOk').onclick = () => { store.set('routa.notice1', true); closeSheet(); };
+}
+setTimeout(() => { if (S.me && S.me.pseudo && !S.nav && $('sheetWrap').hidden) openNotice(); }, 3500);
 function openSheet(title, html, view) {
   $('sheetTitle').textContent = title;
   $('sheetBody').innerHTML = html;
@@ -1108,6 +1125,9 @@ function openSheet(title, html, view) {
   $('sheetWrap').hidden = false;
   S.sheetView = view || null;
   $('sheetWrap').classList.toggle('nomodal', /^(point|preview|place|fav|spot|poi)/.test(S.sheetView || ''));
+  // Mention « infos indicatives » sous toutes les listes de lieux et les suggestions (gardée même quand le contenu se recharge)
+  const nt = $('sheetNote');
+  if (nt) { const on = !!S.sheetView && !/^(menu|settings|profile|onboarding|notice|messages|thread|friends|vehicle|licence|feedback|cursor|plansave|planstory|story|lang|install|ranking|badges|checklists|actdetail)/.test(S.sheetView); nt.hidden = !on; if (on) nt.textContent = I18N.t(DISCLAIM); }
   return $('sheetBody');
 }
 function closeSheet() {
@@ -2777,7 +2797,7 @@ function openVehicle(after, editId) {
   const list = loadVehicles();
   const curId = store.get('routa.vehicleId', list[0].id);
   const base = list.find((x) => x.id === (editId || curId)) || list[0];
-  const V = JSON.parse(JSON.stringify(editId === 'new' ? { id: uuid(), type: 'voiture', dims: {}, hazmat: false } : base));
+  const V = JSON.parse(JSON.stringify(editId === 'new' || editId === 'rental' ? { id: uuid(), type: 'voiture', dims: {}, hazmat: false, rental: editId === 'rental' } : base));
   if (!V.id) V.id = uuid();
   const DB0 = window.ROUTA_VDB || {};
   const kind = () => (CAR_TYPES.includes(V.type) ? 'voiture' : V.type);
@@ -2785,12 +2805,13 @@ function openVehicle(after, editId) {
   const opt = (v, l, sel) => '<option value="' + esc(v) + '"' + (sel ? ' selected' : '') + '>' + esc(l) + '</option>';
   const yNow = new Date().getFullYear();
   const body = openSheet('Ton véhicule',
-    (list.length > 1 || editId === 'new' ? '<h3>Mes véhicules <span class="prem">Premium</span></h3>' + list.map((x) => '<button class="card tap vehcard' + (x.id === V.id ? ' sel' : '') + '" data-vid="' + esc(x.id) + '"><span class="ico">' + ic((VEHICLES[x.type] || VEHICLES.voiture).icon) + '</span><span class="grow"><b>' + esc(vehName(x)) + '</b><span class="sub">' + esc([x.year, x.energy && (x.energy === 'essence' && I18N.lang !== 'fr' ? I18N.t('Essence (moteur)') : I18N.t((ENERGIES.find((e) => e[0] === x.energy) || [0, ''])[1])), x.id === curId ? I18N.t('Véhicule actif') : ''].filter(Boolean).join(' · ')) + '</span></span></button>').join('') : '') +
+    (list.length > 1 || editId === 'new' ? '<h3>Mes véhicules <span class="prem">Premium</span></h3>' + list.map((x) => '<button class="card tap vehcard' + (x.id === V.id ? ' sel' : '') + '" data-vid="' + esc(x.id) + '"><span class="ico">' + ic((VEHICLES[x.type] || VEHICLES.voiture).icon) + '</span><span class="grow"><b>' + esc(vehName(x)) + '</b><span class="sub">' + esc([x.year, x.energy && (x.energy === 'essence' && I18N.lang !== 'fr' ? I18N.t('Essence (moteur)') : I18N.t((ENERGIES.find((e) => e[0] === x.energy) || [0, ''])[1])), x.rental ? I18N.t('location') : '', x.id === curId ? I18N.t('Véhicule actif') : ''].filter(Boolean).join(' · ')) + '</span></span></button>').join('') : '') +
     '<p class="muted small">Le trajet, les alertes et les lieux proposés s\'adaptent à ton véhicule.</p>' +
     '<h3>Type</h3><div class="vehgrid" id="vehGrid">' + KINDS.map(([k, v]) => '<button class="typebtn' + (k === kind() ? ' sel' : '') + '" data-v="' + k + '">' + ic(v.icon) + esc(v.label) + '</button>').join('') + '</div>' +
     '<div id="vehAsst"></div><div id="vehDims"></div>' +
     '<button class="btn block" id="vehSave">Enregistrer</button>' +
     '<button class="btn soft block" id="vehAdd">' + ic('plus') + 'Ajouter un autre véhicule <span class="prem">Premium</span></button>' +
+    (base.rental && editId !== 'new' && editId !== 'rental' ? '<button class="btn soft block" id="vehRentEnd">' + esc(I18N.t('Fin de la location : revenir à mon véhicule')) + '</button>' : editId === 'rental' ? '<p class="muted small">' + esc(I18N.t('Véhicule de location : ton véhicule principal est gardé, tu pourras y revenir en un geste.')) + '</p>' : '<button class="btn soft block" id="vehRent">' + ic('car') + esc(I18N.t('Véhicule de location (temporaire)')) + ' <span class="prem">Premium</span></button>') +
     (list.length > 1 && editId !== 'new' ? '<button class="btn ghost" id="vehDel">Retirer ce véhicule</button>' : ''), 'vehicle');
   const drawAsst = () => {
     const brands = Object.keys(DB0).sort((a, b) => a.localeCompare(b));
@@ -2836,6 +2857,14 @@ function openVehicle(after, editId) {
   });
   body.querySelectorAll('[data-vid]').forEach((b) => { b.onclick = () => { const x = loadVehicles().find((y) => y.id === b.dataset.vid); if (!x) return; useVehicle(x); toast(I18N.t('Véhicule actif') + ' : <b>' + esc(vehName(x)) + '</b>'); openVehicle(after); }; });
   body.querySelector('#vehAdd').onclick = () => openVehicle(after, 'new');
+  const vr = body.querySelector('#vehRent'); if (vr) vr.onclick = () => openVehicle(after, 'rental');
+  const ve = body.querySelector('#vehRentEnd'); if (ve) ve.onclick = () => {
+    const prevId = store.get('routa.rentalPrev', null);
+    const rest = loadVehicles().filter((x) => x.id !== base.id); store.set('routa.vehicles', rest);
+    const back = rest.find((x) => x.id === prevId) || rest[0]; store.set('routa.rentalPrev', null);
+    if (back) useVehicle(back); toast(esc(I18N.t('Location terminée : {v}').split('{v}').join(vehName(back || {}))));
+    openVehicle(after);
+  };
   const del = body.querySelector('#vehDel');
   if (del) del.onclick = () => {
     if (!del.dataset.confirm) { del.dataset.confirm = '1'; del.textContent = I18N.t('Touche encore pour retirer ce véhicule'); return; }
@@ -2854,6 +2883,7 @@ function openVehicle(after, editId) {
     } else V.hazmat = false;
     V.dims = nd;
     if (ctrlBlocked(V.brand || '', (V.model || '') + ' ' + (V.version || ''))) { toast('Pas de mention de contrôles de police ou de radars : c\'est interdit en Suisse.'); return; }
+    if (V.rental && !loadVehicles().some((x) => x.id === V.id)) store.set('routa.rentalPrev', store.get('routa.vehicleId', null) || (loadVehicles()[0] || {}).id || null);
     useVehicle(V);
     if (!S.me.car && V.model) { S.me.car = vehName(V).slice(0, 30); saveMe(); pushPresence(true); }
     toast('Véhicule : <b>' + esc(vehSummary()) + '</b>');
@@ -3140,6 +3170,7 @@ function openSettings() {
     sw('stAhead', 'Prévenir à l\'avance des baisses de limitation', S.settings.limitAhead !== false, 'Un petit panneau, sans son.') +
     sw('stAlert', 'Alerte vocale si je dépasse la limite', S.settings.speedAlert) +
     sw('stSpeedo', 'Afficher le compteur de vitesse', S.settings.showSpeedo !== false) +
+    sw('stLite', I18N.t('Interface de conduite simplifiée'), !!S.settings.navLite, I18N.t('Pendant la navigation : seulement la consigne, l\'arrivée, la vitesse et les alertes.')) +
     '<h3>Carte</h3>' +
     '<p class="muted small" style="margin:0">Couleurs de la carte</p>' + segH('stNight', [['auto', 'Automatique'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
     sw('stPlaces', 'Afficher les établissements sur la carte', S.settings.showPlaces) +
@@ -3153,6 +3184,7 @@ function openSettings() {
     '<h3>Notifications</h3>' +
     sw('stReminders', 'Rappels d\'entretien (pneus, service, batterie)', S.settings.reminders !== false) +
     sw('stReadMsgs', 'Lire les messages reçus à voix haute', S.settings.readMsgs) +
+    sw('stTips', I18N.t('Conseils discrets'), S.settings.tips !== false, I18N.t('De temps en temps, un petit message utile (météo, verglas, trajet habituel). Jamais de son.')) +
     '<h3>Confidentialité et compte</h3>' +
     '<button class="btn soft block" id="stProfile">' + ic('user') + 'Pseudo, visibilité et amis</button>' +
     '<p class="muted small"><a href="confidentialite.html" style="color:var(--info)">Confidentialité et règles d\'utilisation</a></p>' +
@@ -3166,6 +3198,8 @@ function openSettings() {
   ch('stAhead', (v) => { S.settings.limitAhead = v; });
   ch('stAlert', (v) => { S.settings.speedAlert = v; });
   ch('stSpeedo', (v) => { S.settings.showSpeedo = v; updateSpeed(); });
+  ch('stLite', (v) => { S.settings.navLite = v; applyLite(); });
+  ch('stTips', (v) => { S.settings.tips = v; });
   ch('stPlaces', (v) => { S.settings.showPlaces = v; applyPlaces(); });
   ch('stSignals', (v) => { S.settings.showSignals = v; if (window.ROUTA_X && ROUTA_X.signalsToggle) ROUTA_X.signalsToggle(v); });
   ch('stGoogle', (v) => { S.settings.googleLinks = v; });
@@ -3218,6 +3252,7 @@ function onboarding() {
     $('sheetClose').hidden = false;
     closeSheet();
     boot();
+    setTimeout(() => openNotice(), 1200);
   };
 }
 
