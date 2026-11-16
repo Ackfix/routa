@@ -107,6 +107,10 @@ const P = {
   shops: '<path d="M4 8h16l-1 12H5z"/><path d="M9 8V6a3 3 0 016 0v2"/>',
   truckstop: '<path d="M2 16V6h11v10M13 9h4l3 4v3h-7"/><circle cx="6" cy="17.5" r="1.8"/><circle cx="16.5" cy="17.5" r="1.8"/>',
   car: '<path d="M5 15l2-6h10l2 6v3H5z"/><circle cx="8" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/>',
+  bike: '<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l4-8h5l3 8M10 8l-1-2H7M12 16l3-8"/>',
+  ebike: '<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l4-8h5l3 8M12 16l3-8"/><path d="M11 3l-2 3h3l-2 3"/>',
+  walk: '<circle cx="13" cy="4" r="2"/><path d="M11 21l2-6-3-3 1-5 4 3 3 1M10 12l-2 4"/>',
+  transit: '<rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M8 21l2-4M16 21l-2-4"/><circle cx="9" cy="14" r=".8"/><circle cx="15" cy="14" r=".8"/>',
   ev: '<path d="M5 15l2-6h10l2 6v3H5z"/><path d="M12 10l-2 3h3l-2 3"/>',
   camper: '<path d="M2 17V7h13l4 4h3v6"/><path d="M5 10h4v3H5z"/><circle cx="6" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
   minibus: '<path d="M3 17V7h14l4 5v5H3z"/><path d="M6 10h3M11 10h3"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
@@ -699,6 +703,24 @@ function renderDrivers() {
 setInterval(renderDrivers, 30000);
 
 /* Alertes */
+/* Modes de déplacement (#042 vélo et vélo électrique, #043 à pied et transports publics, #063 trajets plus sûrs et agréables).
+   À pied et en transports publics, aucun véhicule n'est nécessaire. */
+const MODES = [['car', 'car', 'Véhicule'], ['bike', 'bike', 'Vélo'], ['ebike', 'ebike', 'Vélo électrique'], ['walk', 'walk', 'À pied'], ['transit', 'transit', 'Transports']];
+S.mode = MODES.some((m) => m[0] === store.get('routa.mode', 'car')) ? store.get('routa.mode', 'car') : 'car';
+const softMode = () => S.mode === 'bike' || S.mode === 'ebike' || S.mode === 'walk';
+const navSoft = () => !!(S.nav && S.nav.mode && S.nav.mode !== 'car');
+function modeSeg(dest) {
+  const w = el('<div class="modeseg" role="tablist">' + MODES.map(([k, icon, l]) => '<button role="tab" data-m="' + k + '" class="' + (S.mode === k ? 'on' : '') + '" aria-label="' + esc(I18N.t(l)) + '">' + ic(k === 'car' ? veh().icon : icon) + '<span>' + esc(I18N.t(k === 'car' ? veh().label : l)) + '</span></button>').join('') + '</div>');
+  w.querySelectorAll('button').forEach((b) => { b.onclick = () => { if (S.mode === b.dataset.m) return; S.mode = b.dataset.m; store.set('routa.mode', S.mode); chooseDestination(dest); }; });
+  return w;
+}
+function softOpts() {
+  const h = new Date().getHours(), dark = h >= 18 || h < 7;
+  // vélo : pistes et rues calmes d'abord, mauvais revêtements évités ; à pied : trottoirs et chemins, rues éclairées le soir
+  if (S.mode === 'bike') return ['bicycle', { bicycle_type: 'Hybrid', cycling_speed: 16, use_roads: 0.2, use_hills: 0.3, avoid_bad_surfaces: 0.4, use_living_streets: 0.7, use_ferry: 0.5 }];
+  if (S.mode === 'ebike') return ['bicycle', { bicycle_type: 'Hybrid', cycling_speed: 22, use_roads: 0.3, use_hills: 0.8, avoid_bad_surfaces: 0.35, use_living_streets: 0.6, use_ferry: 0.5 }];
+  return ['pedestrian', { walking_speed: 5, walkway_factor: 0.8, sidewalk_factor: 0.8, alley_factor: 2, driveway_factor: 5, step_penalty: 10, use_lit: dark ? 1 : 0.3, max_hiking_difficulty: 1, use_ferry: 0.5 }];
+}
 function putAlert(r) { if (!r || !r.id) return; if (r.type === 'lieu_ferme') S.closed.set(r.id, r); else S.alerts.set(r.id, r); }
 function alertVisible(a) { return a && Date.parse(a.expires_at) > Date.now() && (a.denies || 0) <= (a.confirms || 1); }
 function renderAlerts() {
@@ -857,7 +879,7 @@ function updateSpeed() {
   box.hidden = S.settings.showSpeedo === false;
   const kmh = S.speed * 3.6 < 6 ? 0 : Math.round(S.speed * 3.6);
   $('speedVal').textContent = kmh;
-  const lim = capLimit(S.limit);
+  const lim = navSoft() ? null : capLimit(S.limit);
   const over = !!lim && kmh > lim + 3;
   // panneau affiché si on le demande, et toujours (réglable) quand on dépasse
   const showSign = !!lim && (S.settings.showLimit || (over && S.settings.overSign !== false));
@@ -964,7 +986,7 @@ setInterval(() => pushPresence(false), 20000);
 
 /* ======================= Alertes à proximité ======================= */
 function checkNearAlerts() {
-  if (!S.pos) return;
+  if (!S.pos || (S.nav && S.nav.mode === 'walk')) return;
   let best = null;
   S.alerts.forEach((a) => {
     if (!alertVisible(a) || S.prompted.has(a.id) || votedAlerts.has(a.id) || a.created_by === S.me.id) return;
@@ -1208,6 +1230,11 @@ async function fetchValhalla(from, to, costing, opts) {
   } finally { clearTimeout(tm); }
 }
 async function fetchRoute(from, to) {
+  if ((S.nav ? navSoft() : softMode())) {
+    if (S.nav) S.mode = S.nav.mode;
+    const [costing, o] = softOpts();
+    const R = await fetchValhalla(from, to, costing, o); R.mode = S.mode; return R;
+  }
   const v = veh();
   if (v.heavy && window.ROUTA_X && ROUTA_X.route) { try { const R = await ROUTA_X.route(from, to); if (R) { R.vehicle = vehSummary(); return R; } } catch (e) { console.warn('tomtom poids lourd', e); } }
   if (v.heavy) {
@@ -1265,11 +1292,67 @@ function remember(dest) {
   store.set('routa.recents', S.recents);
 }
 
+/* #043 Transports publics : horaires officiels suisses (transport.opendata.ch), retards en direct ; ailleurs, on renvoie vers une appli d'horaires */
+const tpTime = (iso) => { if (!iso) return null; const d = new Date(String(iso).replace(/([+-]\d\d)(\d\d)$/, '$1:$2')); return isNaN(d) ? null : d; };
+const hhmm = (d) => ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+async function tpNearest(p) {
+  const r = await fetch('https://transport.opendata.ch/v1/locations?x=' + p.lat.toFixed(5) + '&y=' + p.lon.toFixed(5) + '&type=station');
+  const j = await r.json();
+  return (j.stations || []).filter((x) => x.id && x.coordinate && x.coordinate.x).sort((a, b) => (a.distance || 0) - (b.distance || 0))[0] || null;
+}
+async function transitPreview(dest) {
+  const tok = (S.tpTok = (S.tpTok || 0) + 1);
+  const body0 = openSheet(dest.name, '<p class="muted">' + esc(I18N.t('Recherche des correspondances…')) + '</p>', 'preview');
+  body0.insertBefore(modeSeg(dest), body0.firstChild);
+  S.preview = null; drawRoute(null);
+  const gUrl = 'https://www.google.com/maps/dir/?api=1&travelmode=transit&origin=' + S.pos.lat.toFixed(5) + ',' + S.pos.lon.toFixed(5) + '&destination=' + dest.lat.toFixed(5) + ',' + dest.lon.toFixed(5);
+  const other = '<a class="btn soft block" target="_blank" rel="noopener" href="' + esc(gUrl) + '">' + ic('transit') + esc(I18N.t('Voir dans Google Maps')) + '</a>';
+  let html = '';
+  try {
+    const [a, b] = await Promise.all([tpNearest(S.pos), tpNearest(dest)]);
+    if (!a || !b || (a.distance || 0) > 2500 || (b.distance || 0) > 2500) throw new Error('loin');
+    if (a.id === b.id) throw new Error('meme');
+    const r = await fetch('https://transport.opendata.ch/v1/connections?from=' + encodeURIComponent(a.id) + '&to=' + encodeURIComponent(b.id) + '&limit=5');
+    const j = await r.json();
+    const cons = (j.connections || []).filter((c) => c.from && c.to);
+    if (!cons.length) throw new Error('aucune');
+    const walkA = Math.max(1, Math.round((a.distance || 0) / 75)), walkB = Math.max(1, Math.round((b.distance || 0) / 75));
+    html = '<p class="muted small">' + esc(I18N.t('Départ : {a} (environ {m} min à pied)').replace('{a}', a.name).replace('{m}', walkA)) + '<br>' + esc(I18N.t('Arrivée : {b}, puis environ {m} min à pied').replace('{b}', b.name).replace('{m}', walkB)) + '</p>' +
+      cons.map((c, i) => {
+        const d = tpTime(c.from.prognosis && c.from.prognosis.departure || c.from.departure), ar = tpTime(c.to.prognosis && c.to.prognosis.arrival || c.to.arrival);
+        const delay = +(c.from.delay || 0);
+        const lines = (c.sections || []).filter((x) => x.journey).map((x) => { const cat = String(x.journey.category || '').trim(), num = String(x.journey.number || '').trim(); const train = !LINE_ONLY.test(cat); return '<span class="ln' + (train ? ' train' : '') + '">' + esc(train ? cat + (num && num.length < 4 ? num : '') : (num || cat)) + '</span>'; }).join(' ');
+        const dur = d && ar ? Math.round((ar - d) / 60000) : null;
+        return '<button class="card tap tpcon" data-i="' + i + '"><div class="grow"><b>' + (d ? hhmm(d) : '–') + ' → ' + (ar ? hhmm(ar) : '–') + '</b>' + (delay > 0 ? ' <span class="tpdelay">+' + delay + ' min</span>' : '') +
+          '<div class="sub">' + (dur != null ? esc(fmtDur(dur * 60)) + ' · ' : '') + esc(I18N.t(c.transfers ? '{n} changement(s)' : 'Direct').replace('{n}', c.transfers)) + (c.from.platform ? ' · ' + esc(I18N.t('voie')) + ' ' + esc(c.from.platform) : '') + '</div><div class="tplines">' + lines + '</div></div></button>' +
+          '<div class="tpdetail" data-d="' + i + '" hidden>' + (c.sections || []).map((x) => {
+            if (x.walk) return '<div class="tpsec walk">' + ic('walk') + '<span>' + esc(I18N.t('Marche')) + '</span></div>';
+            if (!x.journey) return '';
+            const sd = tpTime(x.departure.prognosis && x.departure.prognosis.departure || x.departure.departure), sa = tpTime(x.arrival.prognosis && x.arrival.prognosis.arrival || x.arrival.arrival);
+            return '<div class="tpsec">' + ic('transit') + '<span><b>' + esc(String(x.journey.category || '') + ' ' + String(x.journey.number || '')) + '</b> ' + esc(I18N.t('direction {d}').replace('{d}', x.journey.to || '')) + '<br>' + (sd ? hhmm(sd) : '') + ' ' + esc(x.departure.station && x.departure.station.name || '') + (x.departure.platform ? ' (' + esc(I18N.t('voie')) + ' ' + esc(x.departure.platform) + ')' : '') + '<br>' + (sa ? hhmm(sa) : '') + ' ' + esc(x.arrival.station && x.arrival.station.name || '') + '</span></div>';
+          }).join('') + '</div>';
+      }).join('') +
+      '<button class="btn soft block" id="tpWalk">' + ic('walk') + esc(I18N.t('Me guider à pied jusqu\'à {a}').replace('{a}', a.name)) + '</button>' +
+      '<p class="muted small">' + esc(I18N.t('Horaires et retards en direct : transport.opendata.ch (Suisse).')) + '</p>' + other;
+    if (tok !== S.tpTok || S.sheetView !== 'preview') return;
+    const body = openSheet(dest.name, html, 'preview');
+    body.insertBefore(modeSeg(dest), body.firstChild);
+    body.querySelectorAll('.tpcon').forEach((bt) => { bt.onclick = () => { const dd = body.querySelector('[data-d="' + bt.dataset.i + '"]'); if (dd) dd.hidden = !dd.hidden; }; });
+    body.querySelector('#tpWalk').onclick = () => { S.mode = 'walk'; store.set('routa.mode', 'walk'); chooseDestination({ name: a.name, sub: I18N.t('Arrêt de transports publics'), lat: a.coordinate.x, lon: a.coordinate.y }); };
+    try { const bb = new maplibregl.LngLatBounds(); [S.pos, dest].forEach((p) => bb.extend([p.lon, p.lat])); map.fitBounds(bb, { padding: { top: 140, bottom: Math.round(window.innerHeight * 0.5), left: 40, right: 40 }, maxZoom: 15, duration: 600 }); } catch (e) { /* */ }
+  } catch (e) {
+    console.warn('transports publics', e);
+    if (tok !== S.tpTok || S.sheetView !== 'preview') return;
+    const body = openSheet(dest.name, '<p class="muted">' + esc(I18N.t(String(e.message) === 'meme' ? 'Le même arrêt est le plus proche au départ et à l\'arrivée : le trajet se fait à pied.' : 'Horaires de transports publics indisponibles pour ce trajet (disponibles en Suisse pour le moment).')) + '</p>' + other, 'preview');
+    body.insertBefore(modeSeg(dest), body.firstChild);
+  }
+}
 async function chooseDestination(dest) {
   exitSearch();
   if (!S.pos) { toast("J'attends ta position GPS pour calculer le trajet…"); startGps(); map.flyTo({ center: [dest.lon, dest.lat], zoom: 14 }); return; }
   remember(dest);
   setDestMarker(dest);
+  if (S.mode === 'transit') { transitPreview(dest); return; }
   openSheet(dest.name, '<p class="muted">Calcul du trajet…</p>', 'preview');
   try {
     const R = await fetchRoute(S.pos, dest);
@@ -1279,18 +1362,22 @@ async function chooseDestination(dest) {
     const body = openSheet(dest.name,
       '<div class="row"><div class="grow"><div><span class="eta">' + fmtDur(R.duration) + '</span> <span class="etarest">' + fmtDist(R.total) + ' · arrivée ' + fmtClock(arr) + '</span></div>' +
       '<div class="muted small">' + esc(dest.sub || '') + '</div></div></div>' +
-      (veh().heavy ? (R.fallback ? '<div class="banner warnb">' + ic('info') + '<span><b>Calcul poids lourd indisponible pour le moment.</b> Trajet voiture affiché : attention aux restrictions de hauteur, de poids et d\'accès.</span></div>'
+      (softMode() ? '' : veh().heavy ? (R.fallback ? '<div class="banner warnb">' + ic('info') + '<span><b>Calcul poids lourd indisponible pour le moment.</b> Trajet voiture affiché : attention aux restrictions de hauteur, de poids et d\'accès.</span></div>'
         : '<div class="banner">' + ic(veh().icon) + '<span>Trajet adapté : <b>' + esc(vehSummary()) + '</b>. Les limites connues de hauteur, poids et accès sont évitées. Respecte toujours la signalisation.</span></div>') : '') +
       '<button class="btn block" id="goNav">' + ic('nav') + 'Démarrer</button>' +
-      '<button class="btn ghost" id="chgVeh">' + ic(veh().icon) + 'Véhicule : ' + esc(vehSummary()) + ' (changer)</button>' +
-      '<p class="muted small">Durée calculée sans le trafic en direct.</p>', 'preview');
+      (softMode() ? '<p class="muted small">' + esc(I18N.t(S.mode === 'walk' ? 'Trajet à pied : trottoirs et chemins d\'abord, rues éclairées le soir. Durée estimée à 5 km/h.' : 'Trajet à vélo : pistes cyclables et rues calmes d\'abord, mauvais revêtements évités. Respecte toujours la signalisation.')) + '</p>'
+        : '<button class="btn ghost" id="chgVeh">' + ic(veh().icon) + 'Véhicule : ' + esc(vehSummary()) + ' (changer)</button>' +
+      '<p class="muted small">Durée calculée sans le trafic en direct.</p>'), 'preview');
+    body.insertBefore(modeSeg(dest), body.firstChild);
     body.querySelector('#goNav').onclick = () => { closeSheet(); startNav(R, dest); };
-    body.querySelector('#chgVeh').onclick = () => openVehicle(() => chooseDestination(dest));
+    const cv = body.querySelector('#chgVeh'); if (cv) cv.onclick = () => openVehicle(() => chooseDestination(dest));
+    if (softMode()) return;
     routeCountries(R, dest);
     if (window.ROUTA_X && ROUTA_X.preview) ROUTA_X.preview(R, dest, body);
   } catch (e) {
-    openSheet(dest.name, '<p>Impossible de calculer le trajet pour le moment. Vérifie ta connexion et réessaie.</p><button class="btn block" id="retryRoute">Réessayer</button>', 'preview')
-      .querySelector('#retryRoute').onclick = () => chooseDestination(dest);
+    const eb = openSheet(dest.name, '<p>Impossible de calculer le trajet pour le moment. Vérifie ta connexion et réessaie.</p><button class="btn block" id="retryRoute">Réessayer</button>', 'preview');
+    eb.querySelector('#retryRoute').onclick = () => chooseDestination(dest);
+    eb.insertBefore(modeSeg(dest), eb.firstChild);
   }
 }
 function cancelPreview() { if (!S.nav) { S.preview = null; drawRoute(null); setDestMarker(null); } }
@@ -1388,7 +1475,8 @@ async function checkRoundabouts(R) {
 }
 function startNav(R, dest) {
   S.preview = null;
-  S.nav = { R, dest, along: 0, seg: 0, offCount: 0, lastReroute: 0, spoken: {}, startedAt: Date.now() };
+  S.nav = { R, dest, along: 0, seg: 0, offCount: 0, lastReroute: 0, spoken: {}, startedAt: Date.now(), mode: R.mode || 'car' };
+  document.body.classList.toggle('navsoft', !!R.mode && R.mode !== 'car');
   document.body.classList.add('navigating');
   $('navBanner').hidden = false; $('navBar').hidden = false;
   $('etaDest').textContent = 'Vers ' + dest.name;
@@ -1416,7 +1504,7 @@ function saveTrip(N) {
 function saveActiveNav() {
   const N = S.nav; if (!N) return;
   const X = window.ROUTA_X;
-  store.set('routa.activeNav', { dest: N.dest, via: X && X.via ? X.via.filter((v) => !v.done).map((v) => ({ name: v.name, lat: v.lat, lon: v.lon })) : [], at: Date.now() });
+  store.set('routa.activeNav', { dest: N.dest, mode: N.mode || 'car', via: X && X.via ? X.via.filter((v) => !v.done).map((v) => ({ name: v.name, lat: v.lat, lon: v.lon })) : [], at: Date.now() });
 }
 setInterval(() => { if (S.nav) saveActiveNav(); }, 30000);
 function offerResume() {
@@ -1429,6 +1517,7 @@ async function resumeNav(a) {
   if (!S.pos) { toast(I18N.t('Recherche de ta position…')); setTimeout(() => resumeNav(a), 3000); return; }
   const X = window.ROUTA_X;
   if (X && a.via && a.via.length) { X.via = a.via.map((v) => Object.assign({}, v)); X.viaFor = a.dest.lat.toFixed(4) + ',' + a.dest.lon.toFixed(4); X.altIdx = 0; }
+  if (a.mode && a.mode !== 'transit' && MODES.some((m) => m[0] === a.mode)) S.mode = a.mode;
   try { setDestMarker(a.dest); const R = await fetchRoute(S.pos, a.dest); closeSheet(); startNav(R, a.dest); }
   catch (e) { toast('Impossible de calculer le trajet pour le moment. Vérifie ta connexion et réessaie.'); }
 }
@@ -1437,7 +1526,7 @@ function stopNav(silent) {
   store.set('routa.activeNav', null);
   saveTrip(S.nav);
   S.nav = null;
-  document.body.classList.remove('navigating');
+  document.body.classList.remove('navigating', 'navsoft');
   $('navBanner').hidden = true; $('navBar').hidden = true;
   drawRoute(null); setDestMarker(null);
   releaseWake();
@@ -1564,7 +1653,7 @@ function navUpdate() {
   $('navInstr').textContent = stepText(next);
   $('navArrow').innerHTML = stepArrow(next);
   const after = R.steps[i + 2];
-  if (after && next && next.distance < 200) { $('navThen').hidden = false; $('navThen').innerHTML = 'Puis ' + stepArrow(after) + '<span>' + esc(stepText(after).replace(/^./, (c) => c.toLowerCase())) + '</span>'; }
+  if (after && next && next.distance < 200) { $('navThen').hidden = false; $('navThen').innerHTML = esc(I18N.t('Puis')) + ' ' + stepArrow(after) + '<span>' + esc(stepText(after).replace(/^./, (c) => c.toLowerCase())) + '</span>'; }
   else $('navThen').hidden = true;
 
   const kmh = (S.speed || 0) * 3.6;
@@ -2042,14 +2131,19 @@ async function openStop(f) {
   const link = '<a class="btn soft block" target="_blank" rel="noopener" href="https://search.ch/fahrplan/?from=' + encodeURIComponent(name) + '">' + ic('clock') + 'Horaires complets</a>';
   openSheet(name, '<p class="muted">Chargement des prochains départs…</p>', 'poistop');
   const token = (S.stopTok = (S.stopTok || 0) + 1);
+  // #046 : arrêt trouvé une seule fois, départs rafraîchis toutes les 30 s, filtre par ligne, retards et changements de voie
+  let st = null, filt = null;
   const load = async () => {
     let html = '';
     try {
-      const loc = await fetch('https://transport.opendata.ch/v1/locations?x=' + g[1] + '&y=' + g[0] + '&type=station').then((r) => r.json());
-      const st = (loc.stations || []).filter((x) => x.id).sort((a, b) => (a.distance || 0) - (b.distance || 0))[0];
-      if (!st || (st.distance || 0) > 400) throw new Error('loin');
-      const sb = await fetch('https://transport.opendata.ch/v1/stationboard?id=' + st.id + '&limit=10').then((r) => r.json());
+      if (!st) {
+        const loc = await fetch('https://transport.opendata.ch/v1/locations?x=' + g[1] + '&y=' + g[0] + '&type=station').then((r) => r.json());
+        st = (loc.stations || []).filter((x) => x.id).sort((a, b) => (a.distance || 0) - (b.distance || 0))[0];
+        if (!st || (st.distance || 0) > 400) { st = null; throw new Error('loin'); }
+      }
+      const sb = await fetch('https://transport.opendata.ch/v1/stationboard?id=' + st.id + '&limit=24').then((r) => r.json());
       const now = Date.now();
+      const linesSeen = [];
       const rows = (sb.stationboard || []).map((d) => {
         const t = d.stop && d.stop.departure ? new Date(d.stop.departure.replace(/([+-]\d\d)(\d\d)$/, '$1:$2')) : null;
         if (!t || isNaN(t)) return '';
@@ -2059,16 +2153,22 @@ async function openStop(f) {
         const cat = String(d.category || '').trim(); const num = String(d.number || '').trim();
         const train = !LINE_ONLY.test(cat);
         const line = train ? cat + (num && num.length < 4 ? num : '') : (num || cat);
+        if (!linesSeen.some((x) => x[0] === line)) linesSeen.push([line, train]);
+        if (filt && filt !== line) return '';
         const hm = ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2);
-        const when = m <= 0 ? '<b>maintenant</b>' : m < 60 ? '<b>' + m + ' min</b>' : '<b>' + hm + '</b>';
-        return '<li class="dep"><span class="ln' + (train ? ' train' : '') + '">' + esc(line) + '</span><span class="to">' + esc(d.to || '') + (d.stop.platform ? '<small class="muted"> · <span>voie</span> ' + esc(d.stop.platform) + '</small>' : '') + '</span><span class="tm">' + when + (delay > 0 ? '<small class="late">+' + delay + '</small>' : '') + '</span></li>';
+        const when = m <= 0 ? '<b>' + esc(I18N.t('maintenant')) + '</b>' : m < 60 ? '<b>' + m + ' min</b>' : '<b>' + hm + '</b>';
+        const pf0 = d.stop.platform, pf1 = d.stop.prognosis && d.stop.prognosis.platform;
+        const pfTxt = pf1 && pf1 !== pf0 ? '<small class="pfchg"> · <span>' + esc(I18N.t('voie')) + '</span> ' + esc(pf1) + ' (' + esc(I18N.t('changement')) + ')</small>' : pf0 ? '<small class="muted"> · <span>' + esc(I18N.t('voie')) + '</span> ' + esc(pf0) + '</small>' : '';
+        return '<li class="dep"><span class="ln' + (train ? ' train' : '') + '">' + esc(line) + '</span><span class="to">' + esc(d.to || '') + pfTxt + '</span><span class="tm">' + when + (delay > 0 ? '<small class="late">+' + delay + '</small>' : '') + '</span></li>';
       }).filter(Boolean);
-      html = (rows.length ? '<h3>Prochains départs</h3><ul class="deps">' + rows.join('') + '</ul>' : '<p class="muted">Aucun départ prévu pour le moment.</p>') + link + '<p class="muted small">Horaires en temps réel : opendata.ch</p>';
+      const chips = linesSeen.length > 1 ? '<div class="row wrap depfilt">' + '<button class="pill' + (!filt ? ' on' : '') + '" data-l="">' + esc(I18N.t('Toutes')) + '</button>' + linesSeen.slice(0, 12).map(([l, tr]) => '<button class="pill' + (filt === l ? ' on' : '') + '" data-l="' + esc(l) + '">' + esc(l) + '</button>').join('') + '</div>' : '';
+      html = chips + (rows.length ? '<h3>Prochains départs</h3><ul class="deps">' + rows.slice(0, 14).join('') + '</ul>' : '<p class="muted">Aucun départ prévu pour le moment.</p>') + '<p class="muted small">' + esc(I18N.t('Mis à jour à {h}').replace('{h}', hhmm(new Date()))) + '</p>' + link + '<p class="muted small">Horaires en temps réel : opendata.ch</p>';
     } catch (e) {
       html = '<p class="muted">Horaires en direct indisponibles pour cet arrêt.</p>' + link;
     }
     if (token !== S.stopTok || S.sheetView !== 'poistop') return false;
     $('sheetBody').innerHTML = html;
+    $('sheetBody').querySelectorAll('.depfilt button').forEach((b) => { b.onclick = () => { filt = b.dataset.l || null; load(); }; });
     return true;
   };
   if (await load()) {

@@ -641,7 +641,7 @@ function viaBox(dest, R) {
 }
 /* Pendant la navigation : la barre du bas ouvre le trajet (étapes, restos et essence sur la route) */
 X.openTrip = () => {
-  const N = S.nav; if (!N) return;
+  const N = S.nav; if (!N || (N.mode && N.mode !== 'car')) return;
   const d = N.dest;
   const moving = (S.speed || 0) * 3.6 > 15;
   const body = openSheet(TRX('Trajet'),

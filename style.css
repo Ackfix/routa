@@ -570,3 +570,21 @@ body.navigating.searching #navBanner, body.navigating.searching .lanebar { displ
 .navbar.wrapb { flex-wrap: wrap; row-gap: 10px; }
 .navbar.wrapb .navbar-act { width: 100%; justify-content: flex-end; }
 .closedbox { display: flex; flex-direction: column; gap: 10px; }
+.modeseg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.modeseg button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 58px; padding: 6px 2px; border-radius: 14px; border: 2px solid transparent; background: var(--surface-2); color: var(--fg); font: inherit; font-size: 11px; font-weight: 600; line-height: 1.15; text-align: center; overflow-wrap: normal; word-break: normal; hyphens: auto; min-width: 0; }
+.modeseg button svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.modeseg button.on { border-color: var(--accent); color: var(--accent); }
+.tpcon .tplines { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.tpcon .ln { display: inline-block; min-width: 34px; padding: 3px 7px; border-radius: 8px; background: #4DA3FF; color: #06121f; font: 800 13px var(--display); text-align: center; }
+.tpcon .ln.train { background: #E5484D; color: #fff; }
+.tpdelay { color: var(--danger); font-weight: 700; font-size: 13px; }
+.tpdetail { display: flex; flex-direction: column; gap: 6px; padding: 0 4px 6px; }
+.tpsec { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.35; }
+.tpsec svg { width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px; fill: none; stroke: currentColor; stroke-width: 2; }
+.tpsec.walk { color: var(--muted, #9aa3ad); }
+body.navsoft #limitSign { display: none !important; }
+body.navsoft .tripchip { display: none; }
+.depfilt { gap: 6px; }
+.depfilt .pill { border: 0; font: inherit; font-size: 13px; font-weight: 700; padding: 6px 12px; min-height: 36px; cursor: pointer; }
+.depfilt .pill.on { background: var(--accent); color: var(--accent-ink); }
+.dep .pfchg { color: var(--alert, #F5A524); font-weight: 700; }
