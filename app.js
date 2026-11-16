@@ -756,6 +756,7 @@ function openCursor() {
   draw();
 }
 function applyCursor() {
+  try { setAvatar(); } catch (e) { /* */ }
   const pk = $('mePuck'); if (pk) pk.remove();
   if (S.markers.me) { S.markers.me.remove(); S.markers.me = null; }
   renderMe();
@@ -2748,8 +2749,9 @@ function visLabel(v) { return v === 'invisible' ? 'Invisible' : 'Visible'; }
 function setAvatar() {
   const b = $('btnProfile');
   b.firstChild.nodeType === 3 ? (b.firstChild.nodeValue = initials(S.me.pseudo)) : b.insertBefore(document.createTextNode(initials(S.me.pseudo)), b.firstChild);
-  b.style.background = S.me.color;
-  const m = $('fabMenu'); if (m) { m.textContent = initials(S.me.pseudo); m.style.background = S.me.color; }
+  const cc = curColor(), ink = lum(cc) > 0.5 ? '#0E1116' : '#FFFFFF'; // même couleur que le curseur GPS
+  b.style.background = cc; b.style.color = ink;
+  const m = $('fabMenu'); if (m) { m.textContent = initials(S.me.pseudo); m.style.background = cc; m.style.color = ink; }
 }
 function updateVisChip() {
   if (S.me && S.me.vis === 'amis') { S.me.vis = 'invisible'; saveMe(); }

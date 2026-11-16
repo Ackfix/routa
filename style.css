@@ -122,7 +122,7 @@ body:not(.navigating) .speedbox { bottom: calc(var(--sab) + 72px); }
 body.navigating .topbar { display: none; }
 
 .alertnear { position: fixed; z-index: 26; left: max(10px, var(--sal)); right: max(10px, var(--sar)); max-width: 560px; top: calc(var(--sat) + 150px); padding: 12px 14px; border-radius: 16px; background: #2A2312; border: 1px solid var(--alert); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
-body:not(.navigating) .alertnear { top: calc(var(--sat) + 130px); }
+body:not(.navigating) .alertnear { top: calc(var(--sat) + 144px); }
 .alertnear-txt { flex: 1; min-width: 150px; }
 .alertnear-txt strong { display: block; color: var(--alert); font-size: 16px; }
 .alertnear-txt span { color: #D9DEE5; font-size: 13px; }
@@ -209,7 +209,7 @@ h3 { margin: 6px 0 0; font: 600 16px var(--display); }
 .crosshair span { position: absolute; left: -18px; top: -18px; width: 36px; height: 36px; border-radius: 18px; border: 3px solid var(--accent); box-shadow: 0 0 0 4px rgba(0,0,0,.3); }
 .crosshair span::after { content: ""; position: absolute; left: 13px; top: 13px; width: 4px; height: 4px; border-radius: 2px; background: var(--accent); }
 
-.toasts { position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); top: calc(var(--sat) + 70px); display: flex; flex-direction: column; gap: 8px; width: min(92vw, 440px); pointer-events: none; }
+.toasts { position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); top: calc(var(--sat) + 84px); display: flex; flex-direction: column; gap: 8px; width: min(92vw, 440px); pointer-events: none; }
 .toast { pointer-events: auto; padding: 12px 14px; border-radius: 14px; background: #252C38; box-shadow: 0 10px 30px rgba(0,0,0,.5); font-size: 14px; display: flex; gap: 10px; align-items: center; animation: up .2s ease-out; }
 .toast b { color: var(--accent); }
 .toast .btn { margin-left: auto; }
@@ -322,7 +322,7 @@ body.night.sat #map .maplibregl-canvas { filter: brightness(.78) saturate(.9); }
 body:not(.searching) .topbar { display: none; }
 .topbar { background: linear-gradient(var(--bg) 70%, transparent); padding-bottom: 10px; }
 .qback { width: 52px; height: 52px; border-radius: 16px; flex-shrink: 0; background: var(--surface); }
-.fab-menu { position: fixed; z-index: 16; top: calc(var(--sat) + 12px); left: max(12px, var(--sal)); width: 48px; height: 48px; border-radius: 24px; border: 3px solid var(--bg); background: var(--accent); color: var(--accent-ink); font: 700 16px var(--display); box-shadow: 0 6px 18px rgba(0,0,0,.4); }
+.fab-menu { position: fixed; z-index: 16; top: calc(var(--sat) + 12px); left: max(12px, var(--sal)); width: 62px; height: 62px; border-radius: 31px; border: 4px solid var(--bg); background: var(--accent); color: var(--accent-ink); font: 700 22px var(--display); box-shadow: 0 6px 18px rgba(0,0,0,.4); }
 .fab-search { position: fixed; z-index: 16; right: max(12px, var(--sar)); bottom: calc(var(--sab) + 148px); width: 56px; height: 56px; border-radius: 28px; border: 0; background: var(--surface); color: var(--fg); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 22px rgba(0,0,0,.45); }
 .fab-search svg { width: 26px; height: 26px; stroke-width: 2.4; }
 .fabs-right { bottom: calc(var(--sab) + 214px); }
@@ -414,7 +414,7 @@ body:not(.navigating) .hazchip, #alertNear:not([hidden]) ~ .hazchip { display: n
 #navBanner:has(#laneBar:not([hidden])) ~ .hazchip { top: calc(var(--sat) + 196px); }
 
 /* Mode pro : temps de conduite */
-.prochip { position: fixed; z-index: 16; left: max(12px, var(--sal)); top: calc(var(--sat) + 74px); display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border: 0; border-radius: 999px; background: rgba(20,23,29,.9); color: #F4F6FA; font: 600 13px var(--font); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+.prochip { position: fixed; z-index: 16; left: max(12px, var(--sal)); top: calc(var(--sat) + 88px); display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border: 0; border-radius: 999px; background: rgba(20,23,29,.9); color: #F4F6FA; font: 600 13px var(--font); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
 .prochip .pcdot { width: 9px; height: 9px; border-radius: 50%; background: #3DD68C; }
 .prochip.warn .pcdot { background: var(--alert); }
 .prochip.over { background: #8A1F24; }
@@ -454,7 +454,7 @@ body.navigating .prochip { bottom: calc(var(--navH, 150px) + 180px); }
 .lowchip { position: fixed; z-index: 27; left: 50%; transform: translateX(-50%); top: calc(var(--sat) + 132px); width: min(92vw, 520px); box-sizing: border-box; display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border-radius: 16px; background: #B4232A; color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.4); pointer-events: none; }
 .lowchip b { font-size: 16px; }
 .lowchip span { font-size: 13px; opacity: .92; }
-body:not(.navigating) .lowchip { top: calc(var(--sat) + 74px); }
+body:not(.navigating) .lowchip { top: calc(var(--sat) + 88px); }
 
 /* taille des boutons et de l'affichage (réglage) */
 :root { --ui: 1; }
@@ -518,7 +518,7 @@ body:not(.navigating) .lowchip { top: calc(var(--sat) + 74px); }
   body.navigating .fabs-right { bottom: calc(var(--sab) + 90px); }
   body.navigating .prochip { bottom: calc(var(--sab) + 12px); left: auto; right: calc(var(--eR) + 240px); }
 }
-.geochip { position: fixed; z-index: 27; left: 50%; transform: translateX(-50%); top: calc(var(--sat) + 70px); width: min(92vw, 420px); box-sizing: border-box; display: flex; gap: 10px; align-items: center; text-align: left; padding: 10px 14px; border: 1px solid var(--alert); border-radius: 16px; background: #2A2312; color: #F4F6FA; font-size: 13px; line-height: 1.3; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.geochip { position: fixed; z-index: 27; left: 50%; transform: translateX(-50%); top: calc(var(--sat) + 84px); width: min(92vw, 420px); box-sizing: border-box; display: flex; gap: 10px; align-items: center; text-align: left; padding: 10px 14px; border: 1px solid var(--alert); border-radius: 16px; background: #2A2312; color: #F4F6FA; font-size: 13px; line-height: 1.3; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
 .geochip b { font-size: 14px; }
 .geochip svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--alert); }
 body.navigating .geochip { top: calc(var(--sat) + 150px); }
@@ -763,7 +763,7 @@ body.hzfar .hzmk { display: none; }
 .sheet-body > div[id]:not([class]):empty { display: none; }
 .sheet-body .card + .row, .sheet-body .row + .card { margin-top: 0; }
 /* Alerte GPS affichée : les messages passent juste en dessous, jamais l'un sur l'autre */
-body:has(#geoChip:not([hidden])):not(.navigating) .toasts { top: calc(var(--sat) + 136px); }
+body:has(#geoChip:not([hidden])):not(.navigating) .toasts { top: calc(var(--sat) + 150px); }
 @media (orientation: portrait) { body.navigating:has(#geoChip:not([hidden])) .toasts { top: calc(var(--nbB, 150px) + 52px); } }
 .seg.wrap2 { flex-wrap: wrap; } .seg.wrap2 button { flex: 1 1 45%; }
 /* Entretien : une ligne par rappel, date modifiable sur place */
