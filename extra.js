@@ -402,7 +402,7 @@ function openEvent(id) {
     (ctrlSafe(e.description) ? '<p>' + esc(e.description) + '</p>' : '') +
     '<p><b>' + e.going.length + ' participant' + (e.going.length > 1 ? 's' : '') + '</b>' + (e.going.length ? ' : ' + e.going.slice(0, 12).map((r) => esc(r.pseudo || '?')).join(', ') : '') + '</p>' +
     '<button class="btn block" id="evGoing">' + (going ? 'Je ne viens plus' : 'Je viens') + '</button>' +
-    '<div class="row"><button class="btn soft grow" id="evNav">' + ic('nav') + 'Y aller</button><button class="btn soft grow" id="evCal">' + IC.event + 'Calendrier</button></div>' +
+    '<button class="btn soft block" id="evNav">' + ic('nav') + 'Y aller</button>' +
     '<button class="btn soft block" id="evShare">' + IC.share + 'Partager</button>' +
     (mine ? '<button class="btn danger" id="evDel">' + ic('trash') + 'Supprimer</button>' : ''), 'event');
   body.querySelector('#evGoing').onclick = async () => {
@@ -411,7 +411,6 @@ function openEvent(id) {
     await loadEvents(); openEvent(e.id);
   };
   body.querySelector('#evNav').onclick = () => { closeSheet(); chooseDestination({ name: e.title, sub: 'Rassemblement', lat: e.lat, lon: e.lon }); };
-  body.querySelector('#evCal').onclick = () => icsDownload(e.title, new Date(e.starts_at), 120, e.lat, e.lon, e.description);
   body.querySelector('#evShare').onclick = () => shareLink('ROUTA', 'Rassemblement « ' + e.title + ' » le ' + fmtWhen(e.starts_at) + ' :', appUrl() + '?event=' + e.id);
   const del = body.querySelector('#evDel'); if (del) del.onclick = async () => { await DB.sb.from('events').delete().eq('id', e.id); closeSheet(); await loadEvents(); toast('Rassemblement supprimé.'); };
 }
@@ -988,8 +987,8 @@ function carnetInto(root) {
     '<p class="muted small" style="margin:0">' + esc(TRX('Touche une date pour la changer. Tout est enregistré tout de suite.')) + '</p>' +
     DUE.map(([k, l]) => '<div class="card remrow"><div class="grow"><b>' + esc(TRX(l)) + '</b><div class="sub" id="rs_' + k + '">' + state(carnet.dates[k] || '') + '</div></div>' +
       '<input class="remdate" id="cd_' + k + '" type="date" value="' + esc(carnet.dates[k] || '') + '" aria-label="' + esc(TRX(l)) + '">' +
-      '<button class="iconbtn small remcal" data-cal="' + k + '" aria-label="' + esc(TRX('Ajouter au calendrier')) + '"' + (carnet.dates[k] ? '' : ' hidden') + '>' + IC.event + '</button></div>').join('') +
-    '<button class="btn soft block" id="cdIcs"' + (hasAny() ? '' : ' hidden') + '>' + IC.event + esc(TRX('Ajouter tous les rappels au calendrier')) + '</button>' +
+      '</div>').join('') +
+    '<div id="cdIcs" hidden></div>' +
     '<h3>' + esc(TRX('Pleins')) + '</h3>' +
     '<div class="row"><label class="field grow" for="fKm">' + esc(TRX('Km au compteur')) + '<input id="fKm" type="number" inputmode="numeric"></label><label class="field grow" for="fL">' + esc(TRX('Litres')) + '<input id="fL" type="number" step="0.01" inputmode="decimal"></label><label class="field grow" for="fP">' + esc(TRX('Prix total')) + '<input id="fP" type="number" step="0.05" inputmode="decimal"></label></div>' +
     '<button class="btn block" id="fAdd">' + esc(TRX('Ajouter le plein')) + '</button>' +
@@ -1006,14 +1005,11 @@ function carnetInto(root) {
       if (v) carnet.dates[k] = v; else delete carnet.dates[k];
       saveCarnet();
       body.querySelector('#rs_' + k).innerHTML = state(v);
-      body.querySelector('[data-cal="' + k + '"]').hidden = !v;
-      body.querySelector('#cdIcs').hidden = !hasAny();
     };
     inp.addEventListener('change', save); inp.addEventListener('blur', save);
   });
   const evOf = (k) => ({ t: TRX((DUE.find((x) => x[0] === k) || [k, k])[1]), d: carnet.dates[k] });
-  body.querySelectorAll('[data-cal]').forEach((b) => { b.onclick = () => { if (carnet.dates[b.dataset.cal]) calOpen([evOf(b.dataset.cal)]); }; });
-  body.querySelector('#cdIcs').onclick = () => { const ev = DUE.filter(([k]) => carnet.dates[k]).map(([k]) => evOf(k)); if (ev.length) calOpen(ev); };
+  // ajout au calendrier : retiré pour l'instant (il sera remis quand il marchera dans l'app iPhone)
   body.querySelector('#fAdd').onclick = () => {
     const km = parseInt(body.querySelector('#fKm').value, 10) || null, liters = parseFloat(String(body.querySelector('#fL').value).replace(',', '.')) || null, price = parseFloat(String(body.querySelector('#fP').value).replace(',', '.'));
     if (!liters) { toast(esc(TRX('Indique au moins les litres.'))); return; }
