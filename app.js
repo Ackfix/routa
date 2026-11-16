@@ -3184,6 +3184,7 @@ function openSettings() {
     '<h3>Notifications</h3>' +
     sw('stReminders', 'Rappels d\'entretien (pneus, service, batterie)', S.settings.reminders !== false) +
     sw('stReadMsgs', 'Lire les messages reçus à voix haute', S.settings.readMsgs) +
+    sw('stMoments', I18N.t('ROUTA Moments'), !!S.settings.moments, I18N.t('À l\'arrivée, une courte anecdote sur un lieu proche (Wikipédia). Désactivé par défaut.')) +
     sw('stTips', I18N.t('Conseils discrets'), S.settings.tips !== false, I18N.t('De temps en temps, un petit message utile (météo, verglas, trajet habituel). Jamais de son.')) +
     '<h3>Confidentialité et compte</h3>' +
     '<button class="btn soft block" id="stProfile">' + ic('user') + 'Pseudo, visibilité et amis</button>' +
@@ -3200,6 +3201,7 @@ function openSettings() {
   ch('stSpeedo', (v) => { S.settings.showSpeedo = v; updateSpeed(); });
   ch('stLite', (v) => { S.settings.navLite = v; applyLite(); });
   ch('stTips', (v) => { S.settings.tips = v; });
+  ch('stMoments', (v) => { S.settings.moments = v; });
   ch('stPlaces', (v) => { S.settings.showPlaces = v; applyPlaces(); });
   ch('stSignals', (v) => { S.settings.showSignals = v; if (window.ROUTA_X && ROUTA_X.signalsToggle) ROUTA_X.signalsToggle(v); });
   ch('stGoogle', (v) => { S.settings.googleLinks = v; });

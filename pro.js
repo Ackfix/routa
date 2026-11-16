@@ -177,6 +177,9 @@
     const all = loadDrives();
     const tabs = '<div class="seg">' + PER.map(([k, l]) => '<button data-p="' + k + '" class="' + (k === per ? 'on' : '') + '">' + esc(T(l)) + '</button>').join('') + '</div>';
     let html = tabs, agg = null, label = '';
+    // #038 souvenirs : un trajet du même jour il y a un an (ou plus), dans le journal existant
+    const today = new Date(); const mem = all.map((d, i) => ({ d, i })).filter(({ d }) => { const x = new Date(d.s); return x.getFullYear() < today.getFullYear() && x.getMonth() === today.getMonth() && x.getDate() === today.getDate(); }).pop();
+    if (mem) html += '<button class="card tap memcard" data-t="' + mem.i + '"><div class="grow"><b>' + esc(T('Il y a {n} an(s), ce jour-là', { n: today.getFullYear() - new Date(mem.d.s).getFullYear() })) + '</b><div class="sub">' + esc([mem.d.c0, mem.d.c1].filter(Boolean).join(' → ') || mem.d.nm || T('Trajet')) + ' · ' + nf(mem.d.km, 1) + ' km' + (mem.d.memo ? ' · « ' + esc(mem.d.memo.slice(0, 60)) + ' »' : '') + '</div></div></button>';
     if (per === 'trips') {
       const list = all.slice().reverse().slice(0, 60);
       html += list.length ? list.map((d, i) => '<button class="card tap" data-t="' + (all.length - 1 - i) + '"><div class="grow"><b>' + esc(d.nm || T('Trajet')) + '</b><div class="sub">' + esc(new Date(d.s).toLocaleDateString(LANG(), { weekday: 'short', day: 'numeric', month: 'short' })) + ' · ' + esc(new Date(d.s).toLocaleTimeString(LANG(), { hour: '2-digit', minute: '2-digit' })) + ' · ' + nf(d.km, 1) + ' km · ' + esc(fmtDur(d.mv)) + '</div></div><span class="pill">' + d.score + '</span></button>').join('')
@@ -215,10 +218,12 @@
       '<h3 style="margin:0">' + esc(day) + '</h3><p class="muted small" style="margin:2px 0 8px">' + esc(d.nm || T('Trajet')) + ' · ' + esc(hm(d.s)) + ' → ' + esc(hm(d.e || d.le)) + '</p>' +
       statsHtml(a, d.nm || T('Ce trajet')) +
       '<div class="card"><div class="grow"><b>' + esc(T('Carburant')) + '</b><div class="sub">' + nf(a.litres, 1) + ' l · ' + curr() + ' ' + nf(priceL(), 2) + '/l · ' + esc(T('{c} l/100 km', { c: nf(CFGD.cons, 1) })) + '</div></div><b>' + curr() + ' ' + nf(a.cost) + '</b></div>' +
+      '<label class="field" for="trMemo"><span>' + esc(T('Souvenir (facultatif)')) + '</span><textarea id="trMemo" rows="2" maxlength="280" placeholder="' + esc(T('Un mot sur ce trajet : avec qui, ce que tu as vu…')) + '">' + esc(d.memo || '') + '</textarea></label>' +
       '<button class="btn primary block" id="trStory">' + esc(T('Partager en story')) + '</button>' +
       '<div class="row"><button class="btn ghost grow" id="trBack">' + esc(T('Retour')) + '</button><button class="btn ghost grow" id="trDel">' + esc(T('Supprimer ce trajet')) + '</button></div>', 'drive');
     body.querySelector('#trStory').onclick = () => story(a, day + (d.nm ? ' · ' + d.nm : ''), { trip: d, idx: i });
     body.querySelector('#trBack').onclick = () => openDrive('trips');
+    const mm = body.querySelector('#trMemo'); mm.onchange = () => { const L2 = loadDrives(); const k = L2.findIndex((x) => x.s === d.s); if (k >= 0) { L2[k].memo = mm.value.trim().slice(0, 280); saveDrives(L2); toast(esc(T('Souvenir enregistré.'))); } };
     let arm = 0;
     body.querySelector('#trDel').onclick = (e) => { if (Date.now() - arm > 4000) { arm = Date.now(); e.target.textContent = T('Touche encore pour supprimer'); return; } all.splice(i, 1); saveDrives(all); openDrive('trips'); };
   }

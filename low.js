@@ -319,6 +319,54 @@
   }
   setTimeout(tipTick, 25000); setInterval(tipTick, 30 * 60000);
 
+
+  /* ---------- #061 derniers mètres : entrée connue du bâtiment (OpenStreetMap), jamais inventée ---------- */
+  const ENT_LBL = { main: 'Entrée principale', yes: 'Entrée', service: 'Entrée de service', garage: 'Entrée du garage', staircase: 'Entrée d\'immeuble', emergency: 'Entrée des urgences' };
+  async function entranceNear(d) {
+    const q = '[out:json][timeout:10];node["entrance"~"^(main|yes|staircase|emergency)$"](around:70,' + d.lat.toFixed(6) + ',' + d.lon.toFixed(6) + ');out 20;';
+    const els = await Promise.race([A.overpass(q, A.inCH && A.inCH(d)), new Promise((_, rej) => setTimeout(() => rej(new Error('lent')), 15000))]);
+    const L = (els || []).filter((e) => e.lat != null).map((e) => ({ lat: e.lat, lon: e.lon, t: e.tags || {}, d: dist(d, e) }));
+    if (!L.length) return null;
+    const rank = (x) => (x.t.entrance === 'main' ? 0 : x.t.entrance === 'emergency' && /h[oô]pital|hospital|spital|urgence/i.test(d.name || '') ? 0 : 1);
+    L.sort((a, b) => rank(a) - rank(b) || a.d - b.d);
+    const e = L[0]; if (e.d > 70 || (rank(e) && L.length > 3)) return null;
+    return e;
+  }
+  const prevPreview = X.preview;
+  X.preview = (R, dest, body) => {
+    if (prevPreview) prevPreview(R, dest, body);
+    if (!dest || dest.entrance || /^(Entrée|Entrance)/.test(dest.name || '')) return;
+    entranceNear(dest).then((e) => {
+      const go = body.querySelector('#goNav'); if (!e || !go || !body.isConnected) return;
+      const lbl = T(ENT_LBL[e.t.entrance] || 'Entrée') + (e.t.name ? ' · ' + e.t.name : e.t.ref ? ' ' + e.t.ref : '');
+      const b = el('<div class="banner"><span>' + IC.compass + '</span><span><b>' + esc(lbl) + '</b> ' + esc(T('repérée à {d} du point choisi.', { d: fmtDist(Math.max(5, Math.round(e.d / 5) * 5)) })) + ' <button class="linkbtn wxmore" type="button">' + esc(T('Aller jusqu\'à l\'entrée')) + '</button></span></div>');
+      b.querySelector('button').onclick = () => chooseDestination({ name: lbl, sub: dest.name, lat: e.lat, lon: e.lon, entrance: true });
+      go.parentNode.insertBefore(b, go);
+    }).catch(() => { /* pas d'info d'entrée */ });
+  };
+
+
+  /* ---------- #033 ROUTA Moments : une anecdote locale à l'arrivée, seulement si activé (Wikipédia, source citée) ---------- */
+  async function moment(p) {
+    if (!S.settings.moments || !p) return;
+    const lg = /^(fr|en|de|it|pt|es|tr|sq|sr)$/.test(A.I18N.lang) ? A.I18N.lang : 'fr';
+    try {
+      const g = await getJson('https://' + lg + '.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=' + p.lat.toFixed(5) + '|' + p.lon.toFixed(5) + '&gsradius=1500&gslimit=8&format=json&origin=*', 8000);
+      const L = ((g.query && g.query.geosearch) || []).filter((x) => !/^(Gare|Liste|Bahnhof|Stazione|Station)\b/i.test(x.title));
+      if (!L.length) return;
+      const pick = L[0];
+      const ex = await getJson('https://' + lg + '.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&exsentences=3&pageids=' + pick.pageid + '&format=json&origin=*', 8000);
+      const pg = ex.query && ex.query.pages && ex.query.pages[pick.pageid]; const txt = pg && pg.extract; if (!txt) return;
+      const url = 'https://' + lg + '.wikipedia.org/?curid=' + pick.pageid;
+      toast('<b>' + esc(T('ROUTA Moments')) + '</b> · ' + esc(pick.title) + ' (' + esc(fmtDist(pick.dist)) + ')', { action: T('Lire'), ms: 12000, onAction: () => {
+        openSheet(pick.title, '<p>' + esc(txt) + '</p><p class="muted small">' + esc(T('Extrait de Wikipédia (licence CC BY-SA).')) + ' <a href="' + esc(url) + '" target="_blank" rel="noopener" style="color:var(--info)">' + esc(T('Lire l\'article')) + '</a></p>', 'xmoment');
+      } });
+    } catch (e) { /* rien à raconter */ }
+  }
+  const arr0 = X.arrived;
+  X.arrived = (d) => { if (arr0) arr0(d); setTimeout(() => moment(S.pos || d), 4000); };
+  X.moment = moment;
+
   /* ---------- branchement au menu ---------- */
   const tiles0 = X.tiles;
   X.tiles = () => (tiles0 ? tiles0() : []).concat([['explore', IC.compass, T('Explorer autour')], ['repair', IC.wrench, T('Garages et équipement')], ['breakdown', IC.sos, T('En panne')], ['checklists', IC.list, T('Checklists de voyage')]]);
