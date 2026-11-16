@@ -774,7 +774,7 @@ setInterval(() => { if (!document.hidden) renderDrivers(); }, 30000);
 /* Alertes */
 /* Modes de déplacement (#042 vélo et vélo électrique, #043 à pied et transports publics, #063 trajets plus sûrs et agréables).
    À pied et en transports publics, aucun véhicule n'est nécessaire. */
-const MODES = [['car', 'car', 'Véhicule'], ['bike', 'bike', 'Vélo'], ['ebike', 'ebike', 'Vélo électrique'], ['walk', 'walk', 'À pied'], ['transit', 'transit', 'Transports']];
+const MODES = [['car', 'car', 'Véhicule'], ['bike', 'bike', 'Vélo'], ['walk', 'walk', 'À pied'], ['transit', 'transit', 'Transports']];
 S.mode = MODES.some((m) => m[0] === store.get('routa.mode', 'car')) ? store.get('routa.mode', 'car') : 'car';
 const softMode = () => S.mode === 'bike' || S.mode === 'ebike' || S.mode === 'walk';
 const navSoft = () => !!(S.nav && S.nav.mode && S.nav.mode !== 'car');
@@ -3360,7 +3360,7 @@ if (!store.get('routa.mig096', false)) { S.settings.voice = false; S.settings.re
 if (!store.get('routa.mig0913', false)) { S.settings.traffic = true; S.settings.showPlaces = true; S.settings.showTransit = false; saveSettings(); store.set('routa.mig0913', true); }
 S.settings.mapType = 'plan';
 S.settings.relief3d = false;
-window.ROUTA = { reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, bump, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials, veh, nameOf, openDriver, startNav, openSpot, openK, overpass, inCH, geoReverse, openCountry, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
+window.ROUTA = { reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, bump, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials, veh, nameOf, openDriver, startNav, openSpot, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
 if (!S.me || !S.me.pseudo) onboarding(); else boot();
 
 })();
