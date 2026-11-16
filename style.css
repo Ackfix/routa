@@ -717,6 +717,7 @@ body.dashon .fab-menu, body.dashon .fab-search { z-index: 41; }
 .dk-gw .dk-wv { font-size: 14px; }
 /* ===== Navigation épurée (16.11) : un seul bandeau aux couleurs de ROUTA, pas de « Puis », voies intégrées ===== */
 .navmain { background: var(--nav) !important; border: 1px solid rgba(255,255,255,.1); flex-wrap: wrap; row-gap: 8px; }
+.navmain > .navtext { flex: 1 1 0; }
 .navarrow svg { stroke: var(--accent) !important; }
 .navthen, #navThen { display: none !important; }
 .navmain .lanebar { flex: 1 0 100%; margin: 0; padding: 6px 0 0; border-radius: 0; background: transparent; box-shadow: none; border-top: 1px solid rgba(255,255,255,.08); }

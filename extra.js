@@ -1270,7 +1270,8 @@ setTimeout(autoOffline, 20000); setInterval(autoOffline, 10 * 60000);
 /* ======================= Mode pro : temps de conduite et de repos (OTR 1 / OTR 2) ======================= */
 /* Aide pour les chauffeurs professionnels. Ne remplace ni le tachygraphe ni le livret de travail. */
 const TRX = (s, v) => { let o = (window.ROUTA_I18N && ROUTA_I18N.t) ? ROUTA_I18N.t(s) : s; if (v) Object.keys(v).forEach((k) => { o = o.split('{' + k + '}').join(v[k]); }); return o; };
-const PRO = Object.assign({ on: false, regime: null, auto: true, segs: [] }, store.get('routa.pro', {}));
+const PRO = Object.assign({ on: false, regime: null, segs: [] }, store.get('routa.pro', {}));
+PRO.auto = false; // pas de détection automatique : un bouchon ou un arrêt au feu la tromperait
 const H = 3600000, MIN = 60000;
 const PRO_RULES = {
   otr1: { label: 'OTR 1', sub: 'Transport de marchandises de plus de 3,5 t, et transport de personnes avec plus de 8 places assises sans compter le conducteur (dès 9 places avec lui)', cont: 4.5 * H, day: 9 * H, dayExt: 10 * H, week: 56 * H, twoWeeks: 90 * H, rest: 11 * H, restRed: 9 * H, split1: 15 * MIN },
@@ -1278,6 +1279,7 @@ const PRO_RULES = {
   otr2: { label: 'OTR 2', sub: 'Transport professionnel de personnes en voiture légère ou de tourisme (taxis, VTC, limousines) : 8 places passagers au maximum', cont: 4.5 * H, day: 9 * H, dayExt: null, week: 45 * H, twoWeeks: null, rest: 11 * H, restRed: 9 * H, split1: 20 * MIN }
 };
 const ACT = { drive: 'Conduite', break: 'Pause', work: 'Autre travail', rest: 'Repos' };
+const ACT_BTN = ['drive', 'break']; // seulement Conduite et Pause : une longue pause compte comme repos
 function proRegime() { if (PRO.regime && PRO_RULES[PRO.regime]) return PRO.regime; const t = (A.veh ? A.veh().type : 'voiture'); const ch = !A.S.country || A.S.country === 'CH'; return (t === 'camion' || t === 'bus' || t === 'minibus') ? (ch ? 'otr1' : 'ue') : 'otr2'; }
 /* jours fériés nationaux en France (pour l'interdiction poids lourds du week-end) */
 function frHoliday(d) {
@@ -1383,8 +1385,7 @@ function openPro() {
     '<details class="proedit"><summary>' + esc(TRX('Personnaliser la liste des modes')) + '</summary>' + Object.keys(PRO_RULES).map((k) => '<label class="switch" for="prf_' + k + '"><span><b>' + esc(PRO_RULES[k].label) + '</b></span><input type="checkbox" id="prf_' + k + '"' + (proFavs().includes(k) ? ' checked' : '') + '></label>').join('') + '</details>' +
     '<p class="muted small">' + esc(TRX(R.sub)) + '</p>' +
     (PRO.on ? (
-      '<div class="proacts big">' + Object.keys(ACT).map((a) => '<button data-a="' + a + '" class="pa-' + a + (cur && cur.a === a ? ' on' : '') + '" aria-pressed="' + (cur && cur.a === a ? 'true' : 'false') + '"><span class="paico">' + PA_ICO[a] + '</span>' + esc(TRX(ACT[a])) + '</button>').join('') + '</div>' +
-      '<label class="switch" for="proAuto"><span><b>Détection automatique</b><br><span class="muted small">Conduite dès 8 km/h, pause après 3 min à l\'arrêt</span></span><input type="checkbox" id="proAuto"' + (PRO.auto ? ' checked' : '') + '></label>' +
+      '<div class="proacts big">' + ACT_BTN.map((a) => '<button data-a="' + a + '" class="pa-' + a + (cur && cur.a === a ? ' on' : '') + '" aria-pressed="' + (cur && cur.a === a ? 'true' : 'false') + '"><span class="paico">' + PA_ICO[a] + '</span>' + esc(TRX(ACT[a])) + '</button>').join('') + '</div>' +
       '<div class="procard"><div class="prorow"><b>Conduite continue</b><span>' + hm(st.cont) + ' / 4 h 30</span></div>' + bar(st.cont, R.cont) + '<span class="muted small">' + (reg === 'otr2' ? TRX('Puis pause de 45 min (ou 15 + 30 min, ou 30 min / 2 × 20 min si elle est prise plus tôt).') : TRX('Puis pause de 45 min (ou 15 + 30 min).')) + '</span></div>' +
       '<div class="procard"><div class="prorow"><b>Conduite aujourd\'hui</b><span>' + hm(st.day) + ' / ' + hm(R.day) + '</span></div>' + bar(st.day, R.day) + (R.dayExt ? '<span class="muted small">10 h possibles deux fois par semaine.</span>' : '') + '</div>' +
       '<div class="procard"><div class="prorow"><b>Conduite cette semaine</b><span>' + hm(st.week) + ' / ' + hm(R.week) + '</span></div>' + bar(st.week, R.week) +
@@ -1399,7 +1400,6 @@ function openPro() {
   Object.keys(PRO_RULES).forEach((k) => { const c = body.querySelector('#prf_' + k); if (c) c.onchange = () => { let f = proFavs().filter((x) => x !== k); if (c.checked) f.push(k); f = Object.keys(PRO_RULES).filter((x) => f.includes(x)); if (!f.length) { c.checked = true; return; } PRO.favs = f; if (!f.includes(proRegime())) PRO.regime = f[0]; proSave(); openPro(); }; });
   const rs = body.querySelector('#proReset'); if (rs) rs.onclick = () => { if (rs.dataset.sure) { PRO.segs = []; proSave(); proTick(); toast(esc(TRX('Compteurs remis à zéro.'))); openPro(); } else { rs.dataset.sure = '1'; rs.textContent = TRX('Touche encore pour confirmer : tout sera effacé'); rs.classList.add('danger'); } };
   body.querySelectorAll('.proacts button').forEach((b) => { b.onclick = () => { PRO.auto = b.dataset.a === 'drive' ? PRO.auto : false; proSet(b.dataset.a); openPro(); }; });
-  const au = body.querySelector('#proAuto'); if (au) au.onchange = (e) => { PRO.auto = e.target.checked; proSave(); };
   const pk = body.querySelector('#proPark'); if (pk) pk.onclick = () => A.openK && A.openK('parking');
   const lg = body.querySelector('#proLog'); if (lg) lg.onclick = openProLog;
 }
