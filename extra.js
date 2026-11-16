@@ -552,6 +552,7 @@ X.preview = (R, dest, body) => {
   if (R.total > 30000 && (!R.mode || R.mode === 'car')) { const rb = el('<button class="btn soft block">' + ic(A.veh && A.veh().ev ? 'charge' : 'fuel') + esc(TRX('Autonomie sur ce trajet')) + ' <span class="prem">Premium</span></button>'); rb.onclick = () => X.rangeAssist(R, dest); box.appendChild(rb); }
   if (X.planSave) { const pb2 = el('<button class="btn soft block">' + '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>' + esc(TRX('Planifier ce voyage')) + ' <span class="prem">Premium</span></button>'); pb2.onclick = () => X.planSave(R, dest); box.appendChild(pb2); }
   if ((R.duration || 0) > 7200 && (!R.mode || R.mode === 'car')) { const bb = el('<button class="btn soft block">' + ic('truckstop') + esc(TRX('Pauses conseillées sur le trajet')) + ' <span class="prem">Premium</span></button>'); bb.onclick = () => X.smartBreaks(R, dest); box.appendChild(bb); }
+  if (X.borderCheck && (!R.mode || R.mode === 'car')) X.borderCheck(R, dest, box);
   go.parentNode.insertBefore(box, go.nextSibling);
   routeWeather(R, box);
 };

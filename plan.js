@@ -120,6 +120,52 @@
     };
   }
 
+
+  /* ---------- #025 Assistant passage des frontières (Premium, étiquette seulement) ----------
+     Pays traversés détectés le long du trajet ; infos tirées de la fiche pays vérifiée (countries.js), avec liens officiels. */
+  const CT = window.ROUTA_COUNTRIES || {};
+  const GLOBE = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>';
+  const cache = {};
+  X.borderCheck = async (R, dest, box) => {
+    if (!R || !R.coords || R.total < 15000 || !A.geoReverse) return;
+    const key = dest.lat.toFixed(3) + ',' + dest.lon.toFixed(3) + ',' + Math.round(R.total / 1000);
+    let seq = cache[key];
+    if (!seq) {
+      const C = R.coords, n = Math.min(12, Math.max(3, Math.round(R.total / 40000)));
+      const pts = []; for (let i = 0; i <= n; i++) pts.push(C[Math.round(i * (C.length - 1) / n)]);
+      const ccs = await Promise.all(pts.map((p) => A.geoReverse(p).then((q) => (q && q.cc) || '').catch(() => '')));
+      seq = ccs.filter(Boolean).filter((c, i, a) => i === 0 || a[i - 1] !== c);
+      cache[key] = seq;
+    }
+    const uniq = seq.filter((c, i, a) => a.indexOf(c) === i);
+    if (uniq.length < 2 || !box.isConnected) return;
+    const names = uniq.map((c) => (CT[c] ? T(CT[c].name) : c));
+    const b = el('<button class="card tap borderbtn"><span class="ico" style="background:#4DA3FF">' + GLOBE + '</span><span class="grow"><b>' + esc(T('Passage de frontière')) + PREM + '</b><span class="sub">' + esc(names.join(' → ')) + '</span></span></button>');
+    b.onclick = () => openBorder(uniq.slice(1), uniq[0]);
+    box.insertBefore(b, box.firstChild);
+  };
+  function openBorder(list, from) {
+    const v = A.veh ? A.veh() : {};
+    const html = list.map((c) => {
+      const k = CT[c];
+      if (!k) return '<h3>' + esc(c) + '</h3><p class="muted small">' + esc(T('Pas encore d\'infos pour ce pays.')) + '</p>';
+      const lim = (k.lim || []).join(' / ') + (/mph/.test((k.lim || [''])[0]) ? '' : ' km/h');
+      const toll = k.toll || {};
+      return '<h3>' + esc(T(k.name)) + '</h3>' +
+        '<div class="card"><div class="grow"><b>' + esc(T('Vignette et péages')) + '</b><div class="sub">' + esc(T(toll.text || toll.label || '')) + (v.heavy && toll.heavy ? '<br>' + esc(T(toll.heavy)) : '') + '</div>' + (toll.links || []).map(([l, u]) => '<a class="small" href="' + esc(u) + '" target="_blank" rel="noopener" style="color:var(--info)">' + esc(T(l)) + '</a>').join(' · ') + '</div></div>' +
+        '<div class="card"><div class="grow"><b>' + esc(T('Limites de vitesse')) + '</b><div class="sub">' + esc(lim) + (/mph/.test((k.lim || [''])[0]) ? ' · ' + esc(T('Attention : vitesses et distances en miles')) : '') + '</div></div></div>' +
+        (k.alc ? '<div class="card"><div class="grow"><b>' + esc(T('Alcool')) + '</b><div class="sub">' + esc(T(k.alc)) + '</div></div></div>' : '') +
+        ((k.must || []).length ? '<div class="card"><div class="grow"><b>' + esc(T('Obligatoire')) + '</b><div class="sub">' + k.must.map((m) => esc(T(m))).join('<br>') + '</div></div></div>' : '') +
+        ((k.tips || []).length ? '<div class="card"><div class="grow"><b>' + esc(T('Bon à savoir')) + '</b><div class="sub">' + k.tips.map((m) => esc(T(m))).join('<br>') + '</div></div></div>' : '') +
+        '<div class="card"><div class="grow"><b>' + esc(T('Urgences')) + '</b><div class="sub">' + esc(k.main) + '</div></div></div>' +
+        (A.openCountry ? '<button class="btn soft block" data-c="' + esc(c) + '">' + esc(T('Fiche complète du pays')) + '</button>' : '');
+    }).join('');
+    const body = openSheet(T('Passage de frontière'),
+      '<p class="muted small">' + esc(T('Pays traversés sur ce trajet. Les prix et conditions changent souvent : vérifie sur les sites officiels avant de partir.')) + '</p>' + html +
+      '<p class="muted small">' + esc(T('Pense aussi à ton assurance (couverture à l\'étranger) et à tes papiers : permis, carte grise, pièce d\'identité.')) + '</p>', 'border');
+    body.querySelectorAll('[data-c]').forEach((b) => { b.onclick = () => A.openCountry(b.dataset.c, 'toll'); });
+  }
+
   /* ---------- branchement au menu ---------- */
   const tiles0 = X.tiles;
   X.tiles = () => (tiles0 ? tiles0() : []).concat([['plan', CAL, T('Planifier un voyage')]]);
