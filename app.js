@@ -1955,6 +1955,24 @@ async function attachPrices(list) {
   });
 }
 
+/* #003 : prix officiels en France (prix-carburants.gouv.fr, données publiques sous Licence Ouverte). Aucun prix inventé. */
+const inFR = (p) => p && p.lat > 41.2 && p.lat < 51.2 && p.lon > -5.3 && p.lon < 9.7 && !inCH(p);
+async function attachOfficialFR(list) {
+  const fr = list.filter(inFR); if (!fr.length) return;
+  const groups = []; fr.forEach((p) => { const g = groups.find((x) => dist(x.c, p) < 15000); if (g) g.l.push(p); else if (groups.length < 4) groups.push({ c: p, l: [p] }); });
+  const F = [['e10', 'SP95-E10'], ['sp95', 'SP95'], ['sp98', 'SP98'], ['gazole', 'Gazole'], ['e85', 'E85'], ['gplc', 'GPL']];
+  await Promise.all(groups.map(async (g) => {
+    const u = 'https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?limit=100&select=id,gazole_prix,gazole_maj,sp95_prix,sp95_maj,e10_prix,e10_maj,sp98_prix,sp98_maj,e85_prix,e85_maj,gplc_prix,gplc_maj,geom&where=' + encodeURIComponent("within_distance(geom, geom'POINT(" + g.c.lon.toFixed(5) + ' ' + g.c.lat.toFixed(5) + ")', 16km)");
+    let rows = [];
+    try { const j = await fetchJson(u, 8000); rows = (j.results || []).filter((r) => r.geom); } catch (e) { return; }
+    g.l.forEach((p) => {
+      let best = null, bd = 150; rows.forEach((r) => { const d = dist(p, { lat: r.geom.lat, lon: r.geom.lon }); if (d < bd) { bd = d; best = r; } });
+      if (!best) return;
+      p.offFR = F.filter(([k]) => best[k + '_prix'] != null).map(([k, n]) => ({ fuel: n, price: best[k + '_prix'], at: best[k + '_maj'] }));
+      if (p.offFR.length && p.mainPrice == null) { const m = p.offFR[0]; p.mainPrice = m.price; p.mainFuel = m.fuel; p.priceAt = m.at; p.priceLabel = Number(m.price).toFixed(2); }
+    });
+  }));
+}
 async function attachRatings(list) {
   if (!list.length) return;
   const rows = await DB.ratings(list.map((p) => p.id));
@@ -1976,7 +1994,7 @@ async function openPoiList(kind) {
     $('poiRetry').onclick = () => openPoiList(kind); return;
   }
   list.forEach((p) => { p.dist = dist(c, p); });
-  if (kind === 'fuel') await attachPrices(list);
+  if (kind === 'fuel') { await attachPrices(list); await attachOfficialFR(list); }
   if (RATED[kind]) await attachRatings(list);
   renderPoiList(kind, list, c);
 }
@@ -2147,6 +2165,7 @@ function openPoi(p, kind) {
   if (S.settings.googleLinks) html += '<a class="btn soft block gbtn" href="' + esc(googleUrl(p)) + '" target="_blank" rel="noopener">' + ic('star') + 'Voir les avis Google</a>';
   if (kind === 'fuel') {
     html += '<h3>Prix signalés</h3>' + ((p.prices && p.prices.length) ? p.prices.map((r) => '<div class="card"><div class="grow"><b>' + esc(r.fuel) + '</b><div class="sub">' + ago(r.created_at) + '</div></div><div class="val">' + Number(r.price).toFixed(2) + ' <small>CHF/L</small></div></div>').join('') : '<div class="empty">Aucun prix signalé. Sois le premier !</div>');
+    if (p.offFR && p.offFR.length) html += '<h3>' + esc(I18N.t('Prix officiels (France)')) + '</h3>' + p.offFR.map((r) => '<div class="card"><div class="grow"><b>' + esc(r.fuel) + '</b><div class="sub">' + (r.at ? ago(r.at) : '') + '</div></div><div class="val">' + Number(r.price).toFixed(3) + ' <small>€/L</small></div></div>').join('') + '<p class="muted small">' + esc(I18N.t('Source : prix-carburants.gouv.fr (données publiques). Le prix affiché à la pompe fait foi.')) + '</p>';
     html += '<button class="btn soft block" id="poiPrice">Signaler un prix</button>';
   }
   if (RATED[kind]) {
@@ -2446,7 +2465,7 @@ async function alongRoute(R, kind) {
     const els = await overpass(osmQuery(kind, '1500,' + pts.join(','), 150), inCH(a0) && inCH(last));
     const list = els.map((e) => parseOsm(e, kind)).filter((p) => p.lat != null);
     list.forEach((p) => { p.dist = S.pos ? dist(S.pos, p) : 0; });
-    if (kind === 'fuel') await attachPrices(list);
+    if (kind === 'fuel') { await attachPrices(list); await attachOfficialFR(list); }
     if (kind === 'fuel' && veh().isHgv) list.sort((a, b) => (/Poids lourds|AdBlue/.test(b.details) ? 1 : 0) - (/Poids lourds|AdBlue/.test(a.details) ? 1 : 0));
     if (kind === 'charge') list.sort((a, b) => (/CCS|Tesla/.test(b.details) ? 1 : 0) - (/CCS|Tesla/.test(a.details) ? 1 : 0));
     showPois(list.slice(0, 120), kind);
