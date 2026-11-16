@@ -564,11 +564,21 @@ X.smartBreaks = async (R, dest) => {
   const v = A.veh ? A.veh() : {}, ev = !!v.ev;
   const around = (k) => stops.map((p) => k + '(around:9000,' + p.lat.toFixed(4) + ',' + p.lon.toFixed(4) + ');').join('');
   const q = '[out:json][timeout:25];(' + around('nwr["highway"~"^(services|rest_area)$"]') + ');out center tags 200;';
-  let els = null;
-  try { els = await Promise.race([A.overpass(q, stops.every((p) => A.inCH && A.inCH(p))), new Promise((_, rej) => setTimeout(() => rej(new Error('lent')), 30000))]); } catch (e) { els = null; }
+  let items = null, src = 'OpenStreetMap';
+  if (TT) {
+    try {
+      const rs = await Promise.all(stops.map((p) => getJson(tt('/search/2/nearbySearch/.json', { lat: p.lat, lon: p.lon, radius: 12000, categorySet: '7395', limit: 25, language: LANG }), 9000).catch(() => ({ results: [] }))));
+      items = [].concat(...rs.map((j) => (j.results || []).map((r) => ({ lat: r.position.lat, lon: r.position.lon, name: (r.poi && r.poi.name) || TRX('Aire de repos'), t: { highway: /service|raststätte|autogrill|area di servizio/i.test((r.poi && r.poi.name) || '') ? 'services' : 'rest_area' } }))));
+      if (items.length) src = 'TomTom'; else items = null;
+    } catch (e) { items = null; }
+  }
+  if (!items) {
+    let els = null;
+    try { els = await Promise.race([A.overpass(q, stops.every((p) => A.inCH && A.inCH(p))), new Promise((_, rej) => setTimeout(() => rej(new Error('lent')), 30000))]); } catch (e) { els = null; }
+    if (els) items = els.map((e) => { const c = e.center || e; const t = e.tags || {}; return { lat: c.lat, lon: c.lon, t, name: t.name || (t.highway === 'services' ? TRX('Aire de service') : TRX('Aire de repos')) }; }).filter((x) => x.lat != null);
+  }
   if (S.sheetView !== 'breaks') return;
-  if (!els) { body.innerHTML = '<p class="muted">' + esc(TRX('Données indisponibles pour le moment. Réessaie plus tard.')) + '</p>'; return; }
-  const items = els.map((e) => { const c = e.center || e; const t = e.tags || {}; return { lat: c.lat, lon: c.lon, t, name: t.name || (t.highway === 'services' ? TRX('Aire de service') : TRX('Aire de repos')) }; }).filter((x) => x.lat != null);
+  if (!items) { body.innerHTML = '<p class="muted">' + esc(TRX('Données indisponibles pour le moment. Réessaie plus tard.')) + '</p>'; return; }
   const per = stops.map((p) => {
     const near = items.map((x) => Object.assign({}, x, { d: dist(x, p), onRoute: (() => { let m = Infinity; for (let j = Math.max(0, p.i - 400); j < Math.min(C.length, p.i + 400); j += 3) m = Math.min(m, dist(x, C[j])); return m; })() }))
       .filter((x) => x.onRoute < 1500).sort((a, b) => (b.t.highway === 'services') - (a.t.highway === 'services') || a.d - b.d);
@@ -579,7 +589,7 @@ X.smartBreaks = async (R, dest) => {
   const list = [];
   body.innerHTML = '<p class="muted small">' + esc(TRX('Le TCS conseille de ne pas conduire plus de 2 heures d\'affilée et de s\'arrêter dès les premiers signes de fatigue.')) + '</p>' + stops.map((p, k) => '<h3>' + esc(TRX('Pause vers {t} de route', { t: fmtT(p.t) })) + ' · km ' + Math.round(R.total * p.t / dur / 1000) + '</h3>' +
     (per[k].length ? per[k].map((x) => { list.push(x); return '<button class="card tap" data-i="' + (list.length - 1) + '"><span class="ico" style="background:#2E7D5B">' + ic('truckstop') + '</span><span class="grow"><b>' + esc(x.name) + '</b><span class="sub">' + esc([fmtDist(x.d) + ' ' + TRX('du point de pause'), feat(x.t)].filter(Boolean).join(' · ')) + '</span></span><span class="val small">' + esc(TRX('Ajouter')) + '</span></button>'; }).join('') : '<p class="muted small">' + esc(TRX('Aucune aire connue près de ce point : prévois un arrêt dans une localité proche.')) + '</p>')).join('') +
-    '<p class="muted small">' + esc(TRX('Source : OpenStreetMap. Les équipements peuvent être incomplets.')) + '</p>';
+    '<p class="muted small">' + esc(TRX('Source : OpenStreetMap. Les équipements peuvent être incomplets.')).replace('OpenStreetMap', src) + '</p>';
   body.querySelectorAll('[data-i]').forEach((b) => { b.onclick = () => { const x = list[+b.dataset.i]; X.addVia({ name: x.name, lat: x.lat, lon: x.lon }, dest); }; });
 };
 setInterval(() => {
