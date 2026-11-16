@@ -52,8 +52,8 @@
     const tyres = c.dates && c.dates.tyres ? Date.parse(c.dates.tyres) : 0;
     const recent = tyres && Math.abs(tyres - Date.now()) < 75 * 86400000;
     if (!recent && !store.get(wk, false)) {
-      if ((m === 10 && d >= 10) || m === 11) { store.set(wk, true); toast('<b>' + esc(T('Pneus hiver')) + '</b> : ' + esc(T('c\'est la saison. Pense à prendre rendez-vous si ce n\'est pas fait.')), { action: T('Carnet'), onAction: () => X.open && X.open('carnet'), ms: 10000 }); return; }
-      if ((m === 3 && d >= 20) || m === 4) { store.set(wk, true); toast('<b>' + esc(T('Pneus été')) + '</b> : ' + esc(T('c\'est la saison. Pense à prendre rendez-vous si ce n\'est pas fait.')), { action: T('Carnet'), onAction: () => X.open && X.open('carnet'), ms: 10000 }); return; }
+      if ((m === 10 && d >= 10) || m === 11) { store.set(wk, true); toast('<b>' + esc(T('Pneus hiver')) + '</b> : ' + esc(T('c\'est la saison. Pense à prendre rendez-vous si ce n\'est pas fait.')), { action: T('Mon véhicule'), onAction: () => X.open && X.open('carnet'), ms: 10000 }); return; }
+      if ((m === 3 && d >= 20) || m === 4) { store.set(wk, true); toast('<b>' + esc(T('Pneus été')) + '</b> : ' + esc(T('c\'est la saison. Pense à prendre rendez-vous si ce n\'est pas fait.')), { action: T('Mon véhicule'), onAction: () => X.open && X.open('carnet'), ms: 10000 }); return; }
     }
     // #040 batterie 12 V : un rappel discret par hiver (le froid est la première cause de panne de batterie)
     const bk = 'routa.batt12.' + new Date().getFullYear();
@@ -64,7 +64,7 @@
     }
     if (c.serviceKm) {
       const now = kmEstimate();
-      if (now != null && c.serviceKm - now <= 500) toast('<b>' + esc(T('Service')) + '</b> : ' + esc(c.serviceKm - now <= 0 ? T('le kilométrage prévu est atteint.') : T('plus que {k} km environ.', { k: nf(c.serviceKm - now) })), { action: T('Carnet'), onAction: () => X.open && X.open('carnet'), ms: 10000 });
+      if (now != null && c.serviceKm - now <= 500) toast('<b>' + esc(T('Service')) + '</b> : ' + esc(c.serviceKm - now <= 0 ? T('le kilométrage prévu est atteint.') : T('plus que {k} km environ.', { k: nf(c.serviceKm - now) })), { action: T('Mon véhicule'), onAction: () => X.open && X.open('carnet'), ms: 10000 });
     }
   }
   setTimeout(smartReminders, 12000);

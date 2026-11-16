@@ -765,3 +765,4 @@ body.hzfar .hzmk { display: none; }
 /* Alerte GPS affichée : les messages passent juste en dessous, jamais l'un sur l'autre */
 body:has(#geoChip:not([hidden])):not(.navigating) .toasts { top: calc(var(--sat) + 136px); }
 @media (orientation: portrait) { body.navigating:has(#geoChip:not([hidden])) .toasts { top: calc(var(--nbB, 150px) + 52px); } }
+.seg.wrap2 { flex-wrap: wrap; } .seg.wrap2 button { flex: 1 1 45%; }

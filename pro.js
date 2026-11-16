@@ -21,10 +21,11 @@
   const DRIVES = 'routa.drives';
   const loadDrives = () => store.get(DRIVES, []);
   const saveDrives = (d) => { d = d.slice(-400); let n = 0; for (let i = d.length - 1; i >= 0; i--) if (d[i].pts && ++n > 60) delete d[i].pts; store.set(DRIVES, d); };
-  const CFGD = Object.assign({ cons: 7, price: null }, store.get('routa.drivecfg', {}));
-  const saveCfg = () => store.set('routa.drivecfg', CFGD);
+  // Carburant : seulement à partir des pleins notés dans « Mon véhicule » (aucune valeur par défaut inventée)
+  const fills = () => ((store.get('routa.carnet', {}) || {}).fills || []);
+  const consD = () => { const f = fills().filter((x) => x.km && x.liters).sort((a, b) => a.km - b.km); if (f.length < 2) return null; const km = f[f.length - 1].km - f[0].km; const l = f.slice(1).reduce((t, x) => t + x.liters, 0); return km > 50 ? l / km * 100 : null; };
+  const priceD = () => { const f = fills().filter((x) => x.liters && x.price).slice(-3); return f.length ? f.reduce((t, x) => t + x.price, 0) / f.reduce((t, x) => t + x.liters, 0) : null; };
   const curr = () => ((S.country || 'CH') === 'CH' ? 'CHF' : 'EUR');
-  const priceL = () => CFGD.price || (curr() === 'CHF' ? 1.85 : 1.75);
 
   function scoreOf(d) {
     const km = Math.max(d.km, 1);
@@ -82,8 +83,9 @@
     list.forEach((d) => { a.km += d.km; a.mv += d.mv; a.max = Math.max(a.max, d.max); a.br += d.br; a.ac += d.ac; a.sp += d.sp; a.lim += d.lim; });
     a.avg = a.mv > 60 ? a.km / (a.mv / 3600) : 0;
     a.score = a.n ? scoreOf(a) : null;
-    a.litres = a.km * CFGD.cons / 100;
-    a.cost = a.litres * priceL();
+    const cs = consD(), pl = priceD();
+    a.litres = cs ? a.km * cs / 100 : null;
+    a.cost = a.litres != null && pl ? a.litres * pl : null;
     return a;
   }
   const PER = [['24h', '24 h', 86400000], ['7d', '7 jours', 7 * 86400000], ['30d', '30 jours', 30 * 86400000], ['trips', 'Par trajet', 0]];
@@ -98,7 +100,7 @@
   function statsHtml(a, title) {
     return '<div class="card" style="display:flex;align-items:center;gap:16px">' + ring(a.score, 92) + '<div class="grow"><div class="sub">' + esc(T('Score de conduite')) + '</div><b style="font-size:20px">' + (a.score == null ? esc(T('Pas encore de trajet')) : esc(scoreLabel(a.score))) + '</b><div class="sub">' + esc(title) + '</div></div></div>' +
       '<div class="limgrid">' + stat(nf(a.km, a.km < 100 ? 1 : 0) + ' km', T('Distance')) + stat(fmtDur(a.mv), T('Temps de conduite')) + stat(nf(a.avg) + ' km/h', T('Vitesse moyenne')) + '</div>' +
-      '<div class="limgrid">' + stat(nf(a.max) + ' km/h', T('Vitesse max')) + stat(a.n, T('Trajets')) + stat(curr() + ' ' + nf(a.cost), T('Carburant estimé')) + '</div>' +
+      '<div class="limgrid">' + stat(nf(a.max) + ' km/h', T('Vitesse max')) + stat(a.n, T('Trajets')) + (a.cost != null ? stat(curr() + ' ' + nf(a.cost), T('Carburant estimé')) : '') + '</div>' +
       (a.km >= 1 ? '<div class="card"><div class="grow"><b>' + esc(T('Ce qui compte dans ton score')) + '</b><div class="sub">' +
         esc(T('Freinages brusques')) + ' : ' + a.br + ' · ' + esc(T('Accélérations brusques')) + ' : ' + a.ac + ' · ' + esc(T('Au-dessus de la limite')) + ' : ' + (a.lim > 30 ? Math.round(a.sp / a.lim * 100) + ' %' : '–') + '</div></div></div>' : '');
   }
@@ -193,9 +195,7 @@
     const recOff = monthDrives(-1).length ? -1 : monthDrives(0).length ? 0 : null;
     if (recOff != null) html += '<button class="btn soft block" id="drRecap">' + esc(T('Récap · {m}', { m: monthName(recOff) })) + '</button>';
     if (all.length) html += '<button class="btn soft block" id="drAna">' + esc(T('Analyses détaillées')) + ' <span class="prem">PRO</span></button>';
-    html += '<details class="card" style="display:block"><summary style="cursor:pointer;font-weight:700">' + esc(T('Réglages du calcul de carburant')) + '</summary>' +
-      '<div class="row" style="margin-top:10px"><label class="field grow" for="drCons">' + esc(T('Consommation (l/100 km)')) + '<input id="drCons" type="number" inputmode="decimal" step="0.1" min="2" max="60" value="' + CFGD.cons + '"></label>' +
-      '<label class="field grow" for="drPrice">' + esc(T('Prix du litre ({c})', { c: curr() })) + '<input id="drPrice" type="number" inputmode="decimal" step="0.01" min="0.5" max="5" value="' + priceL().toFixed(2) + '"></label></div></details>' +
+    html +=
       '<p class="muted small">' + esc(T('Le suivi fonctionne quand ROUTA est ouvert pendant que tu roules. Tout reste sur ce téléphone.')) + '</p>';
     const body = openSheet(T('Suivi de conduite'), html, 'drive');
     body.querySelectorAll('[data-p]').forEach((b) => { b.onclick = () => openDrive(b.dataset.p); });
@@ -204,9 +204,6 @@
     const rc = body.querySelector('#drRecap'); if (rc) rc.onclick = () => openRecap(recOff);
     const an = body.querySelector('#drAna'); if (an) an.onclick = openAnalysis;
     const st = body.querySelector('#drStory'); if (st) st.onclick = () => story(agg, label, { list: all.filter((d) => d.s > Date.now() - PER.find((x) => x[0] === per)[2]) });
-    const c = body.querySelector('#drCons'), pr = body.querySelector('#drPrice');
-    const sv = () => { const a = parseFloat(String(c.value).replace(',', '.')), b = parseFloat(String(pr.value).replace(',', '.')); if (a > 1 && a < 80) CFGD.cons = a; if (b > 0.3 && b < 6) CFGD.price = b; saveCfg(); };
-    c.onchange = () => { sv(); openDrive(); }; pr.onchange = () => { sv(); openDrive(); };
   }
 
   function openTrip(i) {
@@ -216,7 +213,7 @@
     const body = openSheet(T('Détails du trajet'),
       '<h3 style="margin:0">' + esc(day) + '</h3><p class="muted small" style="margin:2px 0 8px">' + esc(d.nm || T('Trajet')) + ' · ' + esc(hm(d.s)) + ' → ' + esc(hm(d.e || d.le)) + '</p>' +
       statsHtml(a, d.nm || T('Ce trajet')) +
-      '<div class="card"><div class="grow"><b>' + esc(T('Carburant')) + '</b><div class="sub">' + nf(a.litres, 1) + ' l · ' + curr() + ' ' + nf(priceL(), 2) + '/l · ' + esc(T('{c} l/100 km', { c: nf(CFGD.cons, 1) })) + '</div></div><b>' + curr() + ' ' + nf(a.cost) + '</b></div>' +
+      (a.litres != null ? '<div class="card"><div class="grow"><b>' + esc(T('Carburant')) + '</b><div class="sub">' + nf(a.litres, 1) + ' l' + (priceD() ? ' · ' + curr() + ' ' + nf(priceD(), 2) + '/l' : '') + ' · ' + esc(T('{c} l/100 km', { c: nf(consD(), 1) })) + '</div></div>' + (a.cost != null ? '<b>' + curr() + ' ' + nf(a.cost) + '</b>' : '') + '</div>' : '') +
       '<label class="field" for="trMemo"><span>' + esc(T('Souvenir (facultatif)')) + '</span><textarea id="trMemo" rows="2" maxlength="280" placeholder="' + esc(T('Un mot sur ce trajet : avec qui, ce que tu as vu…')) + '">' + esc(d.memo || '') + '</textarea></label>' +
       '<button class="btn primary block" id="trStory">' + esc(T('Partager en story')) + '</button>' +
       '<div class="row"><button class="btn ghost grow" id="trBack">' + esc(T('Retour')) + '</button><button class="btn ghost grow" id="trDel">' + esc(T('Supprimer ce trajet')) + '</button></div>', 'drive');
@@ -351,8 +348,8 @@
       SCFG.trips && !ctx.trip && [String(a.n), T('Trajets')],
       SCFG.limits && [lim, T('Respect des limites')],
       SCFG.smooth && [a.br + ' / ' + a.ac, T('Freinages / accélérations brusques')],
-      SCFG.fuel && [nf(a.litres, 1) + ' l · ' + curr() + ' ' + nf(a.cost), T('Carburant estimé')],
-      SCFG.co2 && [nf(a.litres * 2.3) + ' kg', T('CO₂ estimé')],
+      SCFG.fuel && a.litres != null && [nf(a.litres, 1) + ' l' + (a.cost != null ? ' · ' + curr() + ' ' + nf(a.cost) : ''), T('Carburant estimé')],
+      SCFG.co2 && a.litres != null && [nf(a.litres * 2.3) + ' kg', T('CO₂ estimé')],
       SCFG.best && ctx.best && [ctx.best.score + ' · ' + (([ctx.best.c0, ctx.best.c1].filter(Boolean).join(' → ')) || ctx.best.nm || new Date(ctx.best.s).toLocaleDateString(LANG(), { day: 'numeric', month: 'short' })), T('Meilleur trajet')]
     ].filter(Boolean);
     if (cards.length) {

@@ -199,6 +199,9 @@ const S = {
   poiCache: {}, wakeLock: null, sheetView: null, online: false
 };
 const saveMe = () => store.set('routa.me', S.me);
+// Réglages fixés (options retirées) : limite seulement en cas de dépassement, compteur toujours affiché,
+// pas de panneau d'avance, pas de feux, pas de conseils, pas de Moments, pas de lecture des messages à voix haute
+Object.assign(S.settings, { showLimit: false, overSign: true, limitAhead: false, showSpeedo: true, showSignals: false, tips: false, moments: false, readMsgs: false });
 const saveSettings = () => store.set('routa.settings', S.settings);
 // taille unique (normale) : plus de réglage, pour que tout reste aligné sur tous les écrans
 const applyUi = () => { try { document.documentElement.style.setProperty('--ui', '1'); } catch (e) { /* */ } };
@@ -1010,8 +1013,8 @@ setInterval(() => {
 }, 1000);
 function updateSpeed() {
   const box = $('speedBox');
-  if (S.speed == null) { box.hidden = true; $('limitSign').hidden = true; return; }
-  box.hidden = S.settings.showSpeedo === false;
+  if (S.speed == null) { box.hidden = false; $('speedVal').textContent = '0'; $('limitSign').hidden = true; return; }
+  box.hidden = false;
   const kmh = S.speed * 3.6 < 4 ? 0 : Math.round(S.speed * 3.6);
   $('speedVal').textContent = kmh;
   const lim = navSoft() ? null : capLimit(S.limit);
@@ -3299,24 +3302,16 @@ function openSettings() {
     '<h3>Navigation</h3>' +
     sw('stVoice', 'Guidage vocal', S.settings.voice) +
     '<p class="muted small" style="margin:0">Pendant la navigation, la carte tourne :</p>' + segH('stNavNorth', [['route', 'Dans le sens de la route'], ['north', 'Nord en haut']], S.settings.navNorth ? 'north' : 'route') +
-    sw('stLimit', 'Afficher la limite de vitesse (indicative)', S.settings.showLimit) +
-    sw('stOverSign', 'Afficher le panneau quand je dépasse la limite', S.settings.overSign !== false, 'Même si l\'affichage de la limite est coupé.') +
-    sw('stAhead', 'Prévenir à l\'avance des baisses de limitation', S.settings.limitAhead !== false, 'Un petit panneau, sans son.') +
     sw('stAlert', 'Alerte vocale si je dépasse la limite', S.settings.speedAlert) +
-    sw('stSpeedo', 'Afficher le compteur de vitesse', S.settings.showSpeedo !== false) +
     '<h3>Carte</h3>' +
     '<p class="muted small" style="margin:0">Couleurs de la carte</p>' + segH('stNight', [['auto', 'Automatique'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
     sw('stPlaces', 'Afficher les établissements sur la carte', S.settings.showPlaces) +
-    sw('stSignals', 'Afficher les feux de circulation', S.settings.showSignals !== false, 'Emplacement seulement : ROUTA ne sait pas s\'ils sont rouges ou verts.') +
     sw('stGoogle', 'Bouton « Voir les avis Google » sur les lieux', S.settings.googleLinks) +
     '<button class="btn soft block" id="stMapView">' + ic('layers') + 'Plan, satellite, trafic et transports</button>' +
     '<h3>Véhicule</h3>' +
     '<button class="btn soft block" id="stVeh">' + ic(veh().icon) + esc(I18N.t('Mon véhicule')) + ' · ' + esc(vehSummary()) + '</button>' +
     '<h3>Notifications</h3>' +
     sw('stReminders', 'Rappels d\'entretien (pneus, service, batterie)', S.settings.reminders !== false) +
-    sw('stReadMsgs', 'Lire les messages reçus à voix haute', S.settings.readMsgs) +
-    sw('stMoments', I18N.t('ROUTA Moments'), !!S.settings.moments, I18N.t('À l\'arrivée, une courte anecdote sur un lieu proche (Wikipédia). Désactivé par défaut.')) +
-    sw('stTips', I18N.t('Conseils discrets'), S.settings.tips !== false, I18N.t('De temps en temps, un petit message utile (météo, verglas, trajet habituel). Jamais de son.')) +
     '<h3>Confidentialité et compte</h3>' +
     '<button class="btn soft block" id="stProfile">' + ic('user') + 'Pseudo et visibilité</button>' +
     '<p class="muted small"><a href="confidentialite.html" style="color:var(--info)">Confidentialité et règles d\'utilisation</a></p>' +
@@ -3325,18 +3320,10 @@ function openSettings() {
     '<p class="muted small">Version ' + VERSION + '.</p>', 'settings');
   const ch = (id, fn) => { const e = body.querySelector('#' + id); if (e) e.onchange = (ev) => { fn(ev.target.checked !== undefined && ev.target.type === 'checkbox' ? ev.target.checked : ev.target.value); saveSettings(); }; };
   ch('stVoice', (v) => { S.settings.voice = v; if (v) unlockVoice(); $('btnMute').classList.toggle('muted', !v); });
-  ch('stLimit', (v) => { S.settings.showLimit = v; updateSpeed(); });
-  ch('stOverSign', (v) => { S.settings.overSign = v; updateSpeed(); });
-  ch('stAhead', (v) => { S.settings.limitAhead = v; });
   ch('stAlert', (v) => { S.settings.speedAlert = v; });
-  ch('stSpeedo', (v) => { S.settings.showSpeedo = v; updateSpeed(); });
-  ch('stTips', (v) => { S.settings.tips = v; });
-  ch('stMoments', (v) => { S.settings.moments = v; });
   ch('stPlaces', (v) => { S.settings.showPlaces = v; applyPlaces(); });
-  ch('stSignals', (v) => { S.settings.showSignals = v; if (window.ROUTA_X && ROUTA_X.signalsToggle) ROUTA_X.signalsToggle(v); });
   ch('stGoogle', (v) => { S.settings.googleLinks = v; });
   ch('stReminders', (v) => { S.settings.reminders = v; });
-  ch('stReadMsgs', (v) => { S.settings.readMsgs = v; });
   body.querySelectorAll('#stNight button').forEach((b) => { b.onclick = () => { S.settings.night = b.dataset.v; saveSettings(); applyNight(); body.querySelectorAll('#stNight button').forEach((x) => x.classList.toggle('on', x === b)); }; });
   body.querySelectorAll('#stNavNorth button').forEach((b) => { b.onclick = () => { S.settings.navNorth = b.dataset.v === 'north'; saveSettings(); body.querySelectorAll('#stNavNorth button').forEach((x) => x.classList.toggle('on', x === b)); if (S.nav) { S.follow = true; followCam(); } updateCompass(); }; });
   body.querySelector('#stCursor').onclick = openCursor;
@@ -3544,6 +3531,7 @@ async function boot() {
   updateVehChip();
   updateCountryChip();
   updateCompass();
+  updateSpeed();
   startGps();
   await DB.init();
   try { await DB.loadAll(); } catch (e) { console.warn(e); }

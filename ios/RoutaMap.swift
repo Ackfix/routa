@@ -81,6 +81,7 @@ public class RoutaMapPlugin: CAPPlugin, CAPBridgedPlugin, MLNMapViewDelegate, UI
         CAPPluginMethod(name: "clearImages", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "downloadRegion", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "regionStatus", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "deleteRegion", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "keepAwake", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "allowSleep", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "duck", returnType: CAPPluginReturnPromise),
@@ -268,6 +269,8 @@ public class RoutaMapPlugin: CAPPlugin, CAPBridgedPlugin, MLNMapViewDelegate, UI
     @objc func downloadRegion(_ call: CAPPluginCall) {
         guard let lat = call.getDouble("lat"), let lon = call.getDouble("lon") else { call.reject("position manquante"); return }
         let km = call.getDouble("radiusKm") ?? 20
+        let name = call.getString("name") ?? "routa-region"
+        let maxZ = call.getDouble("maxZoom") ?? 14
         let styleStr = call.getString("styleURL") ?? "https://tiles.openfreemap.org/styles/liberty"
         guard let url = URL(string: styleStr) else { call.reject("style"); return }
         DispatchQueue.main.async {
@@ -275,10 +278,11 @@ public class RoutaMapPlugin: CAPPlugin, CAPBridgedPlugin, MLNMapViewDelegate, UI
             let dLon = km / (111.0 * cos(lat * Double.pi / 180))
             let bounds = MLNCoordinateBounds(sw: CLLocationCoordinate2D(latitude: lat - dLat, longitude: lon - dLon),
                                              ne: CLLocationCoordinate2D(latitude: lat + dLat, longitude: lon + dLon))
-            let region = MLNTilePyramidOfflineRegion(styleURL: url, bounds: bounds, fromZoomLevel: 6, toZoomLevel: 14)
-            let ctx = "routa-region".data(using: .utf8) ?? Data()
+            let region = MLNTilePyramidOfflineRegion(styleURL: url, bounds: bounds, fromZoomLevel: 6, toZoomLevel: maxZ)
+            let ctx = name.data(using: .utf8) ?? Data()
             let storage = MLNOfflineStorage.shared
-            for old in storage.packs ?? [] { storage.removePack(old, withCompletionHandler: nil) }
+            // on remplace seulement la zone du même nom (les autres zones téléchargées restent)
+            for old in storage.packs ?? [] where String(data: old.context, encoding: .utf8) == name { storage.removePack(old, withCompletionHandler: nil) }
             storage.addPack(for: region, withContext: ctx) { pack, error in
                 if let error = error { call.reject(error.localizedDescription); return }
                 pack?.resume()
@@ -288,8 +292,11 @@ public class RoutaMapPlugin: CAPPlugin, CAPBridgedPlugin, MLNMapViewDelegate, UI
     }
 
     @objc func regionStatus(_ call: CAPPluginCall) {
+        let name = call.getString("name")
         DispatchQueue.main.async {
-            guard let pack = MLNOfflineStorage.shared.packs?.first else { call.resolve(["exists": false]); return }
+            let packs = MLNOfflineStorage.shared.packs ?? []
+            let found = name == nil ? packs.first : packs.first(where: { String(data: $0.context, encoding: .utf8) == name })
+            guard let pack = found else { call.resolve(["exists": false]); return }
             pack.requestProgress()
             let p = pack.progress
             call.resolve([
@@ -299,6 +306,15 @@ public class RoutaMapPlugin: CAPPlugin, CAPBridgedPlugin, MLNMapViewDelegate, UI
                 "bytes": Int(p.countOfBytesCompleted),
                 "complete": pack.state == .complete
             ])
+        }
+    }
+
+    @objc func deleteRegion(_ call: CAPPluginCall) {
+        let name = call.getString("name") ?? ""
+        DispatchQueue.main.async {
+            let storage = MLNOfflineStorage.shared
+            for p in storage.packs ?? [] where String(data: p.context, encoding: .utf8) == name { storage.removePack(p, withCompletionHandler: nil) }
+            call.resolve()
         }
     }
 

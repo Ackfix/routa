@@ -1215,7 +1215,7 @@ function regionTiles(lat, lon, km, zmin, zmax) {
   }
   return out;
 }
-async function downloadWeb(lat, lon, prog) {
+async function downloadWeb(lat, lon, prog, km, zmax) {
   if (!('caches' in window)) throw new Error('cache');
   const cache = await caches.open('routa-map');
   const st = map.getStyle() || {};
@@ -1231,7 +1231,7 @@ async function downloadWeb(lat, lon, prog) {
   const fonts = new Set();
   (st.layers || []).forEach((l) => { const f = l.layout && l.layout['text-font']; if (Array.isArray(f) && f.every((v) => typeof v === 'string')) fonts.add(f.join(',')); });
   if (st.glyphs) fonts.forEach((f) => ['0-255', '256-511', '8192-8447'].forEach((r) => extra.push(st.glyphs.replace('{fontstack}', encodeURIComponent(f)).replace('{range}', r))));
-  const urls = extra.concat(regionTiles(lat, lon, OFF_KM, 6, 14).map(([z, x, y]) => tpl.replace('{z}', z).replace('{x}', x).replace('{y}', y)));
+  const urls = extra.concat(regionTiles(lat, lon, km || OFF_KM, 6, zmax || 14).map(([z, x, y]) => tpl.replace('{z}', z).replace('{x}', x).replace('{y}', y)));
   let done = 0, bytes = 0, i = 0;
   const work = async () => {
     while (i < urls.length) {
@@ -1243,41 +1243,93 @@ async function downloadWeb(lat, lon, prog) {
   await Promise.all([work(), work(), work(), work(), work(), work()]);
   store.set('routa.offline', { at: Date.now(), lat, lon, km: OFF_KM, bytes, web: true });
 }
-async function openOffline() {
-  const info = store.get('routa.offline', null);
-  const mb = (b) => Math.max(1, Math.round(b / 1048576)) + ' Mo';
-  const body = openSheet('Carte hors connexion',
-    '<p>Télécharge la carte autour de toi (environ ' + OFF_KM + ' km) pour la garder dans les tunnels, à la montagne ou sans réseau.</p>' +
-    (info ? '<div class="card"><div class="grow"><b>Carte enregistrée</b><div class="sub">' + esc(new Date(info.at).toLocaleDateString()) + (info.bytes ? ' · ' + mb(info.bytes) : '') + '</div></div></div>' : '') +
+/* Carte hors connexion : autour de moi, la zone affichée, un lieu choisi ou tout un pays, avec un rayon réglable. Plusieurs zones possibles. */
+const OFF_COUNTRIES = { CH: [46.80, 8.23, 180], FR: [46.6, 2.4, 560], DE: [51.1, 10.4, 450], IT: [42.5, 12.6, 600], AT: [47.6, 13.3, 290], BE: [50.6, 4.6, 150], LU: [49.8, 6.1, 45], LI: [47.15, 9.55, 15], PT: [39.6, -8.0, 330], ES: [40.3, -3.7, 560], NL: [52.2, 5.3, 170] };
+const offZones = () => store.get('routa.offzones', []);
+const saveOffZones = (l) => store.set('routa.offzones', l);
+const offTiles = (lat, km, zmax) => { let n = 0; const dLatDeg = km / 111; for (let z = 6; z <= zmax; z++) { const t = Math.pow(2, z); const side = (2 * dLatDeg / 360) * t / Math.cos(lat * Math.PI / 180) + 1; n += Math.ceil(side) * Math.ceil(2 * dLatDeg / 360 * t + 1); } return n; };
+const offZmax = (km) => (km <= 60 ? 14 : km <= 150 ? 13 : 12); // grandes zones : routes et villes, moins de petits détails (sinon plusieurs Go)
+async function offDelete(zn) {
+  try {
+    if (zn.native && nativeMap() && RMAP.deleteRegion) await RMAP.deleteRegion({ name: zn.id });
+    else if ('caches' in window) {
+      const cache = await caches.open('routa-map'); const st = map.getStyle() || {}; let tpl = null;
+      Object.keys(st.sources || {}).forEach((id) => { const src = map.getSource(id); const t = src && src.tiles; if (st.sources[id].type === 'vector' && t && t[0] && !tpl) tpl = t[0]; });
+      const keep = offZones().filter((x) => x.id !== zn.id);
+      if (tpl) for (const [z, x, y] of regionTiles(zn.lat, zn.lon, zn.km, 6, zn.zmax)) {
+        if (keep.some((k) => z <= k.zmax && dist(k, { lat: zn.lat, lon: zn.lon }) < (k.km + zn.km) * 1000)) continue; // tuile partagée avec une autre zone : gardée
+        cache.delete(tpl.replace('{z}', z).replace('{x}', x).replace('{y}', y)).catch(() => {});
+      }
+    }
+  } catch (e) { /* */ }
+  saveOffZones(offZones().filter((x) => x.id !== zn.id));
+}
+async function openOffline(st) {
+  st = Object.assign({ mode: 'me', km: 25, place: null }, st || {});
+  const mb = (b) => (b >= 1073741824 ? (b / 1073741824).toFixed(1).replace('.', ',') + ' Go' : Math.max(1, Math.round(b / 1048576)) + ' Mo');
+  const C = window.ROUTA_COUNTRIES || {};
+  const cc = S.country && OFF_COUNTRIES[S.country] ? S.country : 'CH';
+  const center = () => st.mode === 'me' ? S.pos : st.mode === 'view' ? (() => { const c = map.getCenter(); return { lat: c.lat, lon: c.lng }; })() : st.mode === 'place' ? st.place : { lat: OFF_COUNTRIES[st.cc || cc][0], lon: OFF_COUNTRIES[st.cc || cc][1] };
+  const km = st.mode === 'country' ? OFF_COUNTRIES[st.cc || cc][2] : st.km;
+  const zmax = offZmax(km);
+  const c0 = center();
+  const est = c0 ? offTiles(c0.lat, km, zmax) * 30 * 1024 : 0; // ~30 Ko par morceau de carte (estimation)
+  const zones = offZones();
+  const KMS = [10, 25, 50, 100, 150];
+  const body = openSheet(TRX('Carte hors connexion'),
+    '<p class="muted small" style="margin:0">' + esc(TRX('Garde la carte sans réseau : tunnels, montagne, étranger.')) + '</p>' +
+    '<h3>' + esc(TRX('Quelle zone ?')) + '</h3><div class="seg wrap2" id="offMode">' + [['me', 'Autour de moi'], ['view', 'Zone affichée'], ['place', 'Un lieu'], ['country', 'Tout un pays']].map(([k, l]) => '<button data-m="' + k + '" class="' + (st.mode === k ? 'on' : '') + '">' + esc(TRX(l)) + '</button>').join('') + '</div>' +
+    (st.mode === 'place' ? '<form id="offPlaceF" class="row"><label class="field grow" for="offPlace"><span class="sr">' + esc(TRX('Lieu')) + '</span><input id="offPlace" type="text" placeholder="' + esc(TRX('Ville, col, lieu…')) + '" value="' + esc(st.place ? st.place.name : '') + '"></label><button class="btn" type="submit">' + esc(TRX('Chercher')) + '</button></form><div id="offRes"></div>' : '') +
+    (st.mode === 'country' ? '<label class="field" for="offCc">' + esc(TRX('Pays')) + '<select id="offCc">' + Object.keys(OFF_COUNTRIES).map((k) => '<option value="' + k + '"' + ((st.cc || cc) === k ? ' selected' : '') + '>' + esc(TRX((C[k] && C[k].name) || k)) + '</option>').join('') + '</select></label>'
+      : '<h3>' + esc(TRX('Rayon')) + '</h3><div class="seg" id="offKm">' + KMS.map((k) => '<button data-k="' + k + '" class="' + (st.km === k ? 'on' : '') + '">' + k + ' km</button>').join('') + '</div>') +
+    (c0 ? '<div class="card"><div class="grow"><b>' + esc(st.mode === 'place' && st.place ? st.place.name : st.mode === 'country' ? TRX((C[st.cc || cc] && C[st.cc || cc].name) || (st.cc || cc)) : st.mode === 'view' ? TRX('Zone affichée') : TRX('Autour de moi')) + (st.mode === 'country' ? '' : ' · ' + km + ' km') + '</b><div class="sub">' + esc(TRX('Environ {s}', { s: mb(est) })) + (zmax < 14 ? ' · ' + esc(TRX('routes et villes (moins de petits détails)')) : '') + '</div></div></div>' : '<p class="muted small">' + esc(st.mode === 'me' ? TRX('J\'attends ta position GPS…') : TRX('Choisis un lieu.')) + '</p>') +
     '<div id="offProg" class="muted small" hidden></div>' +
-    '<button class="btn block" id="offGo">' + (info ? 'Mettre à jour avec ma position actuelle' : 'Télécharger ma région') + '</button>' +
-    '<p class="muted small">Environ 30 à 60 Mo : utilise le Wi-Fi de préférence.</p>', 'offline');
+    '<button class="btn block" id="offGo"' + (c0 ? '' : ' disabled') + '>' + esc(TRX('Télécharger cette zone')) + '</button>' +
+    (est > 400 * 1048576 ? '<p class="muted small">' + esc(TRX('Grande zone : utilise le Wi-Fi et garde ROUTA ouvert pendant le téléchargement.')) + '</p>' : '<p class="muted small">' + esc(TRX('Utilise le Wi-Fi de préférence.')) + '</p>') +
+    (zones.length ? '<h3>' + esc(TRX('Zones enregistrées')) + '</h3>' + zones.map((z) => '<div class="card"><div class="grow"><b>' + esc(z.name) + '</b><div class="sub">' + esc(new Date(z.at).toLocaleDateString()) + ' · ' + z.km + ' km</div></div><button class="iconbtn small" data-del="' + esc(z.id) + '" aria-label="' + esc(TRX('Supprimer')) + '">' + ic('trash') + '</button></div>').join('') : '') +
+    '<p class="muted small">' + esc(TRX('La carte de ta région se télécharge aussi toute seule, en arrière-plan.')) + '</p>', 'offline');
+  body.querySelectorAll('#offMode button').forEach((b) => { b.onclick = () => openOffline(Object.assign(st, { mode: b.dataset.m })); });
+  body.querySelectorAll('#offKm button').forEach((b) => { b.onclick = () => openOffline(Object.assign(st, { km: +b.dataset.k })); });
+  const ccS = body.querySelector('#offCc'); if (ccS) ccS.onchange = () => openOffline(Object.assign(st, { cc: ccS.value }));
+  body.querySelectorAll('[data-del]').forEach((b) => { b.onclick = async () => { const z = offZones().find((x) => x.id === b.dataset.del); if (z) await offDelete(z); openOffline(st); }; });
+  const pf = body.querySelector('#offPlaceF');
+  if (pf) pf.onsubmit = async (e) => {
+    e.preventDefault(); const q = body.querySelector('#offPlace').value.trim(); if (q.length < 2) return;
+    const out = body.querySelector('#offRes'); out.innerHTML = '<p class="muted small">' + esc(TRX('Chargement…')) + '</p>';
+    let r = []; try { r = (A.geoSearch ? await A.geoSearch(q, S.pos || null) : []) || []; } catch (e2) { /* */ }
+    out.innerHTML = r.length ? r.slice(0, 5).map((x, i) => '<button class="card tap" data-pi="' + i + '"><span class="grow"><b>' + esc(x.name) + '</b><span class="sub">' + esc(x.sub || '') + '</span></span></button>').join('') : '<div class="empty">' + esc(TRX('Aucun résultat.')) + '</div>';
+    out.querySelectorAll('[data-pi]').forEach((b) => { b.onclick = () => { const x = r[+b.dataset.pi]; openOffline(Object.assign(st, { place: { name: x.name, lat: x.lat, lon: x.lon } })); }; });
+  };
   body.querySelector('#offGo').onclick = async () => {
-    if (!S.pos) { toast('J\'attends ta position GPS…'); return; }
+    const c = center(); if (!c) return;
     const b = body.querySelector('#offGo'), p = body.querySelector('#offProg');
-    b.disabled = true; p.hidden = false; p.textContent = 'Préparation…';
+    b.disabled = true; p.hidden = false; p.textContent = TRX('Préparation…');
+    const name = st.mode === 'place' && st.place ? st.place.name : st.mode === 'country' ? TRX((C[st.cc || cc] && C[st.cc || cc].name) || (st.cc || cc)) : st.mode === 'view' ? TRX('Zone affichée') : TRX('Autour de moi');
+    const zn = { id: 'z' + Date.now(), name, lat: c.lat, lon: c.lon, km, zmax, at: Date.now() };
     try {
       if (nativeMap() && RMAP.downloadRegion) {
-        await RMAP.downloadRegion({ lat: S.pos.lat, lon: S.pos.lon, radiusKm: OFF_KM, styleURL: CFG.mapStyle });
-        store.set('routa.offline', { at: Date.now(), lat: S.pos.lat, lon: S.pos.lon, km: OFF_KM, native: true });
+        await RMAP.downloadRegion({ lat: c.lat, lon: c.lon, radiusKm: km, maxZoom: zmax, styleURL: CFG.mapStyle, name: zn.id });
+        zn.native = true; saveOffZones(offZones().concat([zn]));
         const tick = async () => {
           if (S.sheetView !== 'offline') return;
           try {
-            const s = await RMAP.regionStatus();
-            if (s && s.exists) {
-              const pc = s.total ? Math.min(100, Math.round(s.done / s.total * 100)) : 0;
-              p.textContent = s.complete ? 'Carte enregistrée sur ce téléphone.' : TRX('Téléchargement…') + ' ' + pc + ' %';
-              if (s.complete) { b.disabled = false; return; }
+            const s2 = await RMAP.regionStatus({ name: zn.id });
+            if (s2 && s2.exists) {
+              const pc = s2.total ? Math.min(100, Math.round(s2.done / s2.total * 100)) : 0;
+              p.textContent = s2.complete ? TRX('Carte enregistrée sur ce téléphone.') : TRX('Téléchargement…') + ' ' + pc + ' %';
+              if (s2.complete) { b.disabled = false; return; }
             }
           } catch (e) { /* */ }
           setTimeout(tick, 1500);
         };
         tick();
       } else {
-        await downloadWeb(S.pos.lat, S.pos.lon, (d, t, by) => { p.textContent = TRX('Téléchargement…') + ' ' + Math.round(d / t * 100) + ' % · ' + mb(by); });
-        p.textContent = 'Carte enregistrée sur ce téléphone.'; b.disabled = false;
+        await downloadWeb(c.lat, c.lon, (d, t, by) => { p.textContent = TRX('Téléchargement…') + ' ' + Math.round(d / t * 100) + ' % · ' + mb(by); }, km, zmax);
+        saveOffZones(offZones().concat([zn]));
+        p.textContent = TRX('Carte enregistrée sur ce téléphone.'); b.disabled = false;
+        setTimeout(() => { if (S.sheetView === 'offline') openOffline(st); }, 1200);
       }
-    } catch (e) { p.textContent = 'Le téléchargement n\'a pas abouti. Vérifie ta connexion et réessaie.'; b.disabled = false; }
+    } catch (e) { p.textContent = TRX('Le téléchargement n\'a pas abouti. Vérifie ta connexion et réessaie.'); b.disabled = false; }
   };
 }
 X.openTrips = openTrips;
@@ -1292,7 +1344,7 @@ async function autoOffline() {
   const cn = navigator.connection; if (cn && (cn.saveData || /2g/.test(cn.effectiveType || ''))) return;
   autoOffBusy = true;
   try {
-    if (nativeMap() && RMAP.downloadRegion) { await RMAP.downloadRegion({ lat: S.pos.lat, lon: S.pos.lon, radiusKm: OFF_KM, styleURL: CFG.mapStyle }); store.set('routa.offline', { at: Date.now(), lat: S.pos.lat, lon: S.pos.lon, km: OFF_KM, native: true, auto: true }); }
+    if (nativeMap() && RMAP.downloadRegion) { await RMAP.downloadRegion({ lat: S.pos.lat, lon: S.pos.lon, radiusKm: OFF_KM, styleURL: CFG.mapStyle, name: 'routa-region' }); store.set('routa.offline', { at: Date.now(), lat: S.pos.lat, lon: S.pos.lon, km: OFF_KM, native: true, auto: true }); }
     else if (map.isStyleLoaded()) await downloadWeb(S.pos.lat, S.pos.lon, () => {});
   } catch (e) { /* on réessaiera plus tard */ }
   autoOffBusy = false;

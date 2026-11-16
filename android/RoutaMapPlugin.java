@@ -364,6 +364,8 @@ public class RoutaMapPlugin extends Plugin {
         final Double lat = call.getDouble("lat"), lon = call.getDouble("lon");
         if (lat == null || lon == null) { call.reject("position manquante"); return; }
         final double km = call.getDouble("radiusKm", 20.0);
+        final String name = call.getString("name", "routa-region");
+        final double maxZ = call.getDouble("maxZoom", 14.0);
         final String style = call.getString("styleURL", "https://tiles.openfreemap.org/styles/liberty");
         ui(() -> {
             try {
@@ -373,12 +375,12 @@ public class RoutaMapPlugin extends Plugin {
                 final LatLngBounds b = LatLngBounds.from(lat + dLat, lon + dLon, lat - dLat, lon - dLon);
                 om.listOfflineRegions(new OfflineManager.ListOfflineRegionsCallback() {
                     @Override public void onList(OfflineRegion[] regions) {
-                        if (regions != null) for (OfflineRegion r : regions) r.delete(new OfflineRegion.OfflineRegionDeleteCallback() {
+                        if (regions != null) for (OfflineRegion r : regions) if (name.equals(new String(r.getMetadata()))) r.delete(new OfflineRegion.OfflineRegionDeleteCallback() {
                             @Override public void onDelete() { }
                             @Override public void onError(String error) { }
                         });
-                        OfflineTilePyramidRegionDefinition def = new OfflineTilePyramidRegionDefinition(style, b, 6, 14, density);
-                        om.createOfflineRegion(def, "routa-region".getBytes(), new OfflineManager.CreateOfflineRegionCallback() {
+                        OfflineTilePyramidRegionDefinition def = new OfflineTilePyramidRegionDefinition(style, b, 6, maxZ, density);
+                        om.createOfflineRegion(def, name.getBytes(), new OfflineManager.CreateOfflineRegionCallback() {
                             @Override public void onCreate(OfflineRegion region) {
                                 region.setDownloadState(OfflineRegion.STATE_ACTIVE);
                                 JSObject r = new JSObject(); r.put("started", true); call.resolve(r);
@@ -394,13 +396,17 @@ public class RoutaMapPlugin extends Plugin {
 
     @PluginMethod
     public void regionStatus(final PluginCall call) {
+        final String name = call.getString("name", null);
         ui(() -> {
             try {
                 MapLibre.getInstance(getContext());
                 OfflineManager.getInstance(getContext()).listOfflineRegions(new OfflineManager.ListOfflineRegionsCallback() {
                     @Override public void onList(OfflineRegion[] regions) {
                         if (regions == null || regions.length == 0) { JSObject r = new JSObject(); r.put("exists", false); call.resolve(r); return; }
-                        final OfflineRegion reg = regions[0];
+                        OfflineRegion pick = null;
+                        for (OfflineRegion x : regions) if (name == null || name.equals(new String(x.getMetadata()))) { pick = x; break; }
+                        if (pick == null) { JSObject r = new JSObject(); r.put("exists", false); call.resolve(r); return; }
+                        final OfflineRegion reg = pick;
                         reg.setDownloadState(OfflineRegion.STATE_ACTIVE);
                         reg.getStatus(new OfflineRegion.OfflineRegionStatusCallback() {
                             @Override public void onStatus(OfflineRegionStatus s) {
@@ -415,6 +421,26 @@ public class RoutaMapPlugin extends Plugin {
                             }
                             @Override public void onError(String error) { call.reject(error); }
                         });
+                    }
+                    @Override public void onError(String error) { call.reject(error); }
+                });
+            } catch (Throwable e) { call.reject(String.valueOf(e.getMessage())); }
+        });
+    }
+
+    @PluginMethod
+    public void deleteRegion(final PluginCall call) {
+        final String name = call.getString("name", "");
+        ui(() -> {
+            try {
+                MapLibre.getInstance(getContext());
+                OfflineManager.getInstance(getContext()).listOfflineRegions(new OfflineManager.ListOfflineRegionsCallback() {
+                    @Override public void onList(OfflineRegion[] regions) {
+                        if (regions != null) for (OfflineRegion r : regions) if (name.equals(new String(r.getMetadata()))) r.delete(new OfflineRegion.OfflineRegionDeleteCallback() {
+                            @Override public void onDelete() { }
+                            @Override public void onError(String error) { }
+                        });
+                        call.resolve();
                     }
                     @Override public void onError(String error) { call.reject(error); }
                 });
