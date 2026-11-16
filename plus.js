@@ -158,8 +158,14 @@
     const q = '[out:json][timeout:25];(node["railway"="level_crossing"](around:25,' + line + ');node["hazard"~"^(falling_rocks|landslide|dangerous_curve|curve|curves|slippery|ice|school_zone|children|fog|side_winds)$"](around:40,' + line + '););out 300;';
     try {
       const els = await Promise.race([A.overpass(q, pts.every((p) => A.inCH && A.inCH(p))), new Promise((_, rej) => setTimeout(() => rej(new Error('lent')), 30000))]);
-      const fine = sample(R, 40, 150000);
-      return (els || []).map((e) => { const t = e.tags || {}; const k = t.railway === 'level_crossing' ? 'level_crossing' : t.hazard; const h = nearRoute(fine, { lat: e.lat, lon: e.lon }, k === 'level_crossing' ? 30 : 60); return h && HZ[k] ? { id: e.id, k, lat: e.lat, lon: e.lon, along: h.along } : null; })
+      /* distance exacte au tracé (segments), pour ne garder que ce qui est vraiment sur la route suivie */
+      const segD = (p) => { let best = Infinity, al = 0; const kx = 111320 * Math.cos(p.lat * Math.PI / 180), ky = 110540;
+        for (let i = 1; i < R.coords.length; i++) { const A1 = R.coords[i - 1], B1 = R.coords[i]; if (R.cum[i - 1] > 150000) break;
+          const ax = (A1.lon - p.lon) * kx, ay = (A1.lat - p.lat) * ky, bx = (B1.lon - p.lon) * kx, by = (B1.lat - p.lat) * ky, dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+          const t = L2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2)) : 0, x = ax + t * dx, y = ay + t * dy, d = Math.sqrt(x * x + y * y);
+          if (d < best) { best = d; al = R.cum[i - 1] + t * (R.cum[i] - R.cum[i - 1]); } }
+        return { d: best, along: al }; };
+      return (els || []).map((e) => { const t = e.tags || {}; const k = t.railway === 'level_crossing' ? 'level_crossing' : t.hazard; if (!HZ[k]) return null; const h = segD({ lat: e.lat, lon: e.lon }); return h.d <= (k === 'level_crossing' ? 8 : 35) ? { id: e.id, k, lat: e.lat, lon: e.lon, along: h.along } : null; })
         .filter(Boolean).sort((a, b) => a.along - b.along).filter((x, i, arr) => i === 0 || x.k !== arr[i - 1].k || x.along - arr[i - 1].along > 300);
     } catch (e) { return []; }
   }
