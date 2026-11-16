@@ -3401,14 +3401,15 @@ function openMenu() {
       XO('shareme') && xt('shareme'),
       XO('badges') && xt('badges')
     ]],
-    ['Sorties et convois', [
-      X.open && ['convoy', XI.convoy || ic('car'), X.convoy ? 'Convoi · ' + esc(X.convoy.name) : 'Convoi'],
-      X.open && ['events', XI.event || ic('spot'), 'Rassemblements'],
-      ['spots', ic('spot'), 'Spots, routes et cols'],
-      XO('cols') && xt('cols'),
-      XO('plan') && xt('plan'),
-      XO('checklists') && xt('checklists'),
-      XO('voyage') && xt('voyage')
+    ['Mes déplacements', [
+      ['vehicle', ic(v.icon), esc(I18N.t('Mon véhicule')) + ' · ' + esc(I18N.t(v.label))],
+      X.open && ['carnet', XI.book || ic('info'), 'Carnet du véhicule'],
+      X.open && ['parked', XI.park || ic('parking'), 'Parking'],
+      XO('drive') && xt('drive'),
+      XO('activity') && xt('activity'),
+      XO('repair') && xt('repair'),
+      XO('breakdown') && xt('breakdown'),
+      (() => { const st = store.get('routa.navStart', null); return st && Date.now() - st.at < 24 * 3600000 && (!S.pos || dist(S.pos, st) > 300) ? ['backstart', ic('nav'), I18N.t('Retour au point de départ')] : null; })()
     ]],
     ['Carte et routes', [
       ['favs', ic('star'), 'Mes favoris'],
@@ -3419,15 +3420,14 @@ function openMenu() {
       X.openTrips && ['trips', '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', 'Mes trajets'],
       X.openOffline && ['offline', '<svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>', 'Carte hors connexion']
     ]],
-    ['Mes déplacements', [
-      ['vehicle', ic(v.icon), esc(I18N.t('Mon véhicule')) + ' · ' + esc(I18N.t(v.label))],
-      X.open && ['carnet', XI.book || ic('info'), 'Carnet du véhicule'],
-      X.open && ['parked', XI.park || ic('parking'), 'Parking'],
-      XO('drive') && xt('drive'),
-      XO('activity') && xt('activity'),
-      XO('repair') && xt('repair'),
-      XO('breakdown') && xt('breakdown'),
-      (() => { const st = store.get('routa.navStart', null); return st && Date.now() - st.at < 24 * 3600000 && (!S.pos || dist(S.pos, st) > 300) ? ['backstart', ic('nav'), I18N.t('Retour au point de départ')] : null; })()
+    ['Sorties et convois', [
+      X.open && ['convoy', XI.convoy || ic('car'), X.convoy ? 'Convoi · ' + esc(X.convoy.name) : 'Convoi'],
+      X.open && ['events', XI.event || ic('spot'), 'Rassemblements'],
+      ['spots', ic('spot'), 'Spots, routes et cols'],
+      XO('cols') && xt('cols'),
+      XO('plan') && xt('plan'),
+      XO('checklists') && xt('checklists'),
+      XO('voyage') && xt('voyage')
     ]],
     ['Pro', [
       X.openPro && ['pro', PROI, 'Temps de conduite'],
@@ -3439,17 +3439,17 @@ function openMenu() {
     ]]
   ];
   // #008 : fonctions classées Premium (étiquette seulement pendant les tests, rien n'est verrouillé)
-  const PREM_TILES = ['plan', 'convoy', 'events', 'smart', 'activity', 'checklists', 'spots', 'cols', 'explore', 'voyage', 'dash', 'pro', 'tour', 'bans', 'prolog', 'truckstop', 'restrictions'];
+  const PREM_TILES = ['plan', 'convoy', 'events', 'smart', 'checklists', 'spots', 'cols', 'explore', 'voyage'];
   const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + (PREM_TILES.includes(t[0]) ? '<i class="prem tileprem">Premium</i>' : '') + t[1] + '<span>' + t[2] + '</span></button>';
   const body = openSheet('Menu',
     '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     '<button class="card tap menuprof" data-k="settings"><span class="ico">' + ic('gear') + '</span><span class="grow"><b>' + esc(I18N.t('Réglages')) + '</b><span class="sub">' + esc(I18N.t('Navigation, carte, véhicule, notifications, confidentialité et compte')) + '</span></span></button>' +
     '<button class="card tap menusos" data-k="country"><span class="sosdot big">SOS</span><span class="grow"><b>Urgences et infos pays</b><span class="sub">' + ($('ctryLabel').textContent === 'Infos pays' ? 'Numéros d\'urgence, règles, vignettes' : esc($('ctryLabel').textContent)) + '</span></span></button>' +
+    groups.map(([g, ts]) => { const list = ts.filter(Boolean); if (!list.length) return ''; return '<h3 class="menuh' + (g === 'Pro' ? ' menupro' : '') + '">' + (g === 'Pro' ? esc(I18N.t('Outils pour les professionnels de la route')) + ' <span class="prem">Premium</span>' : g) + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
     '<button class="card tap menufb" data-k="feedback"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg></span><span class="grow"><b>Donner mon avis</b><span class="sub">Un bug, un truc pas clair, une idée : dis-le-nous</span></span></button>' +
-    groups.map(([g, ts]) => { const list = ts.filter(Boolean); if (!list.length) return ''; return '<h3 class="menuh' + (g === 'Pro' ? ' menupro' : '') + '">' + (g === 'Pro' ? esc(I18N.t('Outils pour les professionnels de la route')) : g) + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
     '<div class="menulinks">' + (X.canInstall && X.canInstall() ? '<button data-k="install">Installer l\'app</button>' : '') + '<button data-k="share">Partager ROUTA</button><button data-k="help">Aide</button><button data-k="privacy">Confidentialité</button></div>' +
-    '<p class="menusig">ROUTA par <b>ACKFIX</b></p>' +
-    langSeg(), 'menu');
+    langSeg() +
+    '<p class="menusig">ROUTA par <b>ACKFIX</b></p>', 'menu');
   body.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => openK(b.dataset.k); });
   bindLangSeg(body);
 }
