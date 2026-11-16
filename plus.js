@@ -170,6 +170,22 @@
     } catch (e) { return []; }
   }
 
+
+  /* Routes fermées : en rouge directement sur la carte (pas de popup) */
+  function drawClosed(R, works) {
+    try {
+      const C = R.coords, cum = R.cum; if (!C || !cum) return;
+      const feats = (works || []).filter((x) => x.cat === 8 && x.along != null).map((x) => {
+        const s0 = Math.max(0, x.along - 60), e0 = x.along + Math.max(120, x.len || 0);
+        const pts = []; for (let i = 0; i < C.length; i++) { if (cum[i] >= s0 && cum[i] <= e0) pts.push([C[i].lon, C[i].lat]); }
+        if (pts.length < 2) { const j = cum.findIndex((d) => d >= x.along); if (j > 0) { pts.push([C[j - 1].lon, C[j - 1].lat], [C[j].lon, C[j].lat]); } }
+        return pts.length >= 2 ? { type: 'Feature', geometry: { type: 'LineString', coordinates: pts }, properties: {} } : null;
+      }).filter(Boolean);
+      const data = { type: 'FeatureCollection', features: feats };
+      if (map.getSource('routa-closed')) map.getSource('routa-closed').setData(data);
+      else { map.addSource('routa-closed', { type: 'geojson', data }); map.addLayer({ id: 'routa-closed', type: 'line', source: 'routa-closed', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#E5484D', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 5, 16, 11], 'line-dasharray': [1.2, 0.8] } }); }
+    } catch (e) { /* carte pas prête */ }
+  }
   X.hazardsOnRoute = hazardsOnRoute;
   /* ---------- aires de repos sur la suite du trajet (pour les pauses) ---------- */
   async function restAreas(R) {
@@ -329,18 +345,16 @@
           if (P.R !== R0) { P.R = R0; P.animals = []; P.hazards = []; if (!N.mode || N.mode === 'car') hazardsOnRoute(R0).then((h) => { if (P.R === R0) P.hazards = h; }); }
           P.works = w;
           const a2 = alongNow();
+          drawClosed(R0, w);
+          // route fermée devant : on recalcule automatiquement en l'évitant, sans popup (elle reste en rouge sur la carte)
           const cl = w.find((x) => x.cat === 8 && x.along > a2 + 300 && x.along - a2 < 30000 && !P.warned['c' + x.id]);
-          if (cl && X.avoidAdd) {
-            P.warned['c' + cl.id] = 1;
-            toast(IC.work + ' ' + esc(T('Route fermée sur ton trajet dans {d}.', { d: fmtDist(Math.round((cl.along - a2) / 100) * 100) })) + (cl.where ? '<br><span class="muted small">' + esc(cl.where) + '</span>' : ''),
-              { action: T('Éviter'), onAction: () => { if (S.nav && X.avoidAdd(S.nav.dest, workRect(cl)) === 'ok') X.recalc(S.nav.dest); }, ms: 15000 });
-            say(T('Route fermée sur ton trajet dans {d}.', { d: fmtDist(Math.round((cl.along - a2) / 100) * 100) }));
-          }
+          if (cl && X.avoidAdd) { P.warned['c' + cl.id] = 1; if (X.avoidAdd(S.nav.dest, workRect(cl)) === 'ok') X.recalc(S.nav.dest); }
         }
       }).catch(() => { /* trafic indisponible */ });
     }
     /* 20 · travaux : 1,5 km avant */
-    const wk = (P.R === N.R ? P.works : []).find((x) => x.along > a && x.along - a < 1500 && !P.warned['w' + x.id]);
+    const wk = (P.R === N.R ? P.works : []).find((x) => x.cat !== 8 && x.along > a && x.along - a < 800 && !P.warned['w' + x.id]);
+    if (wk) { P.warned['w' + wk.id] = 1; toast(IC.work + ' ' + esc(T('Travaux dans {d}', { d: fmtDist(Math.round((wk.along - a) / 100) * 100) })), { ms: 5000 }); }
     if (wk) { P.warned['w' + wk.id] = 1; toast(IC.work + ' ' + esc(T(wk.cat === 8 ? 'Route fermée dans {d}' : 'Travaux dans {d}', { d: fmtDist(Math.round((wk.along - a) / 100) * 100) })) + (wk.where ? '<br><span class="muted small">' + esc(wk.where) + '</span>' : ''), { ms: 8000 }); }
     /* 5 · verglas : toutes les 15 min en hiver */
     if (now - D.iceAt > 15 * 60000) { D.iceAt = now; const m = new Date().getMonth(); if (m >= 9 || m <= 4) iceCheck(); }

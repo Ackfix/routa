@@ -1,5 +1,5 @@
 /* ROUTA – service worker : l'app s'ouvre même avec un réseau faible. */
-const CACHE = 'routa-v1.0.41';
+const CACHE = 'routa-v1.0.42';
 const MAPC = 'routa-map';
 const SHELL = ['./', './index.html', './style.css', './app.js', './native.js', './extra.js', './i18n-a.js', './i18n-c.js', './i18n-d.js', './i18n.js', './config.js', './countries.js', './aide.html', './confidentialite.html', './i18n-e.js', './i18n-f.js', './i18n-g.js', './i18n-h.js', './zfe.js', './plus.js', './pro.js', './more.js', './plan.js', './act.js', './cols.js', './low.js', './dash.js', './i18n-p.js', './i18n-m.js', './i18n-n.js', './veh-db.js', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'];
 
@@ -14,10 +14,14 @@ self.addEventListener('fetch', (e) => {
   // Carte : réseau d'abord ; sans réseau, la carte téléchargée de la région.
   if (e.request.method === 'GET' && url.hostname === 'tiles.openfreemap.org') {
     const tile = /\.pbf$/.test(url.pathname);
-    e.respondWith(fetch(e.request).then((r) => {
-      if (!tile && r.ok) { const copy = r.clone(); caches.open(MAPC).then((c) => c.put(e.request, copy)).catch(() => {}); }
-      return r;
-    }).catch(() => caches.open(MAPC).then((c) => c.match(e.request.url)).then((r) => r || Response.error())));
+    // tuiles : d'abord la copie enregistrée (affichage immédiat, même avec un réseau faible), puis mise à jour en arrière-plan ;
+    // si le réseau échoue, un deuxième essai avant d'abandonner
+    const net = () => fetch(e.request).catch(() => new Promise((ok) => setTimeout(ok, 1200)).then(() => fetch(e.request)));
+    e.respondWith(caches.open(MAPC).then((c) => c.match(e.request.url).then((hit) => {
+      const upd = net().then((r) => { if (r && r.ok) c.put(e.request.url, r.clone()).catch(() => {}); return r; });
+      if (hit) { e.waitUntil(upd.catch(() => {})); return hit; }
+      return upd.catch(() => Response.error());
+    })));
     return;
   }
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;

@@ -754,7 +754,7 @@ const laneSvg = (dir) => { const r = LANE_ROT[dir] == null ? 0 : LANE_ROT[dir]; 
 let laneEl = null, laneKey = '';
 setInterval(() => {
   const N = S.nav, box = $('navBanner');
-  if (!laneEl && box) { laneEl = el('<div class="lanebar" id="laneBar" hidden aria-label="' + TRX('Voies à suivre') + '"></div>'); box.insertBefore(laneEl, $('navThen')); }
+  if (!laneEl && box) { laneEl = el('<div class="lanebar" id="laneBar" hidden aria-label="' + TRX('Voies à suivre') + '"></div>'); (box.querySelector('.navmain') || box).appendChild(laneEl); }
   if (!laneEl) return;
   if (!N || !N.R || !N.R.lanes) { laneEl.hidden = true; laneKey = ''; return; }
   const along = N.along || 0;
@@ -1250,6 +1250,22 @@ async function openOffline() {
 }
 X.openTrips = openTrips;
 X.openOffline = openOffline;
+/* Carte de ma région téléchargée automatiquement (une fois), puis de nouveau si on s'éloigne de plus de 60 km :
+   la carte reste affichée même avec un réseau faible. Silencieux, en arrière-plan. */
+let autoOffBusy = false;
+async function autoOffline() {
+  if (autoOffBusy || !S.pos || S.nav) return;
+  const info = store.get('routa.offline', null);
+  if (info && dist(info, S.pos) < 60000 && Date.now() - info.at < 30 * 86400000) return;
+  const cn = navigator.connection; if (cn && (cn.saveData || /2g/.test(cn.effectiveType || ''))) return;
+  autoOffBusy = true;
+  try {
+    if (nativeMap() && RMAP.downloadRegion) { await RMAP.downloadRegion({ lat: S.pos.lat, lon: S.pos.lon, radiusKm: OFF_KM, styleURL: CFG.mapStyle }); store.set('routa.offline', { at: Date.now(), lat: S.pos.lat, lon: S.pos.lon, km: OFF_KM, native: true, auto: true }); }
+    else if (map.isStyleLoaded()) await downloadWeb(S.pos.lat, S.pos.lon, () => {});
+  } catch (e) { /* on réessaiera plus tard */ }
+  autoOffBusy = false;
+}
+setTimeout(autoOffline, 20000); setInterval(autoOffline, 10 * 60000);
 
 /* ======================= Mode pro : temps de conduite et de repos (OTR 1 / OTR 2) ======================= */
 /* Aide pour les chauffeurs professionnels. Ne remplace ni le tachygraphe ni le livret de travail. */

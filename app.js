@@ -450,7 +450,8 @@ function toast(html, opts) {
     b.onclick = () => { el.remove(); opts.onAction(); };
     el.appendChild(b);
   }
-  $('toasts').appendChild(el);
+  const box = $('toasts'); while (box.children.length) box.firstChild.remove(); // un seul message à la fois, jamais d'empilement
+  box.appendChild(el);
   setTimeout(() => el.remove(), (opts && opts.ms) || 4500);
 }
 
@@ -933,6 +934,7 @@ function estSpeed(a, b) { const dt = (b.t - a.t) / 1000; const d = dist(a, b); i
 /* Vitesse fiable : pas de vitesse « fantôme » à l'arrêt (relevés figés, GPS qui saute sur place) */
 function filterSpeed(c, now) {
   const H = S.fixHist || (S.fixHist = []);
+  if (H.length) { const iv = Date.now() - H[H.length - 1].t; if (iv > 200 && iv < 20000) S.fixIv = S.fixIv ? S.fixIv * 0.7 + iv * 0.3 : iv; }
   H.push({ lat: now.lat, lon: now.lon, t: Date.now(), acc: c.accuracy || 0 });
   while (H.length > 2 && Date.now() - H[0].t > 10000) H.shift();
   let raw = (c.speed != null && c.speed >= 0 && !((c.accuracy || 0) > 60 && c.speed > 0)) ? c.speed : (S.pos ? estSpeed(S.pos, now) : null);
@@ -942,21 +944,22 @@ function filterSpeed(c, now) {
     let o = H[0]; for (let i = H.length - 1; i >= 0; i--) if (Date.now() - H[i].t >= 2000) { o = H[i]; break; }
     const span = (Date.now() - o.t) / 1000, moved = dist(o, now);
     // la voiture aurait dû avancer : si elle est restée sur place, c'est du bruit
-    if (span >= 2 && moved < Math.max(8, (c.accuracy || 0)) && moved < raw * span * 0.35) raw = 0;
+    if (span >= 2 && raw < 3 && moved < Math.max(6, (c.accuracy || 0) * 0.6) && moved < raw * span * 0.35) raw = 0;
   }
   let v = S.speed == null ? raw : S.speed * 0.35 + raw * 0.65;
-  if (v < 1.7) v = 0;
+  if (v < 1.1) v = 0;
   return v;
 }
 /* Plus de relevé depuis 3 s : on est arrêté (l'iPhone n'envoie plus rien quand on ne bouge pas) */
 setInterval(() => {
-  if (S.speed && S.fixAt && Date.now() - S.fixAt > 3000) { S.speed = 0; S.moving = false; updateSpeed(); }
+  // délai adapté au rythme réel du GPS (Android envoie parfois une position toutes les 3 à 5 s) : on ne passe pas à 0 entre deux relevés
+  if (S.speed && S.fixAt && Date.now() - S.fixAt > Math.max(4000, Math.min(12000, (S.fixIv || 1000) * 2.5))) { S.speed = 0; S.moving = false; updateSpeed(); }
 }, 1000);
 function updateSpeed() {
   const box = $('speedBox');
   if (S.speed == null) { box.hidden = true; $('limitSign').hidden = true; return; }
   box.hidden = S.settings.showSpeedo === false;
-  const kmh = S.speed * 3.6 < 6 ? 0 : Math.round(S.speed * 3.6);
+  const kmh = S.speed * 3.6 < 4 ? 0 : Math.round(S.speed * 3.6);
   $('speedVal').textContent = kmh;
   const lim = navSoft() ? null : capLimit(S.limit);
   const over = !!lim && kmh > lim + 3;
@@ -1616,7 +1619,7 @@ function saveActiveNav() {
 setInterval(() => { if (S.nav) saveActiveNav(); }, 30000);
 function offerResume() {
   const a = store.get('routa.activeNav', null);
-  if (!a || !a.dest || S.nav || Date.now() - a.at > 3 * 3600000) { if (a) store.set('routa.activeNav', null); return; }
+  if (!a || !a.dest || S.nav || document.body.classList.contains('navigating') || Date.now() - a.at > 3 * 3600000) { if (a) store.set('routa.activeNav', null); return; }
   if (S.pos && dist(S.pos, a.dest) < 150) { store.set('routa.activeNav', null); return; }
   toast(esc(I18N.t('Trajet interrompu vers {d}').replace('{d}', a.dest.name || '')), { action: I18N.t('Reprendre'), ms: 20000, onAction: () => resumeNav(a) });
 }
