@@ -1594,6 +1594,7 @@ async function checkRoundabouts(R) {
 function startNav(R, dest) {
   S.preview = null;
   S.nav = { R, dest, along: 0, seg: 0, offCount: 0, lastReroute: 0, spoken: {}, startedAt: Date.now(), mode: R.mode || 'car' };
+  { const tb = $('toasts'); if (tb) tb.innerHTML = ''; } // aucun ancien message (ex. « Reprendre ») ne reste au démarrage
   // #065 : point de départ gardé pour proposer le retour
   if (S.pos && dist(S.pos, dest) > 300) store.set('routa.navStart', { lat: +S.pos.lat.toFixed(5), lon: +S.pos.lon.toFixed(5), at: Date.now(), to: dest.name, mode: R.mode || 'car' });
   document.body.classList.toggle('navsoft', !!R.mode && R.mode !== 'car');
