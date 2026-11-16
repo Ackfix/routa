@@ -771,3 +771,10 @@ body:has(#geoChip:not([hidden])):not(.navigating) .toasts { top: calc(var(--sat)
 .remrow .remdate { width: 132px; flex: 0 0 auto; min-height: 40px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line, rgba(255,255,255,.12)); background: var(--bg); color: var(--fg); font: inherit; font-size: 14px; }
 .remrow .remcal { flex: 0 0 auto; }
 @media (max-width: 380px) { .remrow { flex-wrap: wrap; } .remrow .remdate { width: auto; flex: 1 1 auto; } }
+
+.proacts.big.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.proacts.big button.pa-avail { color: #FACC15; } .proacts.big button.pa-avail.on { background: #FACC15; }
+.prostatus.pa-avail { border-color: #FACC15; }
+.procard .prorow + .prorow { margin-top: 8px; }
+
+.field.langsel { margin: 8px 0 12px; }

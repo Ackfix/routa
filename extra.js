@@ -1386,12 +1386,13 @@ const PRO = Object.assign({ on: false, regime: null, segs: [] }, store.get('rout
 PRO.auto = false; // pas de détection automatique : un bouchon ou un arrêt au feu la tromperait
 const H = 3600000, MIN = 60000;
 const PRO_RULES = {
-  otr1: { label: 'OTR 1', sub: 'Transport de marchandises de plus de 3,5 t, et transport de personnes avec plus de 8 places assises sans compter le conducteur (dès 9 places avec lui)', cont: 4.5 * H, day: 9 * H, dayExt: 10 * H, week: 56 * H, twoWeeks: 90 * H, rest: 11 * H, restRed: 9 * H, split1: 15 * MIN },
-  ue: { label: 'UE 561', sub: 'Règlement (CE) 561/2006 (France et Union européenne) : transport de marchandises de plus de 3,5 t, et transport de plus de 9 personnes conducteur compris', cont: 4.5 * H, day: 9 * H, dayExt: 10 * H, week: 56 * H, twoWeeks: 90 * H, rest: 11 * H, restRed: 9 * H, split1: 15 * MIN },
-  otr2: { label: 'OTR 2', sub: 'Transport professionnel de personnes en voiture légère ou de tourisme (taxis, VTC, limousines) : 8 places passagers au maximum', cont: 4.5 * H, day: 9 * H, dayExt: null, week: 45 * H, twoWeeks: null, rest: 11 * H, restRed: 9 * H, split1: 20 * MIN }
+  otr1: { label: 'OTR 1', sub: 'Transport de marchandises de plus de 3,5 t, et transport de personnes avec plus de 8 places assises sans compter le conducteur (dès 9 places avec lui)', cont: 4.5 * H, day: 9 * H, dayExt: 10 * H, week: 56 * H, twoWeeks: 90 * H, rest: 11 * H, restRed: 9 * H, split1: 15 * MIN, workCont: 6 * H, wbreak: 15 * MIN, wweek: 60 * H, avail: true },
+  ue: { label: 'UE 561', sub: 'Règlement (CE) 561/2006 (France et Union européenne) : transport de marchandises de plus de 3,5 t, et transport de plus de 9 personnes conducteur compris', cont: 4.5 * H, day: 9 * H, dayExt: 10 * H, week: 56 * H, twoWeeks: 90 * H, rest: 11 * H, restRed: 9 * H, split1: 15 * MIN, workCont: 6 * H, wbreak: 15 * MIN, wweek: 60 * H, avail: true },
+  otr2: { label: 'OTR 2', sub: 'Transport professionnel de personnes en voiture légère ou de tourisme (taxis, VTC, limousines) : 8 places passagers au maximum', cont: 4.5 * H, day: 9 * H, dayExt: null, week: 45 * H, twoWeeks: null, rest: 11 * H, restRed: 9 * H, split1: 20 * MIN, workCont: 5.5 * H, wbreak: 20 * MIN, wweek: 48 * H, avail: false }
 };
-const ACT = { drive: 'Conduite', break: 'Pause', work: 'Autre travail', rest: 'Repos' };
-const ACT_BTN = ['drive', 'break']; // seulement Conduite et Pause : une longue pause compte comme repos
+const ACT = { drive: 'Conduite', work: 'Travail', avail: 'Disponibilité', break: 'Pause', rest: 'Repos' };
+/* boutons : symboles officiels du tachygraphe (volant, marteaux croisés, carré barré, lit). Une longue pause compte comme repos. */
+const actBtns = (R) => R.avail ? ['drive', 'work', 'avail', 'break'] : ['drive', 'work', 'break'];
 function proRegime() { if (PRO.regime && PRO_RULES[PRO.regime]) return PRO.regime; const t = (A.veh ? A.veh().type : 'voiture'); const ch = !A.S.country || A.S.country === 'CH'; return (t === 'camion' || t === 'bus' || t === 'minibus') ? (ch ? 'otr1' : 'ue') : 'otr2'; }
 /* jours fériés nationaux en France (pour l'interdiction poids lourds du week-end) */
 function frHoliday(d) {
@@ -1407,7 +1408,13 @@ function frHgvBan(now) {
   return (offDay && h < 22) || (offNext && h >= 22);
 }
 function proSave() { const cut = Date.now() - 15 * 24 * H; PRO.segs = PRO.segs.filter((s) => !s.e || s.e > cut); store.set('routa.pro', PRO); }
-const PA_ICO = { drive: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2"/><path d="M12 3.5v6.5M4 13.5l6.2-.8M20 13.5l-6.2-.8"/></svg>', break: '<svg viewBox="0 0 24 24"><path d="M5 9h11v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M12 3v3"/></svg>', work: '<svg viewBox="0 0 24 24"><path d="M14 6a4 4 0 0 0 5 5l-8 8a2 2 0 0 1-3-3z"/></svg>', rest: '<svg viewBox="0 0 24 24"><path d="M3 18v-6h18v6M3 14h18M7 12V9h4v3"/></svg>' };
+const PA_ICO = {
+  drive: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2"/><path d="M12 3.5v6.5M4 13.5l6.2-.8M20 13.5l-6.2-.8"/></svg>',
+  work: '<svg viewBox="0 0 24 24"><path d="M5 19L15.5 8.5M19 19L8.5 8.5"/><path d="M12.5 5.5l3-3 4 4-3 3zM11.5 5.5l-3-3-4 4 3 3z"/></svg>',
+  avail: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 20L20 4"/></svg>',
+  break: '<svg viewBox="0 0 24 24"><path d="M3 18V7M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="1.6"/></svg>',
+  rest: '<svg viewBox="0 0 24 24"><path d="M3 18V7M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="1.6"/></svg>'
+};
 function proFavs() { const f = (PRO.favs || []).filter((k) => PRO_RULES[k]); return f.length ? f : Object.keys(PRO_RULES); }
 /* App fermée pendant la conduite automatique : on ne compte pas le temps où ROUTA ne voyait rien comme de la conduite */
 (function proResume() {
@@ -1427,7 +1434,7 @@ const segDur = (s, from, to) => Math.max(0, Math.min(s.e || Date.now(), to || Da
 function proStats() {
   const R = PRO_RULES[proRegime()], now = Date.now(), segs = PRO.segs;
   /* début de la journée de travail : après le dernier repos d'au moins 9 h sans conduite ni travail */
-  const acts = segs.filter((s) => s.a === 'drive' || s.a === 'work');
+  const acts = segs.filter((s) => s.a === 'drive' || s.a === 'work' || s.a === 'avail');
   let shiftStart = acts.length ? acts[0].s : now;
   for (let i = 1; i < acts.length; i++) { if (acts[i].s - (acts[i - 1].e || now) >= R.restRed) shiftStart = acts[i].s; }
   const lastEnd = acts.length ? (acts[acts.length - 1].e || now) : 0;
@@ -1447,7 +1454,18 @@ function proStats() {
   const d0 = new Date(); d0.setHours(0, 0, 0, 0);
   const monday = d0.getTime() - ((d0.getDay() + 6) % 7) * 24 * H;
   const week = sum(monday), prevWeek = sum(monday - 7 * 24 * H, monday);
-  return { R, shiftStart, cont, day, week, two: week + prevWeek, restBy: acts.length && shiftStart < now ? shiftStart + 24 * H - R.rest : null };
+  /* temps de travail = conduite + travail (la disponibilité et les pauses n'en font pas partie) */
+  const wsum = (from, to) => segs.filter((s) => s.a === 'drive' || s.a === 'work').reduce((t, s) => t + segDur(s, from, to), 0);
+  const work = wsum(shiftStart), wweek = wsum(monday);
+  let wcont = 0;
+  segs.forEach((s) => {
+    if ((s.e || now) < shiftStart) return;
+    const d = segDur(s, shiftStart);
+    if (s.a === 'drive' || s.a === 'work') wcont += d;
+    else if (s.a === 'break' && d >= R.wbreak) wcont = 0;
+  });
+  const amp = acts.length && shiftStart < now ? now - shiftStart : 0;
+  return { R, shiftStart, cont, day, week, two: week + prevWeek, work, wweek, wcont, amp, restBy: acts.length && shiftStart < now ? shiftStart + 24 * H - R.rest : null };
 }
 const hm = (ms) => { const m = Math.max(0, Math.round(ms / MIN)); return Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0'); };
 
@@ -1477,6 +1495,10 @@ function proTick(force) {
   if (left <= 30 * MIN && left > 0) proWarn('c30', TRX('Pause obligatoire dans {t} (45 min après 4 h 30 de conduite).', { t: '<b>' + hm(left) + '</b>' }));
   if (left <= 0) proWarn('c0', '<b>' + TRX('Pause obligatoire : 4 h 30 de conduite atteintes. Arrête-toi 45 minutes.') + '</b>');
   if (R.day - st.day <= 30 * MIN) proWarn('d' + k, TRX('Plus que {t} de conduite aujourd\'hui (limite {l}).', { t: '<b>' + hm(R.day - st.day) + '</b>', l: hm(R.day) }));
+  if (st.wcont < 10 * MIN) { delete proWarned.w30; delete proWarned.w0; }
+  if (R.workCont - st.wcont <= 30 * MIN && R.workCont - st.wcont > 0) proWarn('w30', TRX('Pause de travail obligatoire dans {t} ({l} de travail au maximum sans pause).', { t: '<b>' + hm(R.workCont - st.wcont) + '</b>', l: hm(R.workCont) }));
+  if (st.wcont >= R.workCont) proWarn('w0', '<b>' + TRX('Pause obligatoire : {l} de travail sans pause atteintes.', { l: hm(R.workCont) }) + '</b>');
+  if (st.amp >= 24 * H - R.rest - 30 * MIN) proWarn('a' + k, TRX('Ta journée arrive à {t} : avec 11 h de repos, elle ne peut pas dépasser 13 h (15 h avec un repos réduit de 9 h).', { t: '<b>' + hm(st.amp) + '</b>' }));
   if (R.week - st.week <= 2 * H) proWarn('w' + Math.floor(now / (7 * 24 * H)), TRX('Plus que {t} de conduite cette semaine.', { t: '<b>' + hm(R.week - st.week) + '</b>' }));
   const v = A.veh ? A.veh() : {};
   const h = new Date().getHours(), sunday = new Date().getDay() === 0, cc = A.S.country || 'CH';
@@ -1497,7 +1519,13 @@ function openPro() {
     '<details class="proedit"><summary>' + esc(TRX('Personnaliser la liste des modes')) + '</summary>' + Object.keys(PRO_RULES).map((k) => '<label class="switch" for="prf_' + k + '"><span><b>' + esc(PRO_RULES[k].label) + '</b></span><input type="checkbox" id="prf_' + k + '"' + (proFavs().includes(k) ? ' checked' : '') + '></label>').join('') + '</details>' +
     '<p class="muted small">' + esc(TRX(R.sub)) + '</p>' +
     (PRO.on ? (
-      '<div class="proacts big">' + ACT_BTN.map((a) => '<button data-a="' + a + '" class="pa-' + a + (cur && cur.a === a ? ' on' : '') + '" aria-pressed="' + (cur && cur.a === a ? 'true' : 'false') + '"><span class="paico">' + PA_ICO[a] + '</span>' + esc(TRX(ACT[a])) + '</button>').join('') + '</div>' +
+      '<div class="proacts big n' + actBtns(R).length + '">' + actBtns(R).map((a) => '<button data-a="' + a + '" class="pa-' + a + (cur && cur.a === a ? ' on' : '') + '" aria-pressed="' + (cur && cur.a === a ? 'true' : 'false') + '"><span class="paico">' + PA_ICO[a] + '</span>' + esc(TRX(ACT[a])) + '</button>').join('') + '</div>' +
+      '<p class="muted small">' + esc(TRX(R.avail ? 'Travail : attente du client, chargement, déchargement, nettoyage… Disponibilité : attente dont la durée est connue d\'avance, sans être au poste de travail.' : 'Travail : attente du client, chargement, nettoyage… L\'attente compte comme du travail.')) + '</p>' +
+      '<div class="procard"><div class="prorow"><b>' + esc(TRX('Travail aujourd\'hui')) + '</b><span>' + hm(st.work) + '</span></div><span class="muted small">' + esc(TRX('Conduite + travail, sans les pauses ni la disponibilité.')) + '</span>' +
+        '<div class="prorow"><span>' + esc(TRX('Depuis la dernière pause')) + '</span><span>' + hm(st.wcont) + ' / ' + hm(R.workCont) + '</span></div>' + bar(st.wcont, R.workCont) +
+        '<span class="muted small">' + esc(TRX(reg === 'otr2' ? 'Pause d\'au moins 20 min jusqu\'à 7 h de travail, 30 min jusqu\'à 9 h, 1 h au-delà (en blocs de 20 min possible).' : 'Pause d\'au moins 30 min si la journée compte 6 à 9 h de travail, 45 min au-delà de 9 h (en blocs de 15 min possible).')) + '</span></div>' +
+      (st.amp ? '<div class="procard"><div class="prorow"><b>' + esc(TRX('Durée de la journée')) + '</b><span>' + hm(st.amp) + ' / 13 h 00</span></div>' + bar(st.amp, 13 * H) + '<span class="muted small">' + esc(TRX('Depuis la fin du dernier repos. Le repos de 11 h (9 h trois fois par semaine) doit tenir dans les 24 h : la journée dure donc au plus 13 h, ou 15 h avec un repos réduit.')) + '</span></div>' : '') +
+      '<div class="procard"><div class="prorow"><b>' + esc(TRX('Travail cette semaine')) + '</b><span>' + hm(st.wweek) + ' / ' + hm(R.wweek) + '</span></div>' + bar(st.wweek, R.wweek) + '<span class="muted small">' + esc(TRX(reg === 'otr1' ? '48 h en moyenne sur 26 semaines, 60 h au maximum en une semaine.' : reg === 'ue' ? '48 h en moyenne sur 4 mois, 60 h au maximum en une semaine (directive 2002/15/CE).' : '48 h par semaine (53 h dans les entreprises de taxis), heures supplémentaires limitées.')) + '</span></div>' +
       '<div class="procard"><div class="prorow"><b>Conduite continue</b><span>' + hm(st.cont) + ' / 4 h 30</span></div>' + bar(st.cont, R.cont) + '<span class="muted small">' + (reg === 'otr2' ? TRX('Puis pause de 45 min (ou 15 + 30 min, ou 30 min / 2 × 20 min si elle est prise plus tôt).') : TRX('Puis pause de 45 min (ou 15 + 30 min).')) + '</span></div>' +
       '<div class="procard"><div class="prorow"><b>Conduite aujourd\'hui</b><span>' + hm(st.day) + ' / ' + hm(R.day) + '</span></div>' + bar(st.day, R.day) + (R.dayExt ? '<span class="muted small">10 h possibles deux fois par semaine.</span>' : '') + '</div>' +
       '<div class="procard"><div class="prorow"><b>Conduite cette semaine</b><span>' + hm(st.week) + ' / ' + hm(R.week) + '</span></div>' + bar(st.week, R.week) +
@@ -1506,7 +1534,8 @@ function openPro() {
       '<div class="row wrap"><button class="btn soft grow" id="proPark">Parkings proches</button><button class="btn soft grow" id="proLog">Relevé 14 jours</button></div>' +
       '<p class="muted small">' + esc(TRX('Tout est gardé sur ce téléphone, même après la fermeture de l\'app : mode, temps de conduite, pauses et réglages.')) + '</p><button class="btn ghost block" id="proReset">' + esc(TRX('Remettre les compteurs à zéro')) + '</button>'
     ) : '') +
-    '<p class="muted small">' + (reg === 'ue' ? TRX('Aide au respect du règlement (CE) 561/2006. Ne remplace pas le tachygraphe : en cas de contrôle, seul celui-ci fait foi.') : TRX('Aide au respect de l\'{r}. Ne remplace ni le tachygraphe ni le livret de travail : en cas de contrôle, seuls ceux-ci font foi.', { r: reg === 'otr1' ? 'OTR 1 (RS 822.221)' : 'OTR 2 (RS 822.222)' })) + '</p>', 'pro');
+    '<p class="muted small">' + (reg === 'ue' ? TRX('Aide au respect du règlement (CE) 561/2006. Ne remplace pas le tachygraphe : en cas de contrôle, seul celui-ci fait foi.') : TRX('Aide au respect de l\'{r}. Ne remplace ni le tachygraphe ni le livret de travail : en cas de contrôle, seuls ceux-ci font foi.', { r: reg === 'otr1' ? 'OTR 1 (RS 822.221)' : 'OTR 2 (RS 822.222)' })) + '</p>' +
+    '<p class="muted small">' + esc(TRX('Sources')) + ' : ' + esc(reg === 'otr1' ? 'OTR 1 (RS 822.221), art. 2, 5, 6, 8, 9' : reg === 'ue' ? 'Règlement (CE) 561/2006, art. 6 à 8 ; directive 2002/15/CE, art. 3 à 5' : 'OTR 2 (RS 822.222), art. 2, 5, 7, 8, 9') + '</p>', 'pro');
   body.querySelector('#proOn').onchange = (e) => { PRO.on = e.target.checked; if (!PRO.on) proSet(null); proSave(); proTick(); openPro(); };
   body.querySelector('#proRegSel').onchange = (e) => { PRO.regime = e.target.value; proSave(); proTick(); openPro(); };
   Object.keys(PRO_RULES).forEach((k) => { const c = body.querySelector('#prf_' + k); if (c) c.onchange = () => { let f = proFavs().filter((x) => x !== k); if (c.checked) f.push(k); f = Object.keys(PRO_RULES).filter((x) => f.includes(x)); if (!f.length) { c.checked = true; return; } PRO.favs = f; if (!f.includes(proRegime())) PRO.regime = f[0]; proSave(); openPro(); }; });
@@ -1524,7 +1553,8 @@ function proLogText() {
   return Object.keys(days).map((k) => {
     const list = days[k];
     const drive = list.filter((s) => s.a === 'drive').reduce((t, s) => t + segDur(s), 0);
-    return k + ' – ' + TRX('Conduite') + ' ' + hm(drive) + '\n' + list.map((s) => '  ' + fmtClock(new Date(s.s)) + '–' + (s.e ? fmtClock(new Date(s.e)) : '…') + ' ' + TRX(ACT[s.a])).join('\n');
+    const wk = list.filter((s) => s.a === 'drive' || s.a === 'work').reduce((t, s) => t + segDur(s), 0);
+    return k + ' – ' + TRX('Conduite') + ' ' + hm(drive) + ' · ' + TRX('Travail') + ' ' + hm(wk) + '\n' + list.map((s) => '  ' + fmtClock(new Date(s.s)) + '–' + (s.e ? fmtClock(new Date(s.e)) : '…') + ' ' + TRX(ACT[s.a])).join('\n');
   }).reverse().join('\n\n');
 }
 function openProLog() {

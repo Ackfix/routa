@@ -3402,10 +3402,11 @@ $('fabSearch').onclick = enterSearch;
 $('fabMenu').onclick = openMenu;
 $('qback').onclick = () => { const fin = S.pickVia; exitSearch(); if (fin && !S.nav) chooseDestination(fin); };
 function langSeg() {
-  return '<div class="seg langseg" id="langSeg" data-notr>' + Object.entries(I18N.langs).map(([k, v]) => '<button data-l="' + k + '" class="' + (k === I18N.lang ? 'on' : '') + '">' + v + '</button>').join('') + '</div>';
+  return '<label class="field langsel" for="langSel"><span>' + esc(I18N.t('Langue')) + '</span><select id="langSel" data-notr>' + Object.entries(I18N.langs).map(([k, v]) => '<option value="' + k + '"' + (k === I18N.lang ? ' selected' : '') + '>' + v + '</option>').join('') + '</select></label>';
 }
 function bindLangSeg(root) {
-  root.querySelectorAll('#langSeg button').forEach((b) => { b.onclick = () => { if (b.dataset.l !== I18N.lang) I18N.setLang(b.dataset.l); }; });
+  const sel = root.querySelector('#langSel');
+  if (sel) sel.onchange = () => { if (sel.value !== I18N.lang) I18N.setLang(sel.value); };
 }
 /* Crédits des cartes et des données (retirés de la carte pour la garder propre) */
 function openCredits() {
