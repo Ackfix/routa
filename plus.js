@@ -152,7 +152,7 @@
   const HZ = { level_crossing: 'Passage à niveau', falling_rocks: 'Chutes de pierres', landslide: 'Chutes de pierres', dangerous_curve: 'Virage dangereux', curve: 'Virage dangereux', curves: 'Virages dangereux', slippery: 'Chaussée glissante', ice: 'Risque de verglas signalé', school_zone: 'Zone d\'école', children: 'Enfants', fog: 'Brouillard fréquent', side_winds: 'Vent latéral' };
   async function hazardsOnRoute(R) {
     if (!A.overpass || !R || R.total < 2000) return [];
-    const pts = sample(R, 400, 150000);
+    const pts = sample(R, 120, 150000);
     if (pts.length < 2) return [];
     const line = pts.map((p) => p.lat.toFixed(5) + ',' + p.lon.toFixed(5)).join(',');
     const q = '[out:json][timeout:25];(node["railway"="level_crossing"](around:25,' + line + ');node["hazard"~"^(falling_rocks|landslide|dangerous_curve|curve|curves|slippery|ice|school_zone|children|fog|side_winds)$"](around:40,' + line + '););out 300;';
