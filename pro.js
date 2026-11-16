@@ -371,6 +371,8 @@
       const name = 'routa-story-' + new Date().toISOString().slice(0, 10) + '.png';
       const C = window.Capacitor, native = !!(C && C.isNativePlatform && C.isNativePlatform());
       if (native) {
+        // 1) enregistrement direct dans Photos / la galerie (nouvelle version de l'app)
+        try { if (C.Plugins && C.Plugins.RoutaMap) { await C.Plugins.RoutaMap.saveImage({ data: url.split(',')[1], name }); toast(T('Image enregistrée dans tes photos.')); return; } } catch (e) { /* ancienne version : on continue */ }
         const file = new File([b], name, { type: 'image/png' });
         try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
         const P = C.Plugins || {};

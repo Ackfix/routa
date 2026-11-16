@@ -381,8 +381,18 @@ function say(text, force) {
   try {
     const u = new SpeechSynthesisUtterance(I18N.t(text));
     u.lang = I18N.speech; if (frVoice) u.voice = frVoice; u.rate = 1.02;
+    // dans l'app : la musique est baissée le temps de l'annonce, puis revient (jamais coupée)
+    u.onstart = () => nativeDuck(true);
+    u.onend = u.onerror = () => setTimeout(() => { if (!speechSynthesis.speaking && !speechSynthesis.pending) nativeDuck(false); }, 250);
     speechSynthesis.speak(u);
   } catch (e) { /* voix indisponible */ }
+}
+const RMP = () => { const C = window.Capacitor; return C && C.isNativePlatform && C.isNativePlatform() && C.Plugins && C.Plugins.RoutaMap; };
+let duckOn = false;
+function nativeDuck(on) {
+  const R = RMP(); if (!R || duckOn === on) return;
+  duckOn = on;
+  try { R.duck({ on }).catch(() => { /* ancienne version de l'app */ }); } catch (e) { /* */ }
 }
 let voiceUnlocked = false;
 document.addEventListener('click', () => {
@@ -1567,6 +1577,7 @@ function arrive() {
 const KA = () => { const C = window.Capacitor; return C && C.Plugins && C.Plugins.KeepAwake; };
 async function requestWake() {
   try { if (S.nav && KA()) await KA().keepAwake(); } catch (e) { /* */ }
+  try { if (S.nav && RMP()) RMP().keepAwake().catch(() => { /* ancienne version de l'app */ }); } catch (e) { /* */ }
   try {
     if (!('wakeLock' in navigator) || !S.nav || document.visibilityState !== 'visible') return;
     if (S.wakeLock && !S.wakeLock.released) return;
@@ -1575,7 +1586,7 @@ async function requestWake() {
     w.addEventListener('release', () => { if (S.wakeLock === w) S.wakeLock = null; setTimeout(() => { if (S.nav && document.visibilityState === 'visible') requestWake(); }, 1500); });
   } catch (e) { /* refusé (économie d'énergie…) */ }
 }
-function releaseWake() { const w = S.wakeLock; S.wakeLock = null; try { w && w.release(); } catch (e) { /* */ } try { if (KA()) KA().allowSleep(); } catch (e) { /* */ } }
+function releaseWake() { const w = S.wakeLock; S.wakeLock = null; try { w && w.release(); } catch (e) { /* */ } try { if (KA()) KA().allowSleep(); } catch (e) { /* */ } try { if (RMP()) RMP().allowSleep().catch(() => { /* */ }); } catch (e) { /* */ } }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.nav) requestWake(); });
 
 /* ======================= Essence / recharge / parking ======================= */

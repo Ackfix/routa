@@ -9,6 +9,16 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.PointF;
 import android.graphics.RectF;
+import android.content.ContentValues;
+import android.content.Context;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
+import android.net.Uri;
+import android.os.Build;
+import android.provider.MediaStore;
+import android.view.WindowManager;
+import java.io.OutputStream;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -169,6 +179,62 @@ public class RoutaMapPlugin extends Plugin {
             try { getBridge().getWebView().setBackgroundColor(Color.rgb(14, 17, 22)); } catch (Throwable e) { /* */ }
             call.resolve();
         });
+    }
+
+    // ---------- Écran allumé pendant la navigation (Android le relâche quand ROUTA passe en arrière-plan) ----------
+
+    @PluginMethod
+    public void keepAwake(final PluginCall call) {
+        ui(() -> { try { getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); } catch (Throwable e) { /* */ } call.resolve(); });
+    }
+
+    @PluginMethod
+    public void allowSleep(final PluginCall call) {
+        ui(() -> { try { getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); } catch (Throwable e) { /* */ } call.resolve(); });
+    }
+
+    // ---------- Musique baissée (jamais coupée) pendant une annonce vocale ----------
+
+    private AudioFocusRequest focusReq;
+
+    @PluginMethod
+    public void duck(final PluginCall call) {
+        boolean on = Boolean.TRUE.equals(call.getBoolean("on", false));
+        try {
+            AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+            if (Build.VERSION.SDK_INT >= 26) {
+                if (on) {
+                    if (focusReq == null) focusReq = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                        .setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                        .build();
+                    am.requestAudioFocus(focusReq);
+                } else if (focusReq != null) am.abandonAudioFocusRequest(focusReq);
+            } else {
+                if (on) am.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                else am.abandonAudioFocus(null);
+            }
+            call.resolve();
+        } catch (Throwable e) { call.reject("audio"); }
+    }
+
+    // ---------- Enregistrer l'image de la story dans la galerie (Images/ROUTA) ----------
+
+    @PluginMethod
+    public void saveImage(final PluginCall call) {
+        String b64 = call.getString("data", "");
+        String name = call.getString("name", "routa-story.png");
+        if (b64 == null || b64.isEmpty()) { call.reject("image"); return; }
+        try {
+            byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+            ContentValues v = new ContentValues();
+            v.put(MediaStore.Images.Media.DISPLAY_NAME, name);
+            v.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+            if (Build.VERSION.SDK_INT >= 29) v.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ROUTA");
+            Uri uri = getContext().getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+            if (uri == null) { call.reject("galerie"); return; }
+            try (OutputStream os = getContext().getContentResolver().openOutputStream(uri)) { os.write(bytes); }
+            call.resolve();
+        } catch (Throwable e) { call.reject("galerie"); }
     }
 
     @PluginMethod
