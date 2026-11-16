@@ -874,7 +874,7 @@ function setGeoState(st) {
   if (!c) { c = el('<button id="geoChip" class="geochip" hidden></button>'); c.onclick = openGeoHelp; document.body.appendChild(c); }
   const T = { denied: ['Position désactivée pour ROUTA', 'Touche ici pour l\'activer'], off: ['Position du téléphone coupée', 'Touche ici pour l\'activer'], weak: ['Signal GPS faible', 'Recherche de ta position…'], approx: ['Position approximative', 'Active la position exacte'] }[st];
   if (!T) { c.hidden = true; return; }
-  c.innerHTML = ic('info') + '<span><b>' + esc(I18N.t(T[0])) + '</b><br>' + esc(I18N.t(T[1])) + '</span>';
+  c.innerHTML = ic('info') + '<span><b>' + esc(I18N.t(T[0])) + '</b><small><br>' + esc(I18N.t(T[1])) + '</small></span>';
   c.hidden = false;
 }
 function openGeoHelp() {
