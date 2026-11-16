@@ -651,9 +651,22 @@ function smoothHeading(old, nw) {
   return (old + d * 0.55 + 360) % 360;
 }
 /* En navigation : position et direction calées sur la route (comme Waze ou Google Maps) */
-function myView() {
+/* Anticipation : le GPS arrive avec ~1 s de retard et la caméra glisse pendant ~1 s.
+   On place donc le curseur là où la voiture EST (et sera à la fin du glissement), le long de la route. */
+function myView(ahead) {
   const N = S.nav;
-  if (N && N.snap && Date.now() - N.snap.t < 4000) return { lat: N.snap.lat, lon: N.snap.lon, heading: N.snap.heading };
+  const spd = S.speed || 0;
+  const age = S.fixAt ? Math.max(0, Math.min(2.5, (Date.now() - S.fixAt) / 1000)) + 0.35 : 0;
+  const go = spd > 2 ? spd * Math.min(3.5, age + (ahead || 0)) : 0;
+  if (N && N.snap && Date.now() - N.snap.t < 4000) {
+    if (!go || N.along == null || !N.R) return { lat: N.snap.lat, lon: N.snap.lon, heading: N.snap.heading };
+    const P0 = pointAt(N.R, N.along + go), P1 = pointAt(N.R, N.along + go + 40);
+    return { lat: P0.lat, lon: P0.lon, heading: dist(P0, P1) > 5 ? bearing(P0, P1) : N.snap.heading };
+  }
+  if (go && S.heading != null && S.moving) {
+    const m = Math.min(go, 70), h = toRad(S.heading);
+    return { lat: S.pos.lat + (m * Math.cos(h)) / 111320, lon: S.pos.lon + (m * Math.sin(h)) / (111320 * Math.cos(toRad(S.pos.lat))), heading: S.heading };
+  }
   return { lat: S.pos.lat, lon: S.pos.lon, heading: S.heading };
 }
 /* Mon marqueur */
@@ -1082,7 +1095,8 @@ function followCam() {
   if (S.camZoom == null || Math.abs(zt - S.camZoom) > 0.3 || !moving) S.camZoom = moving ? Math.round(zt * 10) / 10 : Math.max(map.getZoom(), 16);
   const zoom = moving ? S.camZoom : (S.lastCam && !S.lastCam.moving ? map.getZoom() : 16.5);
   const north = S.settings.navNorth;
-  const v = myView();
+  const DUR = 1100;
+  const v = myView(moving ? DUR / 1000 : 0); // la caméra arrive sur la vraie position à la fin du glissement
   const live = S.moving || (S.nav && S.nav.snap);
   let bearing = north ? 0 : (live && v.heading != null ? v.heading : map.getBearing());
   const turn = Math.abs(((bearing - map.getBearing()) % 360 + 540) % 360 - 180);
@@ -1097,10 +1111,10 @@ function followCam() {
   if (S.puckAt == null) S.puckAt = 0;
   if (lc && lc.moving !== moving) S.puckAt = nowT + 1000;
   S.lastCam = { moving };
-  map.easeTo({ center: [v.lon, v.lat], bearing, pitch: 0, zoom, duration: turn > 40 ? 600 : 1000, easing: (t) => t, offset: off, essential: true });
+  map.easeTo({ center: [v.lon, v.lat], bearing, pitch: 0, zoom, duration: DUR, easing: (t) => t, offset: off, essential: true });
   renderMe();
 }
-setInterval(() => { if (S.follow && S.pos && !document.hidden) followCam(); }, 1500);
+setInterval(() => { if (S.follow && S.pos && !document.hidden) followCam(); }, 1000);
 
 /* Envoi de ma position */
 let lastPush = 0, lastPushPos = null;

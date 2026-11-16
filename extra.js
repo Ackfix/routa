@@ -861,26 +861,6 @@ X.poiExtra = async (p, kind, body) => {
   } catch (e) { box.querySelector('.sub').textContent = 'Pas de données en direct pour cette borne.'; }
 };
 
-/* ======================= Parkings libres en direct (ParkenDD) ======================= */
-let pkCities = null;
-async function openFreeParking() {
-  const c = here();
-  const body = openSheet('Parkings libres', '<p class="muted">Recherche des parkings en direct…</p>', 'parkfree');
-  try {
-    if (!pkCities) pkCities = (await getJson('https://api.parkendd.de/', 9000)).cities || {};
-    const near = Object.entries(pkCities).filter(([, v]) => v.active_support && v.coords).map(([k, v]) => ({ k, name: v.name, d: dist(c, { lat: v.coords.lat, lon: v.coords.lng }) })).sort((a, b) => a.d - b.d);
-    const city = near[0];
-    if (!city || city.d > 40000) { body.innerHTML = '<div class="empty">Pas de parkings en direct près d\'ici. Villes couvertes en Suisse : Zurich, Bâle et quelques autres. Utilise « Parking » dans les raccourcis pour voir tous les parkings.</div>'; return; }
-    const j = await getJson('https://api.parkendd.de/' + encodeURIComponent(city.k), 9000);
-    if (S.sheetView !== 'parkfree') return;
-    const lots = (j.lots || []).filter((l) => l.coords).map((l) => Object.assign(l, { d: dist(c, { lat: l.coords.lat, lon: l.coords.lng }) })).sort((a, b) => a.d - b.d).slice(0, 25);
-    body.innerHTML = '<p class="muted small">' + esc(city.name) + ' · mis à jour ' + (j.last_updated ? fmtClock(new Date(j.last_updated + 'Z')) : '') + '</p>' +
-      lots.map((l, i) => { const open = l.state === 'open'; const ratio = l.total ? l.free / l.total : 0; const cls = !open ? '' : ratio > 0.15 ? 'ok' : 'warn'; return '<button class="card tap" data-i="' + i + '"><div class="ico" style="background:#4DA3FF">' + IC.park + '</div><div class="grow"><b>' + esc(l.name) + '</b><div class="sub">' + fmtDist(l.d) + (l.address ? ' · ' + esc(l.address) : '') + '</div></div><span class="pill ' + cls + '">' + (open ? l.free + ' libres' : 'Fermé') + '</span></button>'; }).join('') +
-      '<p class="muted small">Données : ParkenDD, d\'après les systèmes de guidage des villes.</p>';
-    body.querySelectorAll('[data-i]').forEach((b) => { b.onclick = () => { const l = lots[+b.dataset.i]; closeSheet(); chooseDestination({ name: l.name, sub: 'Parking', lat: l.coords.lat, lon: l.coords.lng }); }; });
-  } catch (e) { body.innerHTML = '<div class="empty">Service de parkings indisponible pour le moment.</div>'; }
-}
-
 /* ======================= Carnet de la voiture ======================= */
 let carnet = store.get('routa.carnet', { dates: {}, fills: [] });
 const saveCarnet = () => store.set('routa.carnet', carnet);
@@ -961,12 +941,10 @@ function openParked() {
     (parked ? '<div class="card"><div class="ico" style="background:#FFC24D">' + IC.car + '</div><div class="grow"><b>Garée ' + ago(new Date(parked.at).toISOString()) + '</b><div class="sub">' + (S.pos ? 'à ' + fmtDist(dist(S.pos, parked)) : '') + (left != null ? ' · ' + (left > 0 ? 'parking payé encore ' + left + ' min' : 'temps de parking dépassé') : '') + '</div></div></div>' +
       '<div class="row"><button class="btn grow" id="pkGo">' + ic('nav') + 'Y retourner</button><button class="btn soft grow" id="pkShow">Voir</button></div>' : '<p>Aucune position enregistrée. Elle s\'enregistre toute seule à la fin d\'une navigation, ou avec le bouton ci-dessous.</p>') +
     '<button class="btn soft block" id="pkHere">' + IC.car + 'Ma voiture est garée ici</button>' +
-    '<button class="btn soft block" id="pkFree">' + IC.park + 'Parkings libres autour (en direct)</button>' +
     '<h3>Rappel de fin de parking</h3><div class="row wrap" id="pkTimer">' + [30, 60, 90, 120, 180].map((m) => '<button class="pill tap" data-m="' + m + '">' + (m < 60 ? m + ' min' : (m / 60) + ' h') + '</button>').join('') + '</div>' +
     (parked ? '<button class="btn danger" id="pkClear">Effacer</button>' : ''), 'parked');
   const g = body.querySelector('#pkGo'); if (g) g.onclick = () => { closeSheet(); chooseDestination({ name: 'Ma voiture', sub: 'Voiture garée', lat: parked.lat, lon: parked.lon }); };
   const sh = body.querySelector('#pkShow'); if (sh) sh.onclick = () => { closeSheet(); map.flyTo({ center: [parked.lon, parked.lat], zoom: 17 }); };
-  body.querySelector('#pkFree').onclick = openFreeParking;
   body.querySelector('#pkHere').onclick = () => { if (!S.pos) { toast('Recherche de ta position…'); return; } saveParked(S.pos); toast('Position de ta voiture enregistrée.'); openParked(); };
   body.querySelectorAll('[data-m]').forEach((b) => { b.onclick = () => { if (!parked) { if (!S.pos) return; saveParked(S.pos); } parked.until = Date.now() + (+b.dataset.m) * 60000; parked.warned = false; store.set('routa.parked', parked); toast('Rappel 10 min avant la fin du parking.'); try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) { /* */ } openParked(); }; });
   const cl = body.querySelector('#pkClear'); if (cl) cl.onclick = () => { parked = null; store.set('routa.parked', null); drawParked(); closeSheet(); };
@@ -1055,13 +1033,12 @@ X.tiles = () => [
   ['ranking', IC.trophy, 'Classement · ' + (S.me.points || 0) + ' pts'],
   ['shareme', IC.share, (X.share && X.share.until > Date.now()) ? 'Position partagée' : 'Partager ma position'],
   ['chargers', IC.plug, 'Bornes libres'],
-  ['parkfree', IC.park, 'Parkings libres'],
   ['cols', IC.mount, 'Cols et météo'],
   ['parked', IC.car, 'Ma voiture garée']
 ];
 X.icons = IC;
 X.open = (k) => {
-  const f = { install: openInstall, convoy: openConvoy, events: openEvents, ranking: () => openRanking('all'), shareme: openShareSheet, chargers: openChargers, parkfree: openFreeParking, cols: openCols, carnet: openCarnet, parked: openParked, trips: openTrips, offline: openOffline, pro: openPro }[k];
+  const f = { install: openInstall, convoy: openConvoy, events: openEvents, ranking: () => openRanking('all'), shareme: openShareSheet, chargers: openChargers, cols: openCols, carnet: openCarnet, parked: openParked, trips: openTrips, offline: openOffline, pro: openPro }[k];
   if (f) { f(); return true; }
   return false;
 };
