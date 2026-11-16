@@ -42,16 +42,17 @@ a:focus-visible, summary:focus-visible { outline: 3px solid var(--info); outline
 .key { white-space: normal !important; }
 .langbar button.on { background: var(--accent); color: #0E1116; }
 </style><style>
-.login{min-height:100vh;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:24px 0}
-.logo{width:72px;height:72px;border-radius:20px;display:block;margin-bottom:6px}
+.login{min-height:calc(100vh - 80px);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:14px;padding:24px 0}.login>*{width:100%;max-width:420px}.login h1{margin:8px 0 0}.login .lead{text-align:center}
+.login>.logo{width:84px;height:84px;border-radius:22px;display:block;margin:0 auto 6px;object-fit:contain}.langbar{justify-content:center}html[data-os="ios"] .lbtn.a{order:-1}html[data-os="ios"] .lbtn.g{order:0}
 .lbtn{display:flex;align-items:center;justify-content:center;gap:12px;height:56px;border-radius:16px;border:0;font:600 17px Inter,sans-serif;cursor:pointer;width:100%}
 .lbtn.g{background:#fff;color:#1F1F1F}.lbtn.a{background:#000;color:#fff;border:1px solid #3A3F4A}
 .lbtn:focus-visible{outline:3px solid var(--info);outline-offset:2px}
-.msg{min-height:22px;color:var(--alert);font-size:15px;text-align:center}
-.small{font-size:13px;color:var(--muted);text-align:center;margin:0}
+.msg{min-height:22px;order:5;color:var(--alert);font-size:15px;text-align:center}
+.small{font-size:13px;color:var(--muted);text-align:center;margin:0}.login>.small{order:-2}.login>.small:last-child{order:9}.login>.lead{order:-3}.login>h1{order:-4}.login>.logo{order:-5}
 .small a{color:var(--info)}
 </style>
 <script>
+(function () { var ua = navigator.userAgent || '', pf = navigator.platform || ''; var ios = /iPhone|iPad|iPod/.test(ua) || (/Mac/.test(pf) && navigator.maxTouchPoints > 1); document.documentElement.setAttribute('data-os', ios ? 'ios' : (/Android/i.test(ua) ? 'android' : 'other')); })();
 (function () { var l = 'fr'; try { l = localStorage.getItem('routa.lang') || ''; } catch (e) {} if (!/^(fr|en|tr|de|it|pt|es|sq|sr)$/.test(l)) { var n = (navigator.language || 'fr').slice(0, 2).toLowerCase(); if (/^(hr|bs|sh|me)$/.test(n)) n = 'sr'; l = /^(en|tr|de|it|pt|es|sq|sr)$/.test(n) ? n : 'fr'; } document.documentElement.setAttribute('data-l', l); document.documentElement.lang = l; })();
 function setL(l) { try { localStorage.setItem('routa.lang', l); } catch (e) {} document.documentElement.setAttribute('data-l', l); document.documentElement.lang = l; document.querySelectorAll('.langbar button').forEach(function (b) { b.classList.toggle('on', b.dataset.l === l); }); }
 </script>
