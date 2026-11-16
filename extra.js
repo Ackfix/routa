@@ -549,9 +549,43 @@ X.preview = (R, dest, body) => {
   }
   box.appendChild(viaBox(dest, R));
   if (!/parking/i.test(dest.sub || '')) { const pb = el('<button class="btn soft block">' + ic('parking') + esc(TRX('Parkings près de la destination')) + '</button>'); pb.onclick = () => X.parkingsNear(dest); box.appendChild(pb); }
+  if (R.total > 30000 && (!R.mode || R.mode === 'car')) { const rb = el('<button class="btn soft block">' + ic(A.veh && A.veh().ev ? 'charge' : 'fuel') + esc(TRX('Autonomie sur ce trajet')) + ' <span class="prem">Premium</span></button>'); rb.onclick = () => X.rangeAssist(R, dest); box.appendChild(rb); }
   if ((R.duration || 0) > 7200 && (!R.mode || R.mode === 'car')) { const bb = el('<button class="btn soft block">' + ic('truckstop') + esc(TRX('Pauses conseillées sur le trajet')) + ' <span class="prem">Premium</span></button>'); bb.onclick = () => X.smartBreaks(R, dest); box.appendChild(bb); }
   go.parentNode.insertBefore(box, go.nextSibling);
   routeWeather(R, box);
+};
+/* #028 (Premium, étiquette seulement) : autonomie selon le niveau actuel et l'autonomie à plein indiqués par l'utilisateur (aucune consommation inventée) */
+X.rangeAssist = (R, dest) => {
+  const ev = !!(A.veh && A.veh().ev), vid = store.get('routa.vehicleId', 'v'), key = 'routa.range.' + vid;
+  const cfg = store.get(key, { full: '', level: '' });
+  const body = openSheet(TRX('Autonomie sur ce trajet'),
+    '<p class="muted small">' + esc(ev ? TRX('Indique la charge actuelle et l\'autonomie réelle de ton véhicule à 100 % (celle que tu constates, pas celle du catalogue).') : TRX('Indique le niveau actuel du réservoir et l\'autonomie réelle de ton véhicule avec le plein (celle que tu constates, pas celle du catalogue).')) + '</p>' +
+    '<label class="field" for="rgLevel"><span>' + esc(ev ? TRX('Charge actuelle (%)') : TRX('Niveau du réservoir (%)')) + '</span><input id="rgLevel" type="number" inputmode="numeric" min="1" max="100" value="' + esc(cfg.level) + '"></label>' +
+    '<label class="field" for="rgFull"><span>' + esc(ev ? TRX('Autonomie à 100 % (km)') : TRX('Autonomie avec le plein (km)')) + '</span><input id="rgFull" type="number" inputmode="numeric" min="20" max="3000" value="' + esc(cfg.full) + '"></label>' +
+    '<button class="btn block" id="rgCalc">' + esc(TRX('Calculer')) + '</button><div id="rgOut"></div>', 'range');
+  const out = body.querySelector('#rgOut');
+  const calc = async () => {
+    const level = +body.querySelector('#rgLevel').value, full = +body.querySelector('#rgFull').value;
+    if (!(level > 0 && level <= 100 && full >= 20)) { out.innerHTML = '<p class="muted">' + esc(TRX('Remplis les deux champs.')) + '</p>'; return; }
+    store.set(key, { full, level });
+    const avail = full * level / 100, need = R.total / 1000, reserve = full * (ev ? 0.15 : 0.1), left = avail - need;
+    if (left >= reserve) { out.innerHTML = '<div class="banner">' + ic('flag') + '<span>' + esc(TRX('Ça passe : il devrait te rester environ {k} km à l\'arrivée.', { k: Math.round(left) })) + '</span></div><p class="muted small">' + esc(TRX('Estimation simple : autoroute, froid, relief, charge et climatisation peuvent réduire l\'autonomie.')) + '</p>'; return; }
+    const stopKm = Math.max(5, avail - reserve);
+    const C = R.coords; let acc = 0, idx = C.length - 1;
+    for (let i = 1; i < C.length; i++) { acc += dist(C[i - 1], C[i]); if (acc / 1000 >= stopKm) { idx = i; break; } }
+    const pt = C[idx];
+    out.innerHTML = '<div class="banner warnb">' + ic('info') + '<span>' + esc(left < 0 ? TRX('Pas assez pour arriver : il manque environ {k} km.', { k: Math.round(-left) }) : TRX('Tu arriverais presque à vide.')) + ' ' + esc(TRX('Arrêt conseillé avant le km {k}.', { k: Math.round(stopKm) })) + '</span></div><p class="muted">' + esc(TRX('Recherche des stations…')) + '</p>';
+    let res = [];
+    try { const j = await getJson(tt('/search/2/nearbySearch/.json', { lat: pt.lat, lon: pt.lon, radius: 10000, categorySet: ev ? '7309' : '7311', limit: 20, language: LANG }), 9000); res = (j.results || []).map((r) => ({ name: (r.poi && r.poi.name) || (ev ? TRX('Borne') : TRX('Station')), lat: r.position.lat, lon: r.position.lon })); } catch (e) { res = []; }
+    if (S.sheetView !== 'range') return;
+    const back = C.slice(Math.max(0, idx - 600), idx + 1);
+    res = res.map((x) => Object.assign(x, { off: Math.min(...back.filter((_, k) => k % 3 === 0).map((c) => dist(x, c))) })).filter((x) => x.off < 2000).sort((a, b) => a.off - b.off).slice(0, 5);
+    out.querySelector('p.muted').outerHTML = res.length ? res.map((x, i) => '<button class="card tap" data-i="' + i + '"><span class="ico" style="background:' + (ev ? '#2E7D5B' : '#E8590C') + '">' + ic(ev ? 'charge' : 'fuel') + '</span><span class="grow"><b>' + esc(x.name) + '</b><span class="sub">' + esc(TRX('{d} du trajet', { d: fmtDist(x.off) })) + '</span></span><span class="val small">' + esc(TRX('Ajouter')) + '</span></button>').join('') : '<p class="muted small">' + esc(TRX('Aucune station trouvée près de ce point : cherche plus tôt sur le trajet.')) + '</p>';
+    out.querySelectorAll('[data-i]').forEach((b) => { b.onclick = () => { const x = res[+b.dataset.i]; X.addVia({ name: x.name, lat: x.lat, lon: x.lon }, dest); }; });
+    out.appendChild(el('<p class="muted small">' + esc(TRX('Estimation simple : autoroute, froid, relief, charge et climatisation peuvent réduire l\'autonomie.')) + '</p>'));
+  };
+  body.querySelector('#rgCalc').onclick = calc;
+  if (cfg.full && cfg.level) calc();
 };
 /* #041 (Premium, étiquette seulement) : pauses environ toutes les 2 h de conduite (conseil TCS), aires réelles OSM ajoutables comme étape */
 X.smartBreaks = async (R, dest) => {
