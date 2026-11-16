@@ -142,7 +142,7 @@
     const line = pts.map((p) => p.lat.toFixed(5) + ',' + p.lon.toFixed(5)).join(',');
     const q = '[out:json][timeout:25];(node["hazard"~"animal_crossing|deer|wild_animals|horse_crossing|cattle"](around:40,' + line + ');node["traffic_sign"~"(^|;)(FR:A15b|CH:1\\.27|DE:142-10|IT:146)"](around:40,' + line + '););out 200;';
     try {
-      const els = await A.overpass(q);
+      const els = await A.overpass(q, pts.every((p) => A.inCH && A.inCH(p)));
       const fine = sample(R, 60, 150000);
       return (els || []).map((e) => { const h = nearRoute(fine, { lat: e.lat, lon: e.lon }, 80); return h ? { lat: e.lat, lon: e.lon, along: h.along } : null; }).filter(Boolean).sort((a, b) => a.along - b.along);
     } catch (e) { return []; }
@@ -224,19 +224,22 @@
         box.appendChild(avoidBtn(T('Contourner cette zone'), dest, [{ id: 'zfe:' + z.n, s: bb, w: a, n: d, e: c }]));
       }
     });
-    const [works, [animals, hazards]] = await Promise.all([worksOnRoute(R), animalsOnRoute(R).then(async (an) => [an, (!R.mode || R.mode === 'car') ? await hazardsOnRoute(R) : []])]);
+    if (!R.mode || R.mode === 'car') hazardsOnRoute(R).then((hazards) => {
+      if (P.R !== R || !box.isConnected) return;
+      P.hazards = hazards;
+      if (!hazards.length) return;
+      const cnt = {}; hazards.forEach((h) => { const n = HZ[h.k]; cnt[n] = (cnt[n] || 0) + 1; });
+      box.appendChild(banner(IC.work, '<b>' + esc(T('Dangers connus sur le trajet')) + '</b><br>' + Object.keys(cnt).map((n) => '· ' + esc(T(n)) + ' × ' + cnt[n]).join('<br>') + '<br><span class="muted small">' + esc(T('Source : OpenStreetMap. Rappel visuel discret pendant la navigation.')) + '</span>'));
+    });
+    const [works, animals] = await Promise.all([worksOnRoute(R), animalsOnRoute(R)]);
     if (P.R !== R || !box.isConnected) return;
-    P.works = works; P.animals = animals; P.hazards = hazards;
+    P.works = works; P.animals = animals;
     if (works.length) {
       const closed = works.filter((w) => w.cat === 8).length;
       const lines = works.slice(0, 4).map((w) => '<br>· ' + esc(fmtDist(Math.round(w.along / 100) * 100)) + ' : ' + esc(w.cat === 8 ? T('route fermée') : T('travaux')) + (w.road ? ' ' + esc(w.road) : '') + (w.where ? ' (' + esc(w.where) + ')' : '') + (w.delay > 60 ? ' · +' + esc(fmtDur(w.delay)) : '')).join('');
       box.appendChild(banner(IC.work, '<b>' + esc(T(closed ? 'Travaux et fermetures sur le trajet' : 'Travaux sur le trajet')) + ' : ' + works.length + '</b>' + lines, closed > 0));
       // #057 : recalculer en évitant ces endroits (données TomTom en cours, pas de suppositions)
       if (X.avoidAdd) box.appendChild(avoidBtn(T(closed ? 'Éviter ces fermetures et travaux' : 'Éviter ces travaux'), dest, works.slice(0, 8).map(workRect)));
-    }
-    if (hazards.length) {
-      const cnt = {}; hazards.forEach((h) => { const n = HZ[h.k]; cnt[n] = (cnt[n] || 0) + 1; });
-      box.appendChild(banner(IC.work, '<b>' + esc(T('Dangers connus sur le trajet')) + '</b><br>' + Object.keys(cnt).map((n) => '· ' + esc(T(n)) + ' × ' + cnt[n]).join('<br>') + '<br><span class="muted small">' + esc(T('Source : OpenStreetMap. Rappel visuel discret pendant la navigation.')) + '</span>'));
     }
     if (animals.length) box.appendChild(banner(IC.deer, esc(T('{n} passages d\'animaux sauvages signalés sur le trajet. Prudence surtout la nuit.', { n: animals.length }))));
   }
