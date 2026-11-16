@@ -200,7 +200,8 @@ const S = {
 };
 const saveMe = () => store.set('routa.me', S.me);
 const saveSettings = () => store.set('routa.settings', S.settings);
-const applyUi = () => { try { document.documentElement.style.setProperty('--ui', String(+S.settings.uiSize || 1)); } catch (e) { /* */ } };
+// taille unique (normale) : plus de réglage, pour que tout reste aligné sur tous les écrans
+const applyUi = () => { try { document.documentElement.style.setProperty('--ui', '1'); } catch (e) { /* */ } };
 applyUi();
 /* #036 : interface de conduite simplifiée (moins de boutons pendant la navigation, l'essentiel reste) */
 const applyLite = () => document.body.classList.toggle('navlite', !!S.settings.navLite);
@@ -1145,7 +1146,7 @@ function openSheet(title, html, view) {
   $('sheetWrap').classList.toggle('nomodal', /^(point|preview|place|fav|spot|poi)/.test(S.sheetView || ''));
   // Mention « infos indicatives » sous toutes les listes de lieux et les suggestions (gardée même quand le contenu se recharge)
   const nt = $('sheetNote');
-  if (nt) { const on = !!S.sheetView && !/^(menu|settings|profile|onboarding|notice|messages|thread|friends|vehicle|licence|feedback|cursor|plansave|planstory|story|lang|install|ranking|badges|checklists|actdetail)/.test(S.sheetView); nt.hidden = !on; if (on) nt.textContent = I18N.t(DISCLAIM); }
+  if (nt) { const on = false && !!S.sheetView && !/^(menu|settings|profile|onboarding|notice|messages|thread|friends|vehicle|licence|feedback|cursor|plansave|planstory|story|lang|install|ranking|badges|checklists|actdetail)/.test(S.sheetView); nt.hidden = !on; if (on) nt.textContent = I18N.t(DISCLAIM); }
   return $('sheetBody');
 }
 function closeSheet() {
@@ -3233,7 +3234,6 @@ function openSettings() {
     sw('stSignals', 'Afficher les feux de circulation', S.settings.showSignals !== false, 'Emplacement seulement : ROUTA ne sait pas s\'ils sont rouges ou verts.') +
     sw('stGoogle', 'Bouton « Voir les avis Google » sur les lieux', S.settings.googleLinks) +
     '<button class="card tap curbtn" id="stCursor"><span class="cp">' + meHtml() + '</span><span class="grow"><b>' + esc(I18N.t('Curseur GPS')) + ' <span class="prem">Premium</span></b><span class="sub">' + esc(I18N.t('Forme, couleur, taille et halo')) + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
-    '<label class="field" for="stUi">Taille des boutons et de l\'affichage<select id="stUi">' + [['0.85', 'Petite'], ['1', 'Normale'], ['1.15', 'Grande'], ['1.3', 'Très grande']].map(([v, l]) => '<option value="' + v + '"' + (String(+S.settings.uiSize || 1) === String(+v) ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
     '<button class="btn soft block" id="stMapView">' + ic('layers') + 'Plan, satellite, trafic et transports</button>' +
     '<h3>Véhicule</h3>' +
     '<button class="btn soft block" id="stVeh">' + ic(veh().icon) + esc(I18N.t('Ton véhicule')) + ' : ' + esc(vehSummary()) + '</button>' +
@@ -3261,7 +3261,6 @@ function openSettings() {
   ch('stPlaces', (v) => { S.settings.showPlaces = v; applyPlaces(); });
   ch('stSignals', (v) => { S.settings.showSignals = v; if (window.ROUTA_X && ROUTA_X.signalsToggle) ROUTA_X.signalsToggle(v); });
   ch('stGoogle', (v) => { S.settings.googleLinks = v; });
-  ch('stUi', (v) => { S.settings.uiSize = +v; applyUi(); });
   ch('stReminders', (v) => { S.settings.reminders = v; });
   ch('stReadMsgs', (v) => { S.settings.readMsgs = v; });
   body.querySelectorAll('#stNight button').forEach((b) => { b.onclick = () => { S.settings.night = b.dataset.v; saveSettings(); applyNight(); body.querySelectorAll('#stNight button').forEach((x) => x.classList.toggle('on', x === b)); }; });

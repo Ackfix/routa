@@ -569,7 +569,9 @@ body.navigating.searching #navBanner, body.navigating.searching .lanebar { displ
 .navbar-info { flex: 1 1 auto; }
 .navbar-act { flex-shrink: 0; }
 .navbar.wrapb { flex-wrap: wrap; row-gap: 10px; }
-.navbar.wrapb .navbar-act { width: 100%; justify-content: flex-end; }
+.navbar.wrapb .navbar-act { width: 100%; justify-content: space-between; gap: 10px; }
+.navbar.wrapb .navbar-act > * { flex: 1 1 0; width: auto !important; min-width: 0; border-radius: 14px; }
+.navbar .etadest { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .closedbox { display: flex; flex-direction: column; gap: 10px; }
 .modeseg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
 .modeseg button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 58px; padding: 6px 2px; border-radius: 14px; border: 2px solid transparent; background: var(--surface-2); color: var(--fg); font: inherit; font-size: 11px; font-weight: 600; line-height: 1.15; text-align: center; overflow-wrap: normal; word-break: normal; hyphens: auto; min-width: 0; }
@@ -723,7 +725,9 @@ body.dashon .fab-menu, body.dashon .fab-search { z-index: 41; }
 .navmain .lanebar { flex: 1 0 100%; margin: 0; padding: 6px 0 0; border-radius: 0; background: transparent; box-shadow: none; border-top: 1px solid rgba(255,255,255,.08); }
 .navmain .lanebar .lane { width: 30px; height: 32px; border-radius: 8px; }
 .navmain .lanebar .lane svg { width: 22px; height: 22px; }
-.navmain .lanebar .lane.on { background: rgba(255,138,61,.25); }
+.navmain .lanebar .lane.on { background: var(--accent); }
+.navmain .lanebar .lane.on svg { stroke: #fff; }
+.navmain .lanebar .lane:not(.on) svg { stroke: rgba(255,255,255,.25); }
 #navBanner:has(#laneBar:not([hidden])) ~ .hazchip { top: auto; }
 /* messages : un seul à la fois, centrés, même forme partout, sous le bandeau */
 @media (orientation: portrait) { .toasts { left: 50% !important; right: auto !important; transform: translateX(-50%) !important; width: min(calc(100vw - 20px), 560px) !important; } }

@@ -556,7 +556,6 @@ X.preview = (R, dest, body) => {
   if ((R.duration || 0) > 7200 && (!R.mode || R.mode === 'car')) { const bb = el('<button class="btn soft block">' + ic('truckstop') + esc(TRX('Pauses conseillées sur le trajet')) + ' <span class="prem">Premium</span></button>'); bb.onclick = () => X.smartBreaks(R, dest); box.appendChild(bb); }
   if (X.borderCheck && (!R.mode || R.mode === 'car')) X.borderCheck(R, dest, box);
   go.parentNode.insertBefore(box, go.nextSibling);
-  routeWeather(R, box);
 };
 /* #028 (Premium, étiquette seulement) : autonomie selon le niveau actuel et l'autonomie à plein indiqués par l'utilisateur (aucune consommation inventée) */
 X.rangeAssist = (R, dest) => {
@@ -749,17 +748,40 @@ X.poiVia = (p, body) => {
 };
 
 /* ======================= Voies à suivre (comme Google Maps / Waze) ======================= */
-const LANE_ROT = { STRAIGHT: 0, SLIGHT_RIGHT: 45, RIGHT: 90, SHARP_RIGHT: 135, SLIGHT_LEFT: -45, LEFT: -90, SHARP_LEFT: -135, U_TURN: 180 };
-const laneSvg = (dir) => { const r = LANE_ROT[dir] == null ? 0 : LANE_ROT[dir]; return '<svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(' + r + ' 12 14)"><path d="M12 21V7"/><path d="M7 11l5-5 5 5"/></g></svg>'; };
+const LANE_P = {
+  STRAIGHT: '<path d="M12 21V5"/><path d="M7 10l5-5 5 5"/>',
+  SLIGHT: '<path d="M10 21v-6l6-8"/><path d="M11 6.5l5.2.3.3 5.2"/>',
+  TURN: '<path d="M8 21v-8a4 4 0 0 1 4-4h7"/><path d="M15 5l4 4-4 4"/>',
+  SHARP: '<path d="M9 3v8l8 8"/><path d="M11 19.5h6.5V13"/>',
+  U: '<path d="M16 21V10a4 4 0 0 0-8 0v5"/><path d="M4 11l4 4 4-4"/>'
+};
+const laneSvg = (dir) => {
+  const d = dir || 'STRAIGHT', left = /LEFT/.test(d);
+  const k = d === 'STRAIGHT' ? 'STRAIGHT' : /SLIGHT/.test(d) ? 'SLIGHT' : /SHARP/.test(d) ? 'SHARP' : /U_TURN/.test(d) ? 'U' : /LEFT|RIGHT/.test(d) ? 'TURN' : 'STRAIGHT';
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><g' + (left ? ' transform="translate(24 0) scale(-1 1)"' : '') + '>' + LANE_P[k] + '</g></svg>';
+};
+// côté de la manœuvre annoncée dans le bandeau
+const sideOf = (m) => { const x = (m && m.modifier) || ''; return /left/.test(x) ? 'L' : /right/.test(x) ? 'R' : 'S'; };
+const sideDir = (d) => (/LEFT/.test(d || '') ? 'L' : /RIGHT/.test(d || '') ? 'R' : 'S');
 let laneEl = null, laneKey = '';
 setInterval(() => {
   const N = S.nav, box = $('navBanner');
   if (!laneEl && box) { laneEl = el('<div class="lanebar" id="laneBar" hidden aria-label="' + TRX('Voies à suivre') + '"></div>'); (box.querySelector('.navmain') || box).appendChild(laneEl); }
   if (!laneEl) return;
-  if (!N || !N.R || !N.R.lanes) { laneEl.hidden = true; laneKey = ''; return; }
-  const along = N.along || 0;
-  const sec = N.R.lanes.find((s) => s.e > along && s.s - along < 900);
-  if (!sec) { laneEl.hidden = true; laneKey = ''; return; }
+  const hide = () => { laneEl.hidden = true; laneKey = ''; };
+  if (!N || !N.R || !N.R.lanes || !N.R.stepEnds) return hide();
+  const R = N.R, along = N.along || 0;
+  // seulement les voies de la PROCHAINE manœuvre affichée dans le bandeau, à moins de 700 m
+  let i = R.stepEnds.findIndex((e) => e > along + 3); if (i < 0) return hide();
+  const mpos = R.stepEnds[i], next = R.steps[i + 1];
+  if (!next || mpos - along > 700) return hide();
+  const sec = R.lanes.find((s) => s.s <= mpos + 30 && s.e >= mpos - 120 && s.e > along);
+  if (!sec) return hide();
+  // les voies conseillées doivent aller du même côté que la flèche du bandeau, sinon on n'affiche rien (pas d'info contradictoire)
+  const side = sideOf(next.maneuver);
+  const follow = sec.lanes.filter((l) => l.follow);
+  if (!follow.length || follow.length === sec.lanes.length) return hide();
+  if (follow.some((l) => sideDir(l.follow) !== side && !(side === 'S' && sideDir(l.follow) !== 'S' && /SLIGHT/.test(l.follow)))) return hide();
   const key = sec.s + '|' + sec.e;
   if (key !== laneKey) {
     laneKey = key;
