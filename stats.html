@@ -45,6 +45,36 @@ button{height:46px;border-radius:12px;border:0;background:var(--accent);color:#1
     document.getElementById('f').onsubmit = function (e) { e.preventDefault(); var k = document.getElementById('k').value.trim().toUpperCase(); setKey(k); load(); };
   }
   function card(v, l) { return '<div class="card"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + '</div></div>'; }
+  var NOMI = 'https://nominatim.openstreetmap.org';
+  function cget() { try { return JSON.parse(localStorage.getItem('routa.statsPlaces') || '{}'); } catch (e) { return {}; } }
+  function cset(c) { try { localStorage.setItem('routa.statsPlaces', JSON.stringify(c)); } catch (e) { /* */ } }
+  var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  async function where(z, cache) {
+    var key = z.lat + ',' + z.lon;
+    if (cache[key]) return cache[key];
+    try {
+      var r = await fetch(NOMI + '/reverse?format=jsonv2&zoom=10&accept-language=fr&lat=' + z.lat + '&lon=' + z.lon);
+      var j = await r.json(); var a = (j && j.address) || {};
+      var v = { pays: a.country || 'Inconnu', ville: a.city || a.town || a.village || a.municipality || a.county || a.state || 'Autre' };
+      cache[key] = v; cset(cache); await wait(1100); return v;
+    } catch (e) { return { pays: 'Inconnu', ville: 'Autre' }; }
+  }
+  function draw(zs, cache) {
+    var box = document.getElementById('zn'); if (!box) return;
+    var P = {};
+    zs.forEach(function (z) { var v = cache[z.lat + ',' + z.lon]; if (!v) return; var p = P[v.pays] || (P[v.pays] = { n: 0, v: {} }); p.n += z.n; p.v[v.ville] = (p.v[v.ville] || 0) + z.n; });
+    var names = Object.keys(P).sort(function (a, b) { return P[b].n - P[a].n; });
+    if (!names.length) { box.innerHTML = '<span class="muted">Pas encore de données.</span>'; return; }
+    box.innerHTML = names.map(function (n) {
+      var vs = Object.keys(P[n].v).sort(function (a, b) { return P[n].v[b] - P[n].v[a]; });
+      return '<div class="zone"><b>' + esc(n) + '</b><b>' + esc(P[n].n) + '</b></div>' + vs.map(function (c) { return '<div class="zone" style="padding-left:14px;font-size:13px"><span class="muted">' + esc(c) + '</span><span>' + esc(P[n].v[c]) + '</span></div>'; }).join('');
+    }).join('');
+  }
+  async function places(zs) {
+    var cache = cget(); draw(zs, cache);
+    for (var i = 0; i < zs.length; i++) { if (!cache[zs[i].lat + ',' + zs[i].lon]) { await where(zs[i], cache); draw(zs, cache); } }
+    draw(zs, cache);
+  }
   async function load() {
     var k = getKey(); if (!k) { ask(''); return; }
     out.innerHTML = '<p class="muted">Chargement…</p>';
@@ -58,11 +88,11 @@ button{height:46px;border-radius:12px;border:0;background:var(--accent);color:#1
         '<h2>Conducteurs</h2><div class="grid">' + card(d.profils, 'profils créés') + card(d.actifs_24h, 'actifs ces 24 h') + card(d.actifs_7j, 'actifs sur 7 jours') + card(d.actifs_30j, 'actifs sur 30 jours') + '</div>' +
         '<h2>Dernière activité par jour (14 jours)</h2><div class="card bars">' + (days.length ? days.map(function (x) { return '<div class="bar"><span>' + esc(x.j.slice(5).split('-').reverse().join('.')) + '</span><i style="width:' + Math.max(4, Math.round(x.n / max * 100)) + '%"></i><b>' + esc(x.n) + '</b></div>'; }).join('') : '<span class="muted">Pas encore de données.</span>') + '</div>' +
         '<p class="muted">Chaque conducteur compte le jour de sa dernière ouverture de l\'app.</p>' +
-        '<h2>Communauté</h2><div class="grid">' + card(d.spots, 'spots en tout') + card(d.spots_membres, 'spots ajoutés par les membres') + card(d.alertes_7j, 'alertes sur 7 jours') + card(d.convois, 'convois créés') + card(d.messages_7j, 'messages sur 7 jours') + card(d.retours, 'retours de testeurs') + '</div>' +
-        '<h2>Zones les plus actives (30 jours)</h2><div class="card">' + ((d.zones || []).length ? d.zones.map(function (z) { return '<div class="zone"><a target="_blank" rel="noopener" href="https://www.openstreetmap.org/#map=9/' + z.lat + '/' + z.lon + '">Autour de ' + esc(z.lat) + '° N, ' + esc(z.lon) + '° E</a><b>' + esc(z.n) + '</b></div>'; }).join('') : '<span class="muted">Pas encore de données.</span>') + '</div>' +
-        '<p class="muted">Zones d\'environ 100 km, pour voir dans quelles régions l\'app est utilisée.</p>' +
+        '<h2>Pays et villes les plus actifs (30 jours)</h2><div class="card" id="zn"><span class="muted">Chargement…</span></div>' +
+        '<p class="muted">Villes déduites de la zone d\'activité des conducteurs (environ 10 km), jamais de position exacte.</p>' +
         '<p><button id="rf">Actualiser</button></p>';
       document.getElementById('rf').onclick = load;
+      places(d.zones || []);
     } catch (e) { out.innerHTML = '<p class="err">Connexion impossible. Réessaie.</p>'; }
   }
   load();
