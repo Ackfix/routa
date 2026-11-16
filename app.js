@@ -422,9 +422,11 @@ const map = new maplibregl.Map({
   renderWorldCopies: false,
   refreshExpiredTiles: false,
   maxTileCacheSize: 120,
-  pitchWithRotate: true,
+  // carte toujours à plat (2D) : pas d'inclinaison au doigt
+  pitchWithRotate: false,
+  touchPitch: false,
   dragRotate: true,
-  maxPitch: 75
+  maxPitch: 0
 });
 map.touchZoomRotate.enableRotation();
 
@@ -1236,13 +1238,9 @@ async function chooseDestination(dest) {
       (veh().heavy ? (R.fallback ? '<div class="banner warnb">' + ic('info') + '<span><b>Calcul poids lourd indisponible pour le moment.</b> Trajet voiture affiché : attention aux restrictions de hauteur, de poids et d\'accès.</span></div>'
         : '<div class="banner">' + ic(veh().icon) + '<span>Trajet adapté : <b>' + esc(vehSummary()) + '</b>. Les limites connues de hauteur, poids et accès sont évitées. Respecte toujours la signalisation.</span></div>') : '') +
       '<button class="btn block" id="goNav">' + ic('nav') + 'Démarrer</button>' +
-      '<div class="row">' + (veh().type !== 'electrique' ? '<button class="btn soft grow" id="alongFuel">' + ic('fuel') + (veh().isHgv ? 'Carburant PL' : 'Essence') + ' sur le trajet</button>' : '') + (veh().heavy ? '<button class="btn soft grow" id="alongTruck">' + ic('truckstop') + 'Aires sur le trajet</button>' : veh().ev ? '<button class="btn soft grow" id="alongCharge">' + ic('charge') + 'Bornes sur le trajet</button>' : '') + '</div>' +
       '<button class="btn ghost" id="chgVeh">' + ic(veh().icon) + 'Véhicule : ' + esc(vehSummary()) + ' (changer)</button>' +
       '<p class="muted small">Durée calculée sans le trafic en direct.</p>', 'preview');
     body.querySelector('#goNav').onclick = () => { closeSheet(); startNav(R, dest); };
-    const ac = body.querySelector('#alongCharge'); if (ac) ac.onclick = () => alongRoute(R, 'charge');
-    const at = body.querySelector('#alongTruck'); if (at) at.onclick = () => alongRoute(R, 'truckstop');
-    const af = body.querySelector('#alongFuel'); if (af) af.onclick = () => alongRoute(R, 'fuel');
     body.querySelector('#chgVeh').onclick = () => openVehicle(() => chooseDestination(dest));
     routeCountries(R, dest);
     if (window.ROUTA_X && ROUTA_X.preview) ROUTA_X.preview(R, dest, body);
@@ -1449,6 +1447,17 @@ if (CAR) {
   });
 }
 $('btnStop').onclick = () => stopNav();
+/* Barre du bas : si les boutons ne tiennent pas (petit écran, grande taille de texte, langue longue), « Arrêter » devient une croix */
+function fitNavbar() {
+  const n = $('navBar'); if (!n || n.hidden) return;
+  n.classList.remove('tight', 'wrapb');
+  const over = () => n.scrollWidth > n.clientWidth + 1 || [...n.querySelectorAll('button')].some((b) => b.getBoundingClientRect().right > window.innerWidth - 2);
+  if (over()) n.classList.add('tight');
+  if (over()) n.classList.add('wrapb');
+}
+try { new ResizeObserver(fitNavbar).observe($('navBar')); } catch (e) { /* */ }
+window.addEventListener('resize', () => setTimeout(fitNavbar, 50));
+new MutationObserver(() => setTimeout(fitNavbar, 30)).observe($('navBar'), { attributes: true, attributeFilter: ['hidden'], childList: true, subtree: true, characterData: true });
 $('btnOverview').onclick = () => { if (S.nav) { stopFollow(); fitRoute(S.nav.R); } };
 $('btnMute').onclick = () => {
   S.settings.voice = !S.settings.voice; saveSettings();

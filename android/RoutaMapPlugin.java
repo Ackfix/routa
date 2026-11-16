@@ -124,6 +124,7 @@ public class RoutaMapPlugin extends Plugin {
                         m.getUiSettings().setLogoEnabled(false);
                         m.getUiSettings().setCompassEnabled(false);
                         m.getUiSettings().setAttributionEnabled(false);
+                        m.getUiSettings().setTiltGesturesEnabled(false); // carte toujours à plat (2D)
                         m.addOnCameraMoveStartedListener(reason -> {
                             gesture = reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE;
                             sendCamera("start");
@@ -384,6 +385,8 @@ public class RoutaMapPlugin extends Plugin {
             ViewGroup.LayoutParams lp = mapView.getLayoutParams();
             if (lp.width != web.getWidth() || lp.height != web.getHeight()) { lp.width = web.getWidth(); lp.height = web.getHeight(); mapView.setLayoutParams(lp); mapView.requestLayout(); }
             mapView.setX(web.getX()); mapView.setY(web.getY());
+            // redessiner après la nouvelle taille (sinon une partie peut rester grise)
+            mapView.post(() -> { if (map != null) map.triggerRepaint(); });
         });
     }
 

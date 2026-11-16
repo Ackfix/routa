@@ -521,7 +521,8 @@ X.preview = (R, dest, body) => {
     box.appendChild(el('<h3>Itinéraires</h3>')); box.appendChild(seg);
   }
   if (TT) {
-    const o = el('<div class="avoid"><label><input type="checkbox" data-o="tolls"' + (X.opts.tolls ? ' checked' : '') + '> Éviter péages</label><label><input type="checkbox" data-o="motorways"' + (X.opts.motorways ? ' checked' : '') + '> Éviter autoroutes</label><label><input type="checkbox" data-o="vignette"' + (X.opts.vignette ? ' checked' : '') + '> Sans vignette</label>' + (!(A.veh && A.veh().heavy) ? '<label><input type="checkbox" data-o="fun"' + (X.opts.fun ? ' checked' : '') + '> ' + TRX('Route plaisir (virages, sans autoroute)') + '</label>' : '') + '</div>');
+    const opt = (k, t) => '<label class="avoidchip"><input type="checkbox" data-o="' + k + '"' + (X.opts[k] ? ' checked' : '') + '><span>' + esc(TRX(t)) + '</span></label>';
+    const o = el('<div class="avoid">' + opt('tolls', 'Éviter péages') + opt('motorways', 'Éviter autoroutes') + opt('vignette', 'Sans vignette') + (!(A.veh && A.veh().heavy) ? opt('fun', 'Route plaisir (virages, sans autoroute)') : '') + '</div>');
     o.querySelectorAll('input').forEach((c) => { c.onchange = () => { X.opts[c.dataset.o] = c.checked; store.set('routa.ropts', X.opts); X.altIdx = 0; chooseDestination(dest); }; });
     box.appendChild(o);
   }
@@ -551,7 +552,7 @@ X.addVia = (p, fin) => {
   X.via = X.via.filter((v) => !v.done);
   if (X.via.length >= MAX_VIA) { toast(esc(TRX('{n} étapes au maximum.', { n: MAX_VIA }))); return; }
   if (dist(p, d) < 60 || X.via.some((v) => dist(v, p) < 40)) { toast(esc(TRX('Cette étape est déjà sur le trajet.'))); return; }
-  const v = { name: String(p.name || TRX('Étape')).slice(0, 60), lat: p.lat, lon: p.lon };
+  const v = { name: String(p.name || TRX('Point choisi')).slice(0, 60), lat: p.lat, lon: p.lon };
   const R = curRoute();
   let at = X.via.length;
   if (R && R.coords && R.coords.length > 1 && X.via.length) { const k = nearIdx(R, v); const j = X.via.findIndex((x) => nearIdx(R, x) > k); if (j >= 0) at = j; }
@@ -586,12 +587,16 @@ function aheadRoute() {
 }
 function viaActions(d) {
   const v = A.veh ? A.veh() : {};
-  const row = el('<div class="row viaact"><button class="btn soft grow" data-k="food">' + ic('food') + esc(TRX('Restos sur le trajet')) + '</button>' +
-    (v.type !== 'electrique' ? '<button class="btn soft grow" data-k="fuel">' + ic('fuel') + esc(TRX('Essence sur le trajet')) + '</button>' : '<button class="btn soft grow" data-k="charge">' + ic('charge') + esc(TRX('Bornes sur le trajet')) + '</button>') + '</div>');
+  // une seule rangée de recherches sur le trajet (restos, carburant ou bornes, aires PL) : pas de doublon avec l'aperçu
+  const bt = (k, icon, t) => '<button class="btn soft" data-k="' + k + '">' + ic(icon) + '<span>' + esc(TRX(t)) + '</span></button>';
+  const row = el('<div class="viaact">' + bt('food', 'food', 'Restos sur le trajet') +
+    (v.type !== 'electrique' ? bt('fuel', 'fuel', v.isHgv ? 'Carburant PL sur le trajet' : 'Essence sur le trajet') : '') +
+    (v.ev ? bt('charge', 'charge', 'Bornes sur le trajet') : '') +
+    (v.heavy ? bt('truckstop', 'truckstop', 'Aires sur le trajet') : '') + '</div>');
   row.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => { const R = S.nav ? aheadRoute() : curRoute(); if (!R) return; if (S.nav) closeSheet(); A.alongRoute(R, b.dataset.k); }; });
   const add = el('<button class="btn soft block">' + ic('plus') + esc(TRX('Ajouter une adresse')) + '</button>');
   add.onclick = () => { if (X.via.filter((x) => !x.done && X.viaFor === keyOf(d)).length >= MAX_VIA) { toast(esc(TRX('{n} étapes au maximum.', { n: MAX_VIA }))); return; } A.pickVia(d); };
-  const f = document.createDocumentFragment(); f.appendChild(row); f.appendChild(add);
+  const f = el('<div class="viaactwrap"></div>'); f.appendChild(row); f.appendChild(add);
   return f;
 }
 async function showDetour(R, d, line) {
@@ -599,7 +604,8 @@ async function showDetour(R, d, line) {
     if (!TT || !S.pos || !R.viaCount) return;
     const base = (await ttRoutes(S.pos, d, []))[0];
     const dt = R.duration - base.duration, dd = R.total - base.total;
-    line.textContent = dt < 60 && dd < 500 ? TRX('Détour négligeable') : TRX('Détour : +{t} · +{d}', { t: fmtDur(Math.max(60, dt)), d: fmtDist(Math.max(0, dd)) });
+    // distance affichée seulement si elle compte vraiment (au moins 500 m de plus) ; sinon seulement le temps
+    line.textContent = dt < 60 && dd < 500 ? TRX('Détour négligeable') : dd >= 500 ? TRX('Détour : +{t} · +{d}', { t: fmtDur(Math.max(60, dt)), d: fmtDist(dd) }) : TRX('Détour : +{t}', { t: fmtDur(Math.max(60, dt)) });
     line.hidden = false;
   } catch (e) { /* détour inconnu : on n'affiche rien plutôt qu'un chiffre faux */ }
 }

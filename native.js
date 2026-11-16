@@ -126,6 +126,8 @@
       N.syncing = true;
       try { NEV.target = map.getCanvas(); oj({ center: [k.lng, k.lat], zoom: k.zoom, bearing: k.bearing, pitch: k.pitch }, k.gesture ? { originalEvent: NEV } : undefined); } catch (e) { console.warn(e); }
       N.syncing = false;
+      // la carte native ne doit jamais rester inclinée : on la remet à plat
+      if (k.pitch > 0.5 && map.getMaxPitch() < 1 && k.phase !== 'move') send(150);
     });
     const fire = (type, k) => {
       const p = new ML.Point(k.x, k.y);
