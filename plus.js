@@ -187,6 +187,21 @@
     } catch (e) { /* carte pas prête */ }
   }
   X.hazardsOnRoute = hazardsOnRoute;
+
+  /* Dangers, faune et travaux : un petit emoji sur la carte, jamais de popup */
+  const HZE = { level_crossing: '🚂', falling_rocks: '🪨', landslide: '🪨', dangerous_curve: '↪️', curve: '↪️', curves: '〰️', slippery: '⚠️', ice: '🧊', school_zone: '🏫', children: '🚸', fog: '🌫️', side_winds: '💨' };
+  const MK = [];
+  function drawMarks() {
+    MK.splice(0).forEach((m) => { try { m.remove(); } catch (e) { /* */ } });
+    if ((!S.nav && !S.preview) || !window.maplibregl) return;
+    const add = (o, e, t) => { if (o.lat == null || MK.length >= 80) return; const d = document.createElement('div'); d.className = 'hzmk'; d.textContent = e; d.title = t; d.setAttribute('aria-label', t); MK.push(new window.maplibregl.Marker({ element: d }).setLngLat([o.lon, o.lat]).addTo(map)); };
+    (P.hazards || []).forEach((h) => add(h, HZE[h.k] || '⚠️', T(HZ[h.k] || 'Danger')));
+    (P.animals || []).forEach((x) => add(x, '🦌', T('Passage d\'animaux sauvages')));
+    (P.works || []).filter((w) => w.cat !== 8).forEach((w) => add(w, '🚧', T('Travaux')));
+  }
+  setInterval(() => { if (!S.nav && !S.preview && MK.length) drawMarks(); }, 3000);
+  const zk = () => document.body.classList.toggle('hzfar', map.getZoom() < 10.5);
+  try { map.on('zoomend', zk); } catch (e) { /* */ }
   /* ---------- aires de repos sur la suite du trajet (pour les pauses) ---------- */
   async function restAreas(R) {
     if (!A.overpass || !R || R.total < 20000) return [];
@@ -220,7 +235,7 @@
     const go = body.querySelector('#goNav'); if (!go || !R || !R.coords) return;
     let box = body.querySelector('.routex2');
     if (!box) { box = el('<div class="routex2" style="display:flex;flex-direction:column;gap:8px"></div>'); const ref = body.querySelector('.routex') || go; ref.parentNode.insertBefore(box, ref.nextSibling); }
-    P.R = R; P.works = []; P.animals = []; P.warned = {};
+    P.R = R; P.works = []; P.animals = []; P.hazards = []; P.warned = {}; drawMarks();
     const v = A.veh ? A.veh() : {};
     const av = X.avoidList ? X.avoidList(dest) : [];
     if (av.length) {
@@ -242,14 +257,11 @@
     });
     if (!R.mode || R.mode === 'car') hazardsOnRoute(R).then((hazards) => {
       if (P.R !== R || !box.isConnected) return;
-      P.hazards = hazards;
-      if (!hazards.length) return;
-      const cnt = {}; hazards.forEach((h) => { const n = HZ[h.k]; cnt[n] = (cnt[n] || 0) + 1; });
-      box.appendChild(banner(IC.work, '<b>' + esc(T('Dangers connus sur le trajet')) + '</b><br>' + Object.keys(cnt).map((n) => '· ' + esc(T(n)) + ' × ' + cnt[n]).join('<br>') + '<br><span class="muted small">' + esc(T('Source : OpenStreetMap. Rappel visuel discret pendant la navigation.')) + '</span>'));
+      P.hazards = hazards; drawMarks();
     });
     const [works, animals] = await Promise.all([worksOnRoute(R), animalsOnRoute(R)]);
     if (P.R !== R || !box.isConnected) return;
-    P.works = works; P.animals = animals;
+    P.works = works; P.animals = animals; drawMarks();
     if (works.length) {
       const closed = works.filter((w) => w.cat === 8).length;
       const lines = works.slice(0, 4).map((w) => '<br>· ' + esc(fmtDist(Math.round(w.along / 100) * 100)) + ' : ' + esc(w.cat === 8 ? T('route fermée') : T('travaux')) + (w.road ? ' ' + esc(w.road) : '') + (w.where ? ' (' + esc(w.where) + ')' : '') + (w.delay > 60 ? ' · +' + esc(fmtDur(w.delay)) : '')).join('');
@@ -257,7 +269,6 @@
       // #057 : recalculer en évitant ces endroits (données TomTom en cours, pas de suppositions)
       if (X.avoidAdd) box.appendChild(avoidBtn(T(closed ? 'Éviter ces fermetures et travaux' : 'Éviter ces travaux'), dest, works.slice(0, 8).map(workRect)));
     }
-    if (animals.length) box.appendChild(banner(IC.deer, esc(T('{n} passages d\'animaux sauvages signalés sur le trajet. Prudence surtout la nuit.', { n: animals.length }))));
   }
   const prevPreview = X.preview;
   X.preview = (R, dest, body) => {
@@ -314,49 +325,22 @@
     if (moving) { D.driveMs += dt; D.stopMs = 0; } else { D.stopMs += dt; if (D.stopMs > 12 * 60000) { D.driveMs = 0; D.nextPause = 2 * 3600000; } }
     const N = S.nav;
     if (!N) return;
-    ensureRest();
-    /* 6 · pause conseillée toutes les 2 h */
-    if (D.driveMs >= D.nextPause) {
-      D.nextPause += 2 * 3600000;
-      pauseToast(T('{h} de route : une pause de 15 minutes te ferait du bien.', { h: fmtDur(D.driveMs / 1000) }));
-    }
-    /* 19 · fatigue la nuit */
-    const h = new Date().getHours();
-    if ((h >= 23 || h < 5) && D.driveMs > 45 * 60000 && now - D.nightAt > 60 * 60000) {
-      D.nightAt = now;
-      pauseToast(T('Il est tard et tu roules depuis un moment. Au moindre bâillement, fais une pause.'));
-    }
     const a = alongNow();
-    /* #027 · danger connu : 400 m avant, visuel seulement */
-    if (moving && S.speed > 8) {
-      const hz = (P.R === N.R ? (P.hazards || []) : []).find((x) => x.along > a && x.along - a < 400 && !P.warned['h' + x.id]);
-      if (hz) { P.warned['h' + hz.id] = 1; toast(IC.work + ' ' + esc(T('{n} dans {d}', { n: T(HZ[hz.k]), d: fmtDist(Math.round((hz.along - a) / 50) * 50) })), { ms: 6000 }); }
-    }
-    /* 40 · faune : la nuit, 600 m avant */
-    if (moving && isDark()) {
-      const an = (P.R === N.R ? P.animals : []).find((x) => x.along > a && x.along - a < 600 && !P.warned['a' + x.along]);
-      if (an) { P.warned['a' + an.along] = 1; toast(IC.deer + ' ' + esc(T('Passage d\'animaux sauvages dans {d}. Ralentis et surveille les bas-côtés.', { d: fmtDist(Math.round((an.along - a) / 50) * 50) })), { ms: 8000 }); }
-    }
     /* #057 · travaux et fermetures sur la suite du trajet : mis à jour toutes les 4 min et après chaque recalcul */
     if (P.R !== N.R && now - (D.worksAt || 0) > 20000 || now - (D.worksAt || 0) > 240000) {
       D.worksAt = now; const R0 = N.R;
       worksOnRoute(R0).then((w) => {
         if (S.nav && S.nav.R === R0) {
-          if (P.R !== R0) { P.R = R0; P.animals = []; P.hazards = []; if (!N.mode || N.mode === 'car') hazardsOnRoute(R0).then((h) => { if (P.R === R0) P.hazards = h; }); }
+          if (P.R !== R0) { P.R = R0; P.animals = []; P.hazards = []; if (!N.mode || N.mode === 'car') hazardsOnRoute(R0).then((h) => { if (P.R === R0) { P.hazards = h; drawMarks(); } }); }
           P.works = w;
           const a2 = alongNow();
-          drawClosed(R0, w);
+          drawClosed(R0, w); drawMarks();
           // route fermée devant : on recalcule automatiquement en l'évitant, sans popup (elle reste en rouge sur la carte)
           const cl = w.find((x) => x.cat === 8 && x.along > a2 + 300 && x.along - a2 < 30000 && !P.warned['c' + x.id]);
           if (cl && X.avoidAdd) { P.warned['c' + cl.id] = 1; if (X.avoidAdd(S.nav.dest, workRect(cl)) === 'ok') X.recalc(S.nav.dest); }
         }
       }).catch(() => { /* trafic indisponible */ });
     }
-    /* 20 · travaux : 1,5 km avant */
-    const wk = (P.R === N.R ? P.works : []).find((x) => x.cat !== 8 && x.along > a && x.along - a < 800 && !P.warned['w' + x.id]);
-    if (wk) { P.warned['w' + wk.id] = 1; toast(IC.work + ' ' + esc(T(wk.cat === 8 ? 'Route fermée dans {d}' : 'Travaux dans {d}', { d: fmtDist(Math.round((wk.along - a) / 100) * 100) })) + (wk.where ? '<br><span class="muted small">' + esc(wk.where) + '</span>' : ''), { ms: 8000 }); }
-    /* 5 · verglas : toutes les 15 min en hiver */
-    if (now - D.iceAt > 15 * 60000) { D.iceAt = now; const m = new Date().getMonth(); if (m >= 9 || m <= 4) iceCheck(); }
   }, 5000);
 
   /* ---------- 25 · carnet de voyage ---------- */
@@ -373,7 +357,6 @@
         S.spots.forEach((s) => {
           if ((s.category === 'route' || s.category === 'vue') && !V.cols[s.id] && dist(S.pos, s) < 300) {
             V.cols[s.id] = { n: s.name, at: Date.now(), lat: s.lat, lon: s.lon }; ch = true;
-            toast(IC.globe + ' ' + esc(T('{n} ajouté à ton carnet de voyage.', { n: s.name })), { ms: 6000 });
           }
         });
       }
@@ -390,18 +373,57 @@
       '<div class="limgrid">' + [[cs.length, T('pays')], [cols.length, T('cols et routes')], [Math.round(V.km), 'km']].map(([n, l]) => '<div class="limcell"><div class="limv">' + n + '</div><div class="sub">' + esc(l) + '</div></div>').join('') + '</div>' +
       '<h3>' + esc(T('Pays traversés')) + '</h3>' +
       (cs.length ? '<div class="row wrap">' + cs.map(([cc]) => '<span class="pill">' + flag(cc) + ' ' + esc(T((C[cc] && C[cc].name) || cc)) + '</span>').join('') + '</div>' : '<p class="muted small">' + esc(T('Les pays où tu roules avec ROUTA s\'ajoutent ici tout seuls.')) + '</p>') +
+      '<h3>' + esc(T('Mes étapes')) + '</h3>' +
+      '<button class="btn block" id="vyAdd">' + esc('+ ' + T('Ajouter une étape')) + '</button>' +
+      (V.notes || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((n) => '<button class="card tap" data-note="' + esc(n.id) + '"><div class="ico" style="background:#FFB86B">' + IC.globe + '</div><div class="grow"><b>' + esc(n.place) + '</b><div class="sub">' + esc([n.date ? new Date(n.date + 'T12:00').toLocaleDateString(A.I18N && A.I18N.lang === 'sr' ? 'sr-Latn' : (A.I18N && A.I18N.lang) || 'fr', { day: 'numeric', month: 'long', year: 'numeric' }) : '', n.cc ? flag(n.cc) + ' ' + T((C[n.cc] && C[n.cc].name) || n.cc) : ''].filter(Boolean).join(' · ')) + '</div>' + (n.note ? '<div class="sub">' + esc(n.note) + '</div>' : '') + '</div></button>').join('') +
       '<h3>' + esc(T('Cols, routes et points de vue')) + '</h3>' +
       (cols.length ? cols.slice(0, 40).map(([id, c]) => '<button class="card tap" data-id="' + esc(id) + '"><div class="ico" style="background:#8EC5FF">' + IC.globe + '</div><div class="grow"><b>' + esc(c.n) + '</b><div class="sub">' + esc(new Date(c.at).toLocaleDateString(A.I18N && A.I18N.lang ? A.I18N.lang : 'fr')) + '</div></div></button>').join('') : '<p class="muted small">' + esc(T('Passe par un col ou une belle route de la liste « Spots » : elle s\'ajoute ici.')) + '</p>') +
       (cols.length ? '<button class="btn soft block" id="vyMap">' + esc(T('Voir sur la carte')) + '</button>' : '') +
       '<button class="btn ghost" id="vyReset">' + esc(T('Remettre le carnet à zéro')) + '</button>' +
       '<p class="muted small">' + esc(T('Ton carnet reste sur ce téléphone.')) + '</p>', 'voyage');
     body.querySelectorAll('[data-id]').forEach((b) => { b.onclick = () => { if (A.openSpot && S.spots && S.spots.get(b.dataset.id)) A.openSpot(b.dataset.id); }; });
+    body.querySelector('#vyAdd').onclick = () => openNote(null);
+    body.querySelectorAll('[data-note]').forEach((b) => { b.onclick = () => openNote(b.dataset.note); });
     const vm = body.querySelector('#vyMap');
     if (vm) vm.onclick = () => { try { const bb = new window.maplibregl.LngLatBounds(); cols.forEach(([, c]) => bb.extend([c.lon, c.lat])); closeSheet(); map.fitBounds(bb, { padding: 80, maxZoom: 12, duration: 800 }); } catch (e) { /* */ } };
     body.querySelector('#vyReset').onclick = (e) => {
       if (Date.now() - resetArm > 4000) { resetArm = Date.now(); e.target.textContent = T('Touche encore pour tout effacer'); return; }
-      V.c = {}; V.cols = {}; V.km = 0; V.since = Date.now(); vSave(); openVoyage();
+      V.c = {}; V.cols = {}; V.notes = []; V.km = 0; V.since = Date.now(); vSave(); openVoyage();
     };
+  }
+
+  /* Étapes ajoutées à la main : lieu, date, pays, note */
+  function openNote(id) {
+    const C = window.ROUTA_COUNTRIES || {};
+    V.notes = V.notes || [];
+    const n = V.notes.find((x) => x.id === id) || { id: 'n' + Date.now(), place: '', date: new Date().toISOString().slice(0, 10), cc: S.country || '', note: '' };
+    const ccs = Object.keys(C).sort((a, b) => T(C[a].name || a).localeCompare(T(C[b].name || b)));
+    const body = openSheet(T(id ? 'Modifier l\'étape' : 'Ajouter une étape'),
+      '<label class="field" for="vnPlace">' + esc(T('Lieu')) + '<input id="vnPlace" type="text" maxlength="80" value="' + esc(n.place) + '" placeholder="' + esc(T('Ville, col, lieu…')) + '"></label>' +
+      (S.pos ? '<button class="btn soft block" id="vnHere">' + esc(T('Utiliser ma position actuelle')) + '</button>' : '') +
+      '<label class="field" for="vnDate">' + esc(T('Date')) + '<input id="vnDate" type="date" value="' + esc(n.date || '') + '"></label>' +
+      '<label class="field" for="vnCc">' + esc(T('Pays')) + '<select id="vnCc"><option value="">—</option>' + ccs.map((c) => '<option value="' + c + '"' + (c === n.cc ? ' selected' : '') + '>' + flag(c) + ' ' + esc(T(C[c].name || c)) + '</option>').join('') + '</select></label>' +
+      '<label class="field" for="vnNote">' + esc(T('Note')) + '<textarea id="vnNote" rows="3" maxlength="400">' + esc(n.note || '') + '</textarea></label>' +
+      '<button class="btn block" id="vnSave">' + esc(T('Enregistrer')) + '</button>' +
+      (id ? '<button class="btn ghost block" id="vnDel">' + esc(T('Supprimer')) + '</button>' : '') +
+      '<button class="btn ghost block" id="vnBack">' + esc(T('Retour')) + '</button>', 'voyadd');
+    const here = body.querySelector('#vnHere');
+    if (here) here.onclick = async () => {
+      n.lat = S.pos.lat; n.lon = S.pos.lon;
+      try { const g = A.geoReverse ? await A.geoReverse(S.pos) : null; const nm = g && (g.city || g.street); if (nm) body.querySelector('#vnPlace').value = nm; if (g && g.cc) body.querySelector('#vnCc').value = g.cc; } catch (e) { /* */ }
+      if (S.country) body.querySelector('#vnCc').value = S.country;
+    };
+    body.querySelector('#vnSave').onclick = () => {
+      const place = body.querySelector('#vnPlace').value.trim();
+      if (!place) { body.querySelector('#vnPlace').focus(); return; }
+      n.place = place; n.date = body.querySelector('#vnDate').value; n.cc = body.querySelector('#vnCc').value; n.note = body.querySelector('#vnNote').value.trim();
+      if (!V.notes.includes(n)) V.notes.push(n);
+      if (n.cc && !V.c[n.cc]) V.c[n.cc] = n.date ? Date.parse(n.date + 'T12:00') || Date.now() : Date.now();
+      vSave(); openVoyage();
+    };
+    const del = body.querySelector('#vnDel');
+    if (del) del.onclick = () => { V.notes = V.notes.filter((x) => x.id !== n.id); vSave(); openVoyage(); };
+    body.querySelector('#vnBack').onclick = openVoyage;
   }
   const tiles0 = X.tiles;
   X.tiles = () => (tiles0 ? tiles0() : []).concat([['voyage', IC.globe, T('Carnet de voyage')]]);

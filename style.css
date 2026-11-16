@@ -755,3 +755,10 @@ body.navigating .geochip { width: max-content; max-width: calc(100vw - 32px); pa
 body.navigating .geochip br, body.navigating .geochip span > span, body.navigating .geochip small { display: none; }
 body.navigating .geochip svg { width: 16px; height: 16px; }
 .geochip small { font-size: inherit; }
+/* Dangers, faune, travaux : petit emoji sur la carte */
+.hzmk { font-size: 18px; line-height: 1; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: rgba(255,255,255,.92); box-shadow: 0 2px 6px rgba(0,0,0,.35); pointer-events: none; }
+body.hzfar .hzmk { display: none; }
+/* Blocs ajoutés après coup dans un écran (résultats, listes) : même espacement partout, rien de collé */
+.sheet-body > div[id]:not([class]) { display: flex; flex-direction: column; gap: 12px; }
+.sheet-body > div[id]:not([class]):empty { display: none; }
+.sheet-body .card + .row, .sheet-body .row + .card { margin-top: 0; }

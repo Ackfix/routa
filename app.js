@@ -204,7 +204,7 @@ const saveSettings = () => store.set('routa.settings', S.settings);
 const applyUi = () => { try { document.documentElement.style.setProperty('--ui', '1'); } catch (e) { /* */ } };
 applyUi();
 /* #036 : interface de conduite simplifiée (moins de boutons pendant la navigation, l'essentiel reste) */
-const applyLite = () => document.body.classList.toggle('navlite', !!S.settings.navLite);
+const applyLite = () => document.body.classList.remove('navlite');
 applyLite();
 function veh() {
   const v = VEHICLES[S.vehicle.type] || VEHICLES.voiture;
@@ -684,7 +684,7 @@ function meHtml(shape, color, size, halo) {
   let st = shape || S.settings.cursor || 'arrow'; if (!TOP[st] && !BADGE[st]) st = 'arrow';
   const c = isHex(color) ? color : curColor();
   const sz = +(size || S.settings.cursorSize || 1) || 1;
-  const hl = halo != null ? halo : S.settings.cursorHalo !== false;
+  const hl = false; // halo retiré
   const ink = lum(c) > 0.72 ? '#111111' : '#FFFFFF';      // symbole lisible sur un curseur clair (blanc, argent, jaune)
   const edge = lum(c) > 0.72 ? '#1F2937' : '#FFFFFF';     // contour des véhicules : foncé si la couleur est claire
   const wrap = ' style="background:' + (hl ? hexA(c, 0.22) : 'transparent') + '"';
@@ -702,7 +702,6 @@ function openCursor() {
     '<h3>' + esc(I18N.t('Couleur')) + '</h3><div class="curcols" id="curCols">' + CUR_COLORS.map(([c, l]) => { const n = I18N.t(l + ' (couleur)').replace(/ \(couleur\)$/, ''); return '<button data-c="' + c + '" style="background:' + c + '" aria-label="' + esc(n) + '" title="' + esc(n) + '"></button>'; }).join('') +
     '</div>' +
     '<h3>' + esc(I18N.t('Taille')) + '</h3><div class="seg" id="curSize">' + CUR_SIZES.map(([v, l]) => '<button data-v="' + v + '">' + esc(I18N.t(l)) + '</button>').join('') + '</div>' +
-    '<label class="switch" for="curHalo"><span>' + esc(I18N.t('Halo autour du curseur')) + '</span><input id="curHalo" type="checkbox"' + (S.settings.cursorHalo !== false ? ' checked' : '') + '></label>' +
     '<button class="btn block" id="curDone">' + esc(I18N.t('Terminé')) + '</button>' +
     '<button class="btn ghost" id="curReset">' + esc(I18N.t('Revenir au curseur d\'origine')) + '</button>', 'cursor');
   body.querySelector('#curDone').onclick = () => openSettings();
@@ -716,8 +715,7 @@ function openCursor() {
   body.querySelectorAll('.curpick button').forEach((b) => { b.onclick = () => { S.settings.cursor = b.dataset.v; save(); }; });
   body.querySelectorAll('#curCols button').forEach((b) => { b.onclick = () => { S.settings.cursorColor = b.dataset.c; save(); }; });
   body.querySelectorAll('#curSize button').forEach((b) => { b.onclick = () => { S.settings.cursorSize = +b.dataset.v; save(); }; });
-  body.querySelector('#curHalo').onchange = (e) => { S.settings.cursorHalo = e.target.checked; save(); };
-  body.querySelector('#curReset').onclick = () => { delete S.settings.cursor; delete S.settings.cursorColor; delete S.settings.cursorSize; delete S.settings.cursorHalo; body.querySelector('#curHalo').checked = true; save(); };
+  body.querySelector('#curReset').onclick = () => { delete S.settings.cursor; delete S.settings.cursorColor; delete S.settings.cursorSize; delete S.settings.cursorHalo; save(); };
   draw();
 }
 function applyCursor() {
@@ -945,12 +943,18 @@ document.addEventListener('visibilitychange', () => {
 if (navigator.permissions && navigator.permissions.query) {
   navigator.permissions.query({ name: 'geolocation' }).then((ps) => { ps.onchange = () => { if (ps.state === 'granted') startGps(true); else if (ps.state === 'denied') setGeoState('denied'); }; }).catch(() => {});
 }
-function estSpeedH(H, now, acc) {
-  let o = null; const tN = H[H.length - 1].t;
-  for (let i = 0; i < H.length - 1; i++) if ((tN - H[i].t) / 1000 >= 2.5) o = H[i];
-  if (!o) return S.pos ? estSpeed(S.pos, now) || null : null;
-  const span = (tN - o.t) / 1000, d = dist(o, now);
-  if (d < Math.max(8, acc * 1.2)) return 0;
+function estSpeedH(H, now) {
+  // sur toute la fenêtre (jusqu'à 10 s) : le déplacement doit dépasser nettement l'imprécision des positions,
+  // sinon c'est la position qui saute (intérieur, Wi-Fi) et pas le téléphone qui bouge
+  const o = H[0], tN = H[H.length - 1].t, span = (tN - o.t) / 1000;
+  if (span < 3) return null;
+  const accMax = Math.max(...H.map((h) => h.acc || 0));
+  const d = dist(o, now);
+  if (d < Math.max(15, accMax * 2.5)) return 0;
+  // en roulant, les positions avancent dans le même sens : le chemin parcouru point à point reste proche du déplacement total.
+  // Une position qui saute dans tous les sens fait un long chemin pour un petit déplacement : ce n'est pas un mouvement.
+  let path = 0; for (let i = 1; i < H.length; i++) path += dist(H[i - 1], H[i]);
+  if (path > 0 && d / path < 0.6) return 0;
   return d / span;
 }
 function estSpeed(a, b) { const dt = (b.t - a.t) / 1000; const d = dist(a, b); if (dt < 0.8 || d < Math.max(15, 2 * (S.acc || 0))) return 0; return d / dt; }
@@ -962,15 +966,19 @@ function filterSpeed(c, now) {
   while (H.length > 2 && Date.now() - H[0].t > 10000) H.shift();
   // sans vitesse donnée par le téléphone (ou -1 sur iPhone), on la calcule sur les 2,5 à 10 dernières secondes :
   // entre deux relevés à 1 s d'intervalle on ne bouge que de quelques mètres, ce qui donnait 0 km/h à basse vitesse
-  let raw = (c.speed != null && c.speed >= 0 && !((c.accuracy || 0) > 60 && c.speed > 0)) ? c.speed : estSpeedH(H, now, c.accuracy || 0);
+  const acc = c.accuracy || 0;
+  // position trop imprécise (intérieur, Wi-Fi, antennes) : impossible de mesurer une vitesse, on affiche 0
+  let raw = acc > 40 ? 0 : (c.speed != null && c.speed >= 0) ? c.speed : estSpeedH(H, now);
   if (raw == null) return S.speed == null ? null : S.speed;
   if (raw > 70) raw = S.speed || 0; // saut de position (GPS retrouvé) : pas une vraie vitesse
   if (raw > 0 && H.length >= 3) {
     let o = H[0]; for (let i = H.length - 1; i >= 0; i--) if (Date.now() - H[i].t >= 2000) { o = H[i]; break; }
     const span = (Date.now() - o.t) / 1000, moved = dist(o, now);
     // la voiture aurait dû avancer : si elle est restée sur place, c'est du bruit
-    if (span >= 2 && raw < 3 && moved < Math.max(6, (c.accuracy || 0) * 0.6) && moved < raw * span * 0.35) raw = 0;
+    if (span >= 2 && moved < Math.max(6, (c.accuracy || 0) * 0.6) && moved < raw * span * 0.35) raw = 0;
   }
+  // il faut 2 relevés de suite en mouvement pour quitter le 0 (un saut isolé ne fait plus monter le compteur)
+  if (raw > 1.1 && !(S.speed > 1.1)) { S.mvN = (S.mvN || 0) + 1; if (S.mvN < 2) raw = 0; } else if (raw <= 1.1) S.mvN = 0;
   let v = S.speed == null ? raw : S.speed * 0.35 + raw * 0.65;
   if (v < 1.1) v = 0;
   return v;
@@ -2862,12 +2870,14 @@ function openVehicle(after, editId) {
   const body = openSheet('Ton véhicule',
     (list.length > 1 || editId === 'new' ? '<h3>Mes véhicules <span class="prem">Premium</span></h3>' + list.map((x) => '<button class="card tap vehcard' + (x.id === V.id ? ' sel' : '') + '" data-vid="' + esc(x.id) + '"><span class="ico">' + ic((VEHICLES[x.type] || VEHICLES.voiture).icon) + '</span><span class="grow"><b>' + esc(vehName(x)) + '</b><span class="sub">' + esc([x.year, x.energy && (x.energy === 'essence' && I18N.lang !== 'fr' ? I18N.t('Essence (moteur)') : I18N.t((ENERGIES.find((e) => e[0] === x.energy) || [0, ''])[1])), x.rental ? I18N.t('location') : '', x.id === curId ? I18N.t('Véhicule actif') : ''].filter(Boolean).join(' · ')) + '</span></span></button>').join('') : '') +
     '<p class="muted small">Le trajet, les alertes et les lieux proposés s\'adaptent à ton véhicule.</p>' +
+    '<button class="card tap" id="vehLic"><span class="ico">' + ic('info') + '</span><span class="grow"><b>' + esc(I18N.t('Mon permis de conduire')) + '</b><span class="sub">' + esc(licSummary() || I18N.t('Catégories, pays, date')) + '</span></span></button>' +
     '<h3>Type</h3><div class="vehgrid" id="vehGrid">' + KINDS.map(([k, v]) => '<button class="typebtn' + (k === kind() ? ' sel' : '') + '" data-v="' + k + '">' + ic(v.icon) + esc(v.label) + '</button>').join('') + '</div>' +
     '<div id="vehAsst"></div><div id="vehDims"></div>' +
     '<button class="btn block" id="vehSave">Enregistrer</button>' +
     '<button class="btn soft block" id="vehAdd">' + ic('plus') + 'Ajouter un autre véhicule <span class="prem">Premium</span></button>' +
     (base.rental && editId !== 'new' && editId !== 'rental' ? '<button class="btn soft block" id="vehRentEnd">' + esc(I18N.t('Fin de la location : revenir à mon véhicule')) + '</button>' : editId === 'rental' ? '<p class="muted small">' + esc(I18N.t('Véhicule de location : ton véhicule principal est gardé, tu pourras y revenir en un geste.')) + '</p>' : '<button class="btn soft block" id="vehRent">' + ic('car') + esc(I18N.t('Véhicule de location (temporaire)')) + ' <span class="prem">Premium</span></button>') +
     (list.length > 1 && editId !== 'new' ? '<button class="btn ghost" id="vehDel">Retirer ce véhicule</button>' : ''), 'vehicle');
+  { const vl = body.querySelector('#vehLic'); if (vl) vl.onclick = () => openLicence(); }
   const drawAsst = () => {
     const TB = TYPE_BRANDS[V.type];
     if (TB) { // autres véhicules que la voiture : seulement les marques de ce type, modèle libre
@@ -3198,15 +3208,14 @@ function openLicence() {
 }
 function openProfile() {
   const f = profileForm(false);
-  const body = openSheet('Mon profil', '<button class="card tap menuprof" id="pfSettings"><span class="ico">' + ic('gear') + '</span><span class="grow"><b>' + esc(I18N.t('Réglages')) + '</b><span class="sub">' + esc(I18N.t('Navigation, carte, véhicule, notifications, confidentialité et compte')) + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' + f.html +
+  const body = openSheet('Mon profil', '<button class="card tap menuprof" id="pfSettings"><span class="ico">' + ic('gear') + '</span><span class="grow"><b>' + esc(I18N.t('Réglages')) + '</b><span class="sub">' + esc(I18N.t('Navigation, carte, véhicule, notifications, confidentialité et compte')) + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
+    '<div class="row"><button class="btn soft grow" id="pfVeh">' + ic(veh().icon) + esc(I18N.t('Ton véhicule')) + '</button><button class="btn soft grow" id="pfLic">' + ic('info') + esc(I18N.t('Mon permis de conduire')) + '</button></div>' + f.html +
     '<button class="btn block" id="pfSave">Enregistrer</button>' +
     '<h3>Mon code ami</h3><div class="card"><div class="grow"><div class="code">' + esc(S.me.code) + '</div><div class="sub">Donne-le à tes potes : ils l\'entrent dans « Ajouter un ami ».</div></div><button class="iconbtn small" id="pfCopy" aria-label="Copier le code">' + ic('copy') + '</button></div>' +
     '<h3>Ajouter un ami</h3><form id="frForm" class="row"><label class="field grow" for="frCode"><span class="sr">Code ami</span><input id="frCode" type="text" maxlength="6" placeholder="Code à 6 caractères" autocapitalize="characters" autocomplete="off"></label><button class="btn" type="submit">Ajouter</button></form>' +
     ((S.me.friends || []).length ? (S.me.friends.map((fr, i) => '<div class="card"><div class="grow"><b>' + esc(fr.pseudo) + '</b><div class="sub">Peut te voir quand tu es visible</div></div><button class="iconbtn small" data-rm="' + i + '" aria-label="Retirer ' + esc(fr.pseudo) + '">' + ic('trash') + '</button></div>').join('')) : '<div class="empty">Pas encore d\'amis.</div>') +
     '<button class="btn block" id="pfFeedback">' + ic('msg') + 'Signaler un problème ou une idée</button>' +
     '<a class="btn soft block" href="aide.html" style="text-decoration:none">' + ic('info') + 'Aide et installation (iPhone, Android)</a>' +
-    '<button class="btn soft block" id="pfLic">' + ic('info') + esc(I18N.t('Mon permis de conduire')) + (licSummary() ? ' : ' + esc(licSummary()) : '') + '</button>' +
-    '<button class="btn soft block" id="pfVeh">' + ic(veh().icon) + esc(I18N.t('Ton véhicule')) + ' : ' + esc(vehSummary()) + '</button>' +
     '<div class="banner">' + ic('info') + '<span>' + (S.online ? 'Mode en ligne : alertes, spots, conducteurs et messages partagés.' : 'Mode solo : tes alertes et spots restent sur ce téléphone.') + ' Version ' + VERSION + '. Carte © OpenStreetMap, OpenFreeMap. Itinéraires OSRM et Valhalla. Recherche Photon.</span></div>' +
     '<p class="muted small"><a href="confidentialite.html" style="color:var(--info)">Confidentialité et règles d\'utilisation</a></p>', 'profile');
   const save = f.bind(body);
@@ -3241,7 +3250,6 @@ function openSettings() {
     sw('stAhead', 'Prévenir à l\'avance des baisses de limitation', S.settings.limitAhead !== false, 'Un petit panneau, sans son.') +
     sw('stAlert', 'Alerte vocale si je dépasse la limite', S.settings.speedAlert) +
     sw('stSpeedo', 'Afficher le compteur de vitesse', S.settings.showSpeedo !== false) +
-    sw('stLite', I18N.t('Interface de conduite simplifiée'), !!S.settings.navLite, I18N.t('Pendant la navigation : seulement la consigne, l\'arrivée, la vitesse et les alertes.')) +
     '<h3>Carte</h3>' +
     '<p class="muted small" style="margin:0">Couleurs de la carte</p>' + segH('stNight', [['auto', 'Automatique'], ['off', 'Jour'], ['on', 'Nuit']], S.settings.night) +
     sw('stPlaces', 'Afficher les établissements sur la carte', S.settings.showPlaces) +
@@ -3269,7 +3277,6 @@ function openSettings() {
   ch('stAhead', (v) => { S.settings.limitAhead = v; });
   ch('stAlert', (v) => { S.settings.speedAlert = v; });
   ch('stSpeedo', (v) => { S.settings.showSpeedo = v; updateSpeed(); });
-  ch('stLite', (v) => { S.settings.navLite = v; applyLite(); });
   ch('stTips', (v) => { S.settings.tips = v; });
   ch('stMoments', (v) => { S.settings.moments = v; });
   ch('stPlaces', (v) => { S.settings.showPlaces = v; applyPlaces(); });
@@ -3342,6 +3349,8 @@ function openK(k) {
     else if (SLOTS[k]) goSlot(k);
     else if (k === 'mapview') openMapView();
     else if (k === 'profile') openProfile();
+    else if (k === 'settings') openSettings();
+    else if (k === 'licence') openLicence();
     else if (k === 'share') shareApp();
     else if (k === 'help') location.href = 'aide.html';
     else if (k === 'privacy') location.href = 'confidentialite.html';
@@ -3385,7 +3394,6 @@ function openMenu() {
     ]],
     ['Carte et routes', [
       ['favs', ic('star'), 'Favoris'],
-      XO('dash') && xt('dash'),
       XO('smart') && xt('smart'),
       XO('explore') && xt('explore'),
       v.ev && X.open && ['chargers', XI.plug || ic('charge'), 'Bornes libres'],
@@ -3417,6 +3425,7 @@ function openMenu() {
   const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + (PREM_TILES.includes(t[0]) ? '<i class="prem tileprem">Premium</i>' : '') + t[1] + '<span>' + t[2] + '</span></button>';
   const body = openSheet('Menu',
     '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
+    '<button class="card tap menuprof" data-k="settings"><span class="ico">' + ic('gear') + '</span><span class="grow"><b>' + esc(I18N.t('Réglages')) + '</b><span class="sub">' + esc(I18N.t('Navigation, carte, véhicule, notifications, confidentialité et compte')) + '</span></span></button>' +
     '<button class="card tap menusos" data-k="country"><span class="sosdot big">SOS</span><span class="grow"><b>Urgences et infos pays</b><span class="sub">' + ($('ctryLabel').textContent === 'Infos pays' ? 'Numéros d\'urgence, règles, vignettes' : esc($('ctryLabel').textContent)) + '</span></span></button>' +
     '<button class="card tap menufb" data-k="feedback"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg></span><span class="grow"><b>Donner mon avis</b><span class="sub">Un bug, un truc pas clair, une idée : dis-le-nous</span></span></button>' +
     groups.map(([g, ts]) => { const list = ts.filter(Boolean); if (!list.length) return ''; return '<h3 class="menuh' + (g === 'Pro' ? ' menupro' : '') + '">' + (g === 'Pro' ? esc(I18N.t('Outils pour les professionnels de la route')) : g) + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
