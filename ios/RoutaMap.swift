@@ -34,6 +34,8 @@ final class RoutaWebView: WKWebView {
 @objc(RoutaBridgeViewController)
 open class RoutaBridgeViewController: CAPBridgeViewController {
     let mapPlugin = RoutaMapPlugin()
+    let carPlugin = RoutaCarPlugin()
+    let geoPlugin = RoutaGeoPlugin()
 
     open override func webView(with frame: CGRect, configuration: WKWebViewConfiguration) -> WKWebView {
         let web = RoutaWebView(frame: frame, configuration: configuration)
@@ -48,6 +50,8 @@ open class RoutaBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(mapPlugin)
         // ROUTA ne coupe jamais la musique : session audio « ambiante » qui se mélange aux autres apps
         try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: [.mixWithOthers])
+        bridge?.registerPluginInstance(carPlugin)
+        bridge?.registerPluginInstance(geoPlugin)
         if let web = webView {
             web.isOpaque = false
             web.scrollView.isOpaque = false
@@ -75,6 +79,8 @@ public class RoutaMapPlugin: CAPPlugin, CAPBridgedPlugin, MLNMapViewDelegate, UI
         CAPPluginMethod(name: "setVisibility", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setImages", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearImages", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "downloadRegion", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "regionStatus", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "keepAwake", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "allowSleep", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "duck", returnType: CAPPluginReturnPromise),
@@ -255,6 +261,45 @@ public class RoutaMapPlugin: CAPPlugin, CAPBridgedPlugin, MLNMapViewDelegate, UI
             }
             self.images.removeAll()
             call.resolve()
+        }
+    }
+
+    // MARK: Carte hors connexion de la région
+
+    @objc func downloadRegion(_ call: CAPPluginCall) {
+        guard let lat = call.getDouble("lat"), let lon = call.getDouble("lon") else { call.reject("position manquante"); return }
+        let km = call.getDouble("radiusKm") ?? 20
+        let styleStr = call.getString("styleURL") ?? "https://tiles.openfreemap.org/styles/liberty"
+        guard let url = URL(string: styleStr) else { call.reject("style"); return }
+        DispatchQueue.main.async {
+            let dLat = km / 111.0
+            let dLon = km / (111.0 * cos(lat * Double.pi / 180))
+            let bounds = MLNCoordinateBounds(sw: CLLocationCoordinate2D(latitude: lat - dLat, longitude: lon - dLon),
+                                             ne: CLLocationCoordinate2D(latitude: lat + dLat, longitude: lon + dLon))
+            let region = MLNTilePyramidOfflineRegion(styleURL: url, bounds: bounds, fromZoomLevel: 6, toZoomLevel: 14)
+            let ctx = "routa-region".data(using: .utf8) ?? Data()
+            let storage = MLNOfflineStorage.shared
+            for old in storage.packs ?? [] { storage.removePack(old, withCompletionHandler: nil) }
+            storage.addPack(for: region, withContext: ctx) { pack, error in
+                if let error = error { call.reject(error.localizedDescription); return }
+                pack?.resume()
+                call.resolve(["started": true])
+            }
+        }
+    }
+
+    @objc func regionStatus(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let pack = MLNOfflineStorage.shared.packs?.first else { call.resolve(["exists": false]); return }
+            pack.requestProgress()
+            let p = pack.progress
+            call.resolve([
+                "exists": true,
+                "done": Int(p.countOfResourcesCompleted),
+                "total": Int(p.countOfResourcesExpected),
+                "bytes": Int(p.countOfBytesCompleted),
+                "complete": pack.state == .complete
+            ])
         }
     }
 
