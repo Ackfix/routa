@@ -141,6 +141,37 @@
     body.querySelector('#rkBack').onclick = () => openDrive();
   }
 
+  /* ---------- #031 analyses enrichies (Premium, étiquette seulement) : mêmes données que le suivi #009, rien n'est retiré ---------- */
+  function openAnalysis() {
+    const all = loadDrives(), now = Date.now(), M = 30 * 86400000;
+    const cur = all.filter((d) => d.s > now - M), prev = all.filter((d) => d.s <= now - M && d.s > now - 2 * M);
+    const a = aggregate(cur), b = aggregate(prev);
+    const delta = (x, y, unit, dec) => { if (!b.n) return ''; const d = x - y; if (Math.abs(d) < (dec ? 0.05 : 0.5)) return '<span class="muted small"> · ' + esc(T('stable')) + '</span>'; return '<span class="small" style="color:' + (unit === '' ? (d > 0 ? 'var(--ok,#3DDC84)' : 'var(--danger,#FF6B6B)') : 'var(--muted,#9AA3AF)') + '"> ' + (d > 0 ? '+' : '−') + nf(Math.abs(d), dec ? 1 : 0) + (unit || '') + '</span>'; };
+    const card = (t, v, extra) => '<div class="card"><div class="grow"><b>' + esc(t) + '</b><div class="sub">' + v + (extra || '') + '</div></div></div>';
+    const bars = (vals, labels) => { const mx = Math.max(1, ...vals); return '<div class="anabars">' + vals.map((v, i) => '<div class="anabar"><i style="height:' + Math.round(4 + 76 * v / mx) + 'px"></i><span>' + esc(labels[i]) + '</span></div>').join('') + '</div>'; };
+    const wd = [0, 0, 0, 0, 0, 0, 0], hb = [0, 0, 0, 0]; let night = 0;
+    cur.forEach((d) => { const dt = new Date(d.s); wd[(dt.getDay() + 6) % 7] += d.km; const h = dt.getHours(); hb[h < 6 ? 3 : h < 12 ? 0 : h < 18 ? 1 : h < 22 ? 2 : 3] += d.km; if (h >= 22 || h < 6) night += d.km; });
+    const days = [...Array(7)].map((_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(LANG(), { weekday: 'short' }));
+    const dest = {}; cur.forEach((d) => { if (d.c1) dest[d.c1] = (dest[d.c1] || 0) + 1; });
+    const top = Object.entries(dest).sort((x, y) => y[1] - x[1]).slice(0, 5);
+    const longest = cur.slice().sort((x, y) => y.km - x.km)[0];
+    let html = '<p class="muted small">' + esc(T('30 derniers jours, comparés aux 30 jours d\'avant.')) + '</p>';
+    if (!cur.length) html += '<div class="empty">' + esc(T('Pas encore de trajet ces 30 derniers jours.')) + '</div>';
+    else {
+      html += card(T('Distance'), nf(a.km, 0) + ' km', delta(a.km, b.km, ' km')) +
+        card(T('Temps de conduite'), esc(fmtDur(a.mv)), b.n ? delta(a.mv / 3600, b.mv / 3600, ' h', 1) : '') +
+        card(T('Score de conduite'), a.score == null ? '–' : a.score + '/100', b.n && a.score != null && b.score != null ? delta(a.score, b.score, '') : '') +
+        card(T('Trajet moyen'), nf(a.km / a.n, 1) + ' km · ' + esc(fmtDur(a.mv / a.n))) +
+        (longest ? card(T('Plus long trajet'), nf(longest.km, 1) + ' km · ' + esc(new Date(longest.s).toLocaleDateString(LANG(), { day: 'numeric', month: 'short' }))) : '') +
+        card(T('Conduite de nuit (22 h – 6 h)'), Math.round(100 * night / Math.max(a.km, 0.1)) + ' %') +
+        '<h3>' + esc(T('Kilomètres par jour de la semaine')) + '</h3>' + bars(wd, days) +
+        '<h3>' + esc(T('Kilomètres selon le moment')) + '</h3>' + bars(hb, [T('Matin'), T('Après-midi'), T('Soirée'), T('Nuit')]) +
+        (top.length ? '<h3>' + esc(T('Destinations fréquentes')) + '</h3>' + top.map(([c, n]) => card(c, esc(T('{n} trajets', { n })))).join('') : '');
+    }
+    html += '<button class="btn ghost block" id="anBack">' + esc(T('Retour')) + '</button><p class="muted small">' + esc(T('Calculé à partir de ton suivi de conduite. Tout reste sur ce téléphone.')) + '</p>';
+    const body = openSheet(T('Analyses détaillées'), html, 'drivean');
+    body.querySelector('#anBack').onclick = () => openDrive();
+  }
   function openDrive(view) {
     if (view) per = view;
     const all = loadDrives();
@@ -159,6 +190,7 @@
     html += '<button class="btn soft block" id="drRank">' + esc(T('Classement entre amis')) + '</button>';
     const recOff = monthDrives(-1).length ? -1 : monthDrives(0).length ? 0 : null;
     if (recOff != null) html += '<button class="btn soft block" id="drRecap">' + esc(T('Récap · {m}', { m: monthName(recOff) })) + '</button>';
+    if (all.length) html += '<button class="btn soft block" id="drAna">' + esc(T('Analyses détaillées')) + ' <span class="prem">Premium</span></button>';
     html += '<details class="card" style="display:block"><summary style="cursor:pointer;font-weight:700">' + esc(T('Réglages du calcul de carburant')) + '</summary>' +
       '<div class="row" style="margin-top:10px"><label class="field grow" for="drCons">' + esc(T('Consommation (l/100 km)')) + '<input id="drCons" type="number" inputmode="decimal" step="0.1" min="2" max="60" value="' + CFGD.cons + '"></label>' +
       '<label class="field grow" for="drPrice">' + esc(T('Prix du litre ({c})', { c: curr() })) + '<input id="drPrice" type="number" inputmode="decimal" step="0.01" min="0.5" max="5" value="' + priceL().toFixed(2) + '"></label></div></details>' +
@@ -168,6 +200,7 @@
     body.querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => openTrip(+b.dataset.t); });
     body.querySelector('#drRank').onclick = openRank;
     const rc = body.querySelector('#drRecap'); if (rc) rc.onclick = () => openRecap(recOff);
+    const an = body.querySelector('#drAna'); if (an) an.onclick = openAnalysis;
     const st = body.querySelector('#drStory'); if (st) st.onclick = () => story(agg, label, { list: all.filter((d) => d.s > Date.now() - PER.find((x) => x[0] === per)[2]) });
     const c = body.querySelector('#drCons'), pr = body.querySelector('#drPrice');
     const sv = () => { const a = parseFloat(String(c.value).replace(',', '.')), b = parseFloat(String(pr.value).replace(',', '.')); if (a > 1 && a < 80) CFGD.cons = a; if (b > 0.3 && b < 6) CFGD.price = b; saveCfg(); };
