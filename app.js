@@ -1956,7 +1956,7 @@ async function attachPrices(list) {
 }
 
 /* #003 : prix officiels en France (prix-carburants.gouv.fr, données publiques sous Licence Ouverte). Aucun prix inventé. */
-const inFR = (p) => p && p.lat > 41.2 && p.lat < 51.2 && p.lon > -5.3 && p.lon < 9.7 && !inCH(p);
+const inFR = (p) => p && p.lat > 41.2 && p.lat < 51.2 && p.lon > -5.3 && p.lon < 9.7;
 async function attachOfficialFR(list) {
   const fr = list.filter(inFR); if (!fr.length) return;
   const groups = []; fr.forEach((p) => { const g = groups.find((x) => dist(x.c, p) < 15000); if (g) g.l.push(p); else if (groups.length < 4) groups.push({ c: p, l: [p] }); });
