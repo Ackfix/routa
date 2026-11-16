@@ -1331,6 +1331,7 @@ function proStats() {
     if ((s.e || now) < shiftStart) return;
     const d = segDur(s, shiftStart);
     if (s.a === 'drive') cont += d;
+    else if (s.a !== 'break' && s.a !== 'rest') return; // le travail et la disponibilité ne sont pas des pauses
     else if (d >= 45 * MIN) { cont = 0; partial = false; }
     else if (d >= 30 * MIN && partial) { cont = 0; partial = false; }
     else if (d >= R.split1) partial = true;
