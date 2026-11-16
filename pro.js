@@ -49,6 +49,8 @@
   setInterval(() => {
     const now = Date.now();
     const v = S.speed;
+    // à vélo ou à pied (navigation ROUTA dans ce mode), ce n'est pas un trajet en voiture : on ne l'enregistre pas
+    if (S.nav && S.nav.mode && S.nav.mode !== 'car') { lastT = 0; return; }
     if (document.hidden || v == null || !S.pos) { if (cur && now - (cur.le || now) > 15 * 60000) finish(); lastT = 0; return; }
     const dt = lastT ? (now - lastT) / 1000 : 0; lastT = now;
     if (!cur && v > 3) { cur = { s: now, le: now, km: 0, mv: 0, max: 0, br: 0, ac: 0, sp: 0, lim: 0, nm: '', p0: { lat: +S.pos.lat.toFixed(3), lon: +S.pos.lon.toFixed(3) }, pts: [[+S.pos.lat.toFixed(4), +S.pos.lon.toFixed(4)]] }; lastP = { lat: S.pos.lat, lon: S.pos.lon }; lastV = v; stopSince = 0; return; }
