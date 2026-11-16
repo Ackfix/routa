@@ -684,7 +684,7 @@ const hexA = (h, a) => 'rgba(' + [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2)
 const lum = (h) => { const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
 const curColor = () => (isHex(S.settings.cursorColor) ? S.settings.cursorColor : '#4DA3FF');
 /* Formes vues du dessus, pointe vers l'avant (en haut) : elles tournent avec la direction */
-const CDK = 'rgba(0,0,0,.42)';
+let CDK = 'rgba(0,0,0,.42)'; // détails (vitres, lignes) : foncés sur une couleur claire, clairs sur une couleur sombre
 const MIR = (c, k, l, r, y) => '<path fill="' + c + '" stroke="' + k + '" stroke-width="1.1" d="M' + l + ' ' + y + 'l-1.6.5v1l1.6.2zM' + r + ' ' + y + 'l1.6.5v1l-1.6.2z"/>';
 const TOP = {
   car: (c, k) => '<path fill="' + c + '" stroke="' + k + '" stroke-width="1.2" d="M5.4 8.3l-1.7.5v1.1l1.8.2zM18.6 8.3l1.7.5v1.1l-1.8.2z"/>' +
@@ -723,6 +723,7 @@ function meHtml(shape, color, size, halo) {
   const hl = false; // halo retiré
   const ink = lum(c) > 0.72 ? '#111111' : '#FFFFFF';      // symbole lisible sur un curseur clair (blanc, argent, jaune)
   const edge = lum(c) > 0.72 ? '#1F2937' : '#FFFFFF';     // contour des véhicules : foncé si la couleur est claire
+  CDK = lum(c) < 0.3 ? 'rgba(255,255,255,.45)' : 'rgba(0,0,0,.42)';
   const wrap = ' style="background:' + (hl ? hexA(c, 0.22) : 'transparent') + '"';
   const sc = sz !== 1 ? ' style="transform:scale(' + sz + ')"' : '';
   if (TOP[st]) return '<div class="mk-me cur-top cur-' + st + '"' + wrap + '><i' + sc + '><svg aria-hidden="true" viewBox="0 0 24 24" style="width:100%;height:100%">' + TOP[st](c, edge) + '</svg></i></div>';
@@ -3406,7 +3407,7 @@ function openMenu() {
   const PREM_TILES = ['plan', 'convoy', 'events', 'checklists', 'spots', 'cols', 'voyage', 'pro', 'tour', 'bans', 'prolog', 'truckstop', 'restrictions'];
   const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + (PREM_TILES.includes(t[0]) ? '<i class="prem tileprem">PRO</i>' : '') + t[1] + '<span>' + t[2] + '</span></button>';
   const body = openSheet('Menu',
-    '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
+    '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + curColor() + ';color:' + (lum(curColor()) > 0.5 ? '#0E1116' : '#FFFFFF') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     '<button class="card tap menuprof" data-k="settings"><span class="ico">' + ic('gear') + '</span><span class="grow"><b>' + esc(I18N.t('Réglages')) + '</b><span class="sub">' + esc(I18N.t('Navigation, carte, véhicule, notifications, confidentialité et compte')) + '</span></span></button>' +
     '<button class="card tap menusos" data-k="country"><span class="sosdot big">SOS</span><span class="grow"><b>Urgences et infos pays</b><span class="sub">' + ($('ctryLabel').textContent === 'Infos pays' ? 'Numéros d\'urgence, règles, vignettes' : esc($('ctryLabel').textContent)) + '</span></span></button>' +
     groups.map(([g, ts]) => { const list = ts.filter(Boolean); if (!list.length) return ''; return '<h3 class="menuh' + (g === 'Pro' ? ' menupro' : '') + '">' + (g === 'Pro' ? esc(I18N.t('Outils pour les professionnels de la route')) : g) + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
