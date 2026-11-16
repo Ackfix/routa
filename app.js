@@ -629,7 +629,7 @@ const CUR_COLORS = [
   ['#4DA3FF', 'Bleu'], ['#38BDF8', 'Ciel'], ['#22D3EE', 'Cyan'], ['#14B8A6', 'Turquoise'], ['#3DDC97', 'Vert'], ['#84CC16', 'Vert pomme'],
   ['#15803D', 'Vert foncé'], ['#F5C542', 'Jaune'], ['#FF8A3D', 'Orange'], ['#E5484D', 'Rouge'], ['#9F1239', 'Bordeaux'], ['#F472B6', 'Rose'],
   ['#A78BFA', 'Violet'], ['#4F46E5', 'Indigo'], ['#1E3A8A', 'Bleu marine'], ['#92400E', 'Marron'], ['#C8A165', 'Beige'], ['#FFFFFF', 'Blanc'],
-  ['#C0C6CF', 'Argent'], ['#6B7280', 'Gris'], ['#374151', 'Anthracite'], ['#111111', 'Noir']
+  ['#C0C6CF', 'Argent'], ['#6B7280', 'Gris'], ['#111111', 'Noir']
 ];
 const isHex = (c) => /^#[0-9a-f]{6}$/i.test(c || '');
 const hexA = (h, a) => 'rgba(' + [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(',') + ',' + a + ')';
@@ -645,8 +645,6 @@ const TOP = {
   truck: (c, k) => '<rect x="7" y="1.5" width="10" height="5.6" rx="1.8" fill="' + c + '" stroke="' + k + '" stroke-width="1.4"/><path fill="' + CDK + '" d="M8.3 3.2h7.4l-.4 1.7H8.7z"/><rect x="6.3" y="8.1" width="11.4" height="14.4" rx="1" fill="' + c + '" stroke="' + k + '" stroke-width="1.4"/><path fill="none" stroke="' + CDK + '" stroke-width="1" d="M8.2 11h7.6M8.2 15h7.6M8.2 19h7.6"/>',
   bus: (c, k) => '<rect x="6.5" y="1.5" width="11" height="21" rx="2.2" fill="' + c + '" stroke="' + k + '" stroke-width="1.4"/><path fill="' + CDK + '" d="M7.9 3.6h8.2v2.2H7.9z"/><path fill="' + CDK + '" d="M9.3 9h5.4v2.6H9.3zM9.3 15h5.4v2.6H9.3z"/>',
   camper: (c, k) => '<rect x="5.6" y="1.5" width="12.8" height="21" rx="3" fill="' + c + '" stroke="' + k + '" stroke-width="1.5"/><path fill="' + CDK + '" d="M7.6 4.4c2.9-.9 5.9-.9 8.8 0l-.6 2.6H8.2z"/><rect x="9" y="11" width="6" height="4.4" rx="1" fill="' + CDK + '"/><path fill="none" stroke="' + CDK + '" stroke-width="1" d="M7.6 8.6h8.8"/>',
-  moto: (c, k) => '<path fill="none" stroke="' + k + '" stroke-width="3.4" stroke-linecap="round" d="M6.5 7.6h11"/><path fill="none" stroke="' + c + '" stroke-width="1.8" stroke-linecap="round" d="M6.5 7.6h11"/><path fill="' + c + '" stroke="' + k + '" stroke-width="1.4" d="M12 2.5c1.5 0 2.4 1.2 2.4 2.7v13.6c0 1.5-.9 2.7-2.4 2.7s-2.4-1.2-2.4-2.7V5.2c0-1.5.9-2.7 2.4-2.7z"/><ellipse cx="12" cy="13.5" rx="1.3" ry="2.6" fill="' + CDK + '"/>',
-  bike: (c, k) => '<path fill="none" stroke="' + k + '" stroke-width="4" stroke-linecap="round" d="M12 3v5.5M12 15.5V21M12 8.5v7M8 7.4h8"/><path fill="none" stroke="' + c + '" stroke-width="2.3" stroke-linecap="round" d="M12 3v5.5M12 15.5V21M12 8.5v7M8 7.4h8"/>'
 };
 /* Formes « badge » : un rond de couleur avec un symbole */
 const BADGE = {
@@ -654,7 +652,10 @@ const BADGE = {
   chevron: (k) => '<path fill="none" stroke="' + k + '" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-8 7 8"/>',
   dot: () => '',
   walk: (k) => '<g fill="none" stroke="' + k + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="1.6" fill="' + k + '"/><path d="M11 21l2-6-3-3 1-5 4 3 3 1M10 12l-2 4"/></g>',
-  star: (k) => '<path fill="' + k + '" d="M12 2.5l2.8 6 6.5.7-4.9 4.4 1.4 6.4L12 16.8 6.2 20l1.4-6.4-4.9-4.4 6.5-.7z"/>'
+  star: (k) => '<path fill="' + k + '" d="M12 2.5l2.8 6 6.5.7-4.9 4.4 1.4 6.4L12 16.8 6.2 20l1.4-6.4-4.9-4.4 6.5-.7z"/>',
+  /* deux-roues vus de profil : le dessin reste droit à l'écran, la petite flèche du cercle indique la direction */
+  moto: (k) => '<g fill="none" stroke="' + k + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="16" r="3.3"/><circle cx="18.5" cy="16" r="3.3"/><path d="M5.5 16l3.2-4.6h6.1l3.7 4.6"/><path d="M8.2 11.4h-2.6M14.8 11.4l1.6-3.4h2.4"/><path d="M9.5 9.2h4.4l1 2.2" /></g>',
+  bike: (k) => '<g fill="none" stroke="' + k + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="16" r="3.4"/><circle cx="18.5" cy="16" r="3.4"/><path d="M5.5 16l3.9-7h6.2l2.9 7M9.4 9l3.1 7H5.5M15.6 9l-1-3h-2M8 6.5h3"/></g>'
 };
 const CUR_GROUPS = [
   ['Flèches et points', [['arrow', 'Flèche'], ['chevron', 'Chevron'], ['dot', 'Point'], ['star', 'Étoile']]],
@@ -673,7 +674,8 @@ function meHtml(shape, color, size, halo) {
   const wrap = ' style="background:' + (hl ? hexA(c, 0.22) : 'transparent') + '"';
   const sc = sz !== 1 ? ' style="transform:scale(' + sz + ')"' : '';
   if (TOP[st]) return '<div class="mk-me cur-top cur-' + st + '"' + wrap + '><i' + sc + '><svg aria-hidden="true" viewBox="0 0 24 24" style="width:100%;height:100%">' + TOP[st](c, edge) + '</svg></i></div>';
-  return '<div class="mk-me cur-' + st + '"' + wrap + '><i style="background:' + c + (lum(c) > 0.72 ? ';border-color:#1F2937' : '') + (sz !== 1 ? ';transform:scale(' + sz + ')' : '') + '">' + (st === 'dot' ? '' : '<svg aria-hidden="true" viewBox="0 0 24 24">' + BADGE[st](ink) + '</svg>') + '</i></div>';
+  const up = st === 'moto' || st === 'bike';
+  return '<div class="mk-me cur-' + st + (up ? ' cur-up' : '') + '"' + wrap + '>' + (up ? '<b class="cur-ptr" style="border-bottom-color:' + c + '"></b>' : '') + '<i style="background:' + c + (lum(c) > 0.72 ? ';border-color:#1F2937' : '') + (sz !== 1 ? ';transform:scale(' + sz + ')' : '') + '">' + (st === 'dot' ? '' : '<svg aria-hidden="true" viewBox="0 0 24 24"' + (up ? ' class="upr"' : '') + '>' + BADGE[st](ink) + '</svg>') + '</i></div>';
 }
 /* Page de personnalisation complète du curseur */
 function openCursor() {
@@ -682,7 +684,7 @@ function openCursor() {
     '<div class="curhead"><div class="curprev" id="curPrev"></div><div><span class="prem">Premium</span><p class="muted small">' + esc(I18N.t('Choisis la forme, la couleur et la taille de ton curseur sur la carte.')) + '</p></div></div>' +
     CUR_GROUPS.map(([g, list]) => '<h3>' + esc(I18N.t(g)) + '</h3><div class="curpick">' + list.map(([k, l]) => '<button data-v="' + k + '" aria-label="' + esc(I18N.t(l)) + '"><span class="cp"></span><span>' + esc(I18N.t(l)) + '</span></button>').join('') + '</div>').join('') +
     '<h3>' + esc(I18N.t('Couleur')) + '</h3><div class="curcols" id="curCols">' + CUR_COLORS.map(([c, l]) => { const n = I18N.t(l + ' (couleur)').replace(/ \(couleur\)$/, ''); return '<button data-c="' + c + '" style="background:' + c + '" aria-label="' + esc(n) + '" title="' + esc(n) + '"></button>'; }).join('') +
-    '<label class="curcustom" title="' + esc(I18N.t('Autre couleur')) + '"><input type="color" id="curPick" value="' + curColor() + '" aria-label="' + esc(I18N.t('Autre couleur')) + '"><span>+</span></label></div>' +
+    '</div>' +
     '<h3>' + esc(I18N.t('Taille')) + '</h3><div class="seg" id="curSize">' + CUR_SIZES.map(([v, l]) => '<button data-v="' + v + '">' + esc(I18N.t(l)) + '</button>').join('') + '</div>' +
     '<label class="switch" for="curHalo"><span>' + esc(I18N.t('Halo autour du curseur')) + '</span><input id="curHalo" type="checkbox"' + (S.settings.cursorHalo !== false ? ' checked' : '') + '></label>' +
     '<button class="btn block" id="curDone">' + esc(I18N.t('Terminé')) + '</button>' +
@@ -692,14 +694,11 @@ function openCursor() {
     body.querySelector('#curPrev').innerHTML = meHtml();
     body.querySelectorAll('.curpick button').forEach((b) => { b.classList.toggle('on', b.dataset.v === cur()); b.querySelector('.cp').innerHTML = meHtml(b.dataset.v); });
     body.querySelectorAll('#curCols button').forEach((b) => b.classList.toggle('on', b.dataset.c.toLowerCase() === curColor().toLowerCase()));
-    const custom = !CUR_COLORS.some(([c]) => c.toLowerCase() === curColor().toLowerCase());
-    const lab = body.querySelector('.curcustom'); lab.classList.toggle('on', custom); lab.style.background = custom ? curColor() : '';
     body.querySelectorAll('#curSize button').forEach((b) => b.classList.toggle('on', +b.dataset.v === (+S.settings.cursorSize || 1)));
   };
   const save = () => { saveSettings(); draw(); applyCursor(); };
   body.querySelectorAll('.curpick button').forEach((b) => { b.onclick = () => { S.settings.cursor = b.dataset.v; save(); }; });
   body.querySelectorAll('#curCols button').forEach((b) => { b.onclick = () => { S.settings.cursorColor = b.dataset.c; save(); }; });
-  body.querySelector('#curPick').oninput = (e) => { if (isHex(e.target.value)) { S.settings.cursorColor = e.target.value; save(); } };
   body.querySelectorAll('#curSize button').forEach((b) => { b.onclick = () => { S.settings.cursorSize = +b.dataset.v; save(); }; });
   body.querySelector('#curHalo').onchange = (e) => { S.settings.cursorHalo = e.target.checked; save(); };
   body.querySelector('#curReset').onclick = () => { delete S.settings.cursor; delete S.settings.cursorColor; delete S.settings.cursorSize; delete S.settings.cursorHalo; body.querySelector('#curHalo').checked = true; save(); };
@@ -727,6 +726,7 @@ function renderMe() {
     pk.style.top = Math.round(r.top + r.height / 2 + S.camOff[1]) + 'px';
     const rot = S.settings.navNorth ? (v.heading || 0) : (S.moving || S.nav) ? 0 : ((v.heading || 0) - map.getBearing() + 360) % 360; // en roulant, la carte suit la route : le curseur pointe vers le haut
     pk.firstChild.style.transform = 'rotate(' + Math.round(rot) + 'deg)';
+    const u1 = pk.querySelector('svg.upr'); if (u1) u1.style.transform = 'rotate(' + (-Math.round(rot)) + 'deg)';
     pk.hidden = false;
     return;
   }
@@ -736,6 +736,7 @@ function renderMe() {
     S.markers.me = new maplibregl.Marker({ element: e, rotationAlignment: 'map', pitchAlignment: 'map' }).setLngLat([v.lon, v.lat]).addTo(map);
   }
   S.markers.me.setLngLat([v.lon, v.lat]).setRotation(v.heading || 0);
+  const u2 = S.markers.me.getElement().querySelector('svg.upr'); if (u2) u2.style.transform = 'rotate(' + Math.round(-((v.heading || 0) - map.getBearing())) + 'deg)';
 }
 
 
@@ -3342,6 +3343,7 @@ function openMenu() {
     ]],
     ['Carte et routes', [
       ['favs', ic('star'), 'Favoris'],
+      XO('dash') && xt('dash'),
       XO('smart') && xt('smart'),
       XO('explore') && xt('explore'),
       v.ev && X.open && ['chargers', XI.plug || ic('charge'), 'Bornes libres'],
@@ -3369,13 +3371,13 @@ function openMenu() {
     ]]
   ];
   // #008 : fonctions classées Premium (étiquette seulement pendant les tests, rien n'est verrouillé)
-  const PREM_TILES = ['plan', 'convoy', 'events', 'smart', 'activity', 'checklists'];
+  const PREM_TILES = ['plan', 'convoy', 'events', 'smart', 'activity', 'checklists', 'spots', 'cols', 'explore', 'voyage', 'dash', 'pro', 'tour', 'bans', 'prolog', 'truckstop', 'restrictions'];
   const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + (PREM_TILES.includes(t[0]) ? '<i class="prem tileprem">Premium</i>' : '') + t[1] + '<span>' + t[2] + '</span></button>';
   const body = openSheet('Menu',
     '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     '<button class="card tap menusos" data-k="country"><span class="sosdot big">SOS</span><span class="grow"><b>Urgences et infos pays</b><span class="sub">' + ($('ctryLabel').textContent === 'Infos pays' ? 'Numéros d\'urgence, règles, vignettes' : esc($('ctryLabel').textContent)) + '</span></span></button>' +
     '<button class="card tap menufb" data-k="feedback"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg></span><span class="grow"><b>Donner mon avis</b><span class="sub">Un bug, un truc pas clair, une idée : dis-le-nous</span></span></button>' +
-    groups.map(([g, ts]) => { const list = ts.filter(Boolean); if (!list.length) return ''; return '<h3 class="menuh' + (g === 'Pro' ? ' menupro' : '') + '">' + (g === 'Pro' ? esc(I18N.t('Outils pour les professionnels de la route')) + ' <span class="prem">Premium</span>' : g) + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
+    groups.map(([g, ts]) => { const list = ts.filter(Boolean); if (!list.length) return ''; return '<h3 class="menuh' + (g === 'Pro' ? ' menupro' : '') + '">' + (g === 'Pro' ? esc(I18N.t('Outils pour les professionnels de la route')) : g) + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
     '<div class="menulinks">' + (X.canInstall && X.canInstall() ? '<button data-k="install">Installer l\'app</button>' : '') + '<button data-k="share">Partager ROUTA</button><button data-k="help">Aide</button><button data-k="privacy">Confidentialité</button></div>' +
     '<p class="menusig">ROUTA par <b>ACKFIX</b></p>' +
     langSeg(), 'menu');
@@ -3442,7 +3444,7 @@ if (!store.get('routa.mig096', false)) { S.settings.voice = false; S.settings.re
 if (!store.get('routa.mig0913', false)) { S.settings.traffic = true; S.settings.showPlaces = true; S.settings.showTransit = false; saveSettings(); store.set('routa.mig0913', true); }
 S.settings.mapType = 'plan';
 S.settings.relief3d = false;
-window.ROUTA = { reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, bump, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials, veh, nameOf, openDriver, startNav, openSpot, openPoi, goBackStart, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
+window.ROUTA = { reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, bump, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials, veh, nameOf, openDriver, startNav, openSpot, openPoi, goBackStart, capLimit, openCursor, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
 if (!S.me || !S.me.pseudo) onboarding(); else boot();
 
 })();

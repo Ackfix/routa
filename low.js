@@ -230,8 +230,17 @@
     let els; try { els = await osm(F, bike ? 5000 : 10000, c, 120); } catch (e) { fail(view); return; }
     if (S.sheetView !== view) return;
     const lab = (t) => ({ car_repair: 'Garage', tyres: 'Pneus', car_parts: 'Pièces auto', truck_repair: 'Garage poids lourds', bicycle: 'Magasin de vélos', motorcycle: 'Moto', motorcycle_repair: 'Garage moto' })[t.shop] || (t.amenity === 'car_wash' ? 'Lavage' : t.amenity === 'bicycle_repair_station' ? 'Station de réparation vélo' : t.amenity === 'charging_station' ? 'Borne de recharge' : 'Garage');
-    const items = els.map(pt).filter((x) => x.lat != null).map((x) => { const st = x.t.opening_hours && A.ohStatus(A.ohParse(x.t.opening_hours)); return { name: x.t.name || T(lab(x.t)), lat: x.lat, lon: x.lon, d: dist(c, x), sub: [T(lab(x.t)), fmtDist(dist(c, x)), st ? st.txt : ''].filter(Boolean).join(' · '), color: '#5B6472', icon: IC.wrench }; }).sort((a, b) => a.d - b.d).slice(0, 40);
-    listSheet(title, view, esc(T('Adapté à ton véhicule actif.')), items, { foot: esc(T('Source : OpenStreetMap. Appelle avant de passer pour vérifier les horaires.')) });
+    const favs = store.get('routa.favGarages', []);
+    const isFav = (x) => favs.some((f) => dist(f, x) < 40);
+    const items = els.map(pt).filter((x) => x.lat != null).map((x) => { const st = x.t.opening_hours && A.ohStatus(A.ohParse(x.t.opening_hours)); return { name: x.t.name || T(lab(x.t)), lat: x.lat, lon: x.lon, d: dist(c, x), sub: [T(lab(x.t)), fmtDist(dist(c, x)), st ? st.txt : ''].filter(Boolean).join(' · '), phone: x.t.phone || x.t['contact:phone'] || '' }; }).filter((x) => !isFav(x)).sort((a, b) => a.d - b.d).slice(0, 40);
+    const card = (x, i, fav) => '<div class="card favrow"><button class="grow tapzone" data-go="' + i + '"><b>' + esc(x.name) + '</b><span class="sub">' + esc(fav ? T('Mon garage') + ' · ' + fmtDist(dist(c, x)) : x.sub) + '</span></button>' + (x.phone ? '<a class="iconbtn small" href="tel:' + esc(String(x.phone).split(';')[0].replace(/[^+\d]/g, '')) + '" aria-label="' + esc(T('Appeler')) + '">' + A.ic('phone') + '</a>' : '') + '<button class="iconbtn small favstar' + (fav ? ' on' : '') + '" data-fav="' + i + '" aria-label="' + esc(fav ? T('Retirer de mes garages') : T('Ajouter à mes garages')) + '" aria-pressed="' + (fav ? 'true' : 'false') + '">' + (fav ? '★' : '☆') + '</button></div>';
+    const all = favs.map((f) => Object.assign({ fav: true }, f)).concat(items);
+    const body = openSheet(title, '<p class="muted small">' + esc(T('Adapté à ton véhicule actif. Touche l\'étoile pour garder ton garage en haut de la liste.')) + '</p>' +
+      (favs.length ? '<h3>' + esc(T('Mes garages')) + '</h3>' + favs.map((f, i) => card(f, i, true)).join('') + '<h3>' + esc(T('Autour de toi')) + '</h3>' : '') +
+      (items.length ? items.map((x, i) => card(x, favs.length + i, false)).join('') : '<div class="empty">' + esc(T('Rien trouvé autour de toi pour le moment.')) + '</div>') +
+      '<p class="muted small">' + esc(T('Source : OpenStreetMap. Appelle avant de passer pour vérifier les horaires.')) + '</p>', view);
+    body.querySelectorAll('[data-go]').forEach((b) => { b.onclick = () => { const x = all[+b.dataset.go]; closeSheet(); chooseDestination({ name: x.name, lat: x.lat, lon: x.lon }); }; });
+    body.querySelectorAll('[data-fav]').forEach((b) => { b.onclick = () => { const x = all[+b.dataset.fav]; let F = store.get('routa.favGarages', []); if (x.fav) F = F.filter((f) => dist(f, x) >= 40); else F.push({ name: x.name, lat: x.lat, lon: x.lon, phone: x.phone || '' }); store.set('routa.favGarages', F.slice(-5)); openRepair(); }; });
   }
 
   /* ---------- #029 assistance en panne ---------- */
@@ -241,12 +250,28 @@
     const link = c ? 'https://www.openstreetmap.org/?mlat=' + c.lat.toFixed(5) + '&mlon=' + c.lon.toFixed(5) + '#map=17/' + c.lat.toFixed(5) + '/' + c.lon.toFixed(5) : '';
     const body = openSheet(T('En panne'),
       '<div class="banner warnb">' + IC.sos + '<span>' + esc(T('En cas de danger ou de blessé, appelle les secours : ROUTA ne les contacte pas automatiquement.')) + '</span></div>' +
+      assistHtml() +
       (k ? '<a class="btn block sosbtn" href="tel:' + esc(k.main) + '">' + esc(T('Appeler le {n}', { n: k.main })) + '</a>' + sos.map(([l, n]) => '<a class="card tap telrow" href="tel:' + esc(n) + '"><div class="grow"><b>' + esc(T(l)) + '</b></div><div class="val">' + esc(n) + '</div></a>').join('') : '') +
       '<h3>' + esc(T('Sécurise-toi')) + '</h3><div class="card"><div class="grow"><div class="sub">' + esc(T('Feux de détresse, gilet avant de sortir, triangle derrière le véhicule, puis attends derrière la glissière si tu es sur autoroute.')) + (k && k.must && k.must.length ? '<br>' + esc(T('Obligatoire ici')) + ' : ' + k.must.map((m) => esc(T(m))).join(', ') : '') + '</div></div></div>' +
       (c ? '<h3>' + esc(T('Ta position')) + '</h3><div class="card"><div class="grow"><b>' + c.lat.toFixed(5) + ', ' + c.lon.toFixed(5) + '</b><div class="sub">' + esc(T('À donner au dépanneur ou aux secours.')) + '</div></div></div><button class="btn soft block" id="bdShare">' + esc(T('Partager ma position')) + '</button>' : '<p class="muted">' + esc(T('Position inconnue pour le moment.')) + '</p>') +
       '<button class="btn soft block" id="bdGar">' + esc(T('Garages et dépanneurs proches')) + '</button>', 'breakdown');
     const sh = body.querySelector('#bdShare'); if (sh) sh.onclick = async () => { const txt = T('Je suis en panne ici : {u}', { u: link }); try { if (navigator.share) { await navigator.share({ title: 'ROUTA', text: txt }); return; } } catch (e) { if (e && e.name === 'AbortError') return; } try { await navigator.clipboard.writeText(txt); toast(esc(T('Position copiée.'))); } catch (e) { toast(esc(link)); } };
     body.querySelector('#bdGar').onclick = openRepair;
+    bindAssist(body);
+  }
+  /* Mon assistance / assurance dépannage : gardée sur ce téléphone, toujours en haut de « En panne » */
+  function assistHtml() {
+    const L = store.get('routa.assist', []);
+    return (L.length ? L.map((a, i) => '<div class="card favrow"><a class="grow tapzone" href="tel:' + esc(a.tel.replace(/[^+\d]/g, '')) + '"><b>' + esc(a.name) + '</b><span class="sub">' + esc(T('Mon assistance')) + ' · ' + esc(a.tel) + (a.ref ? ' · ' + esc(T('N° de contrat')) + ' ' + esc(a.ref) : '') + '</span></a><button class="iconbtn small" data-asdel="' + i + '" aria-label="' + esc(T('Retirer')) + '">×</button></div>').join('') : '') +
+      '<details class="card" style="display:block"' + (L.length ? '' : ' open') + '><summary style="cursor:pointer;font-weight:700">' + esc(L.length ? T('Ajouter une autre assistance') : T('Ajoute ton assistance dépannage ou ton assurance')) + '</summary>' +
+      '<form id="asForm"><label class="field" for="asName"><span>' + esc(T('Nom (ex. : ton assurance, TCS, assistance du constructeur)')) + '</span><input id="asName" type="text" maxlength="40" required></label>' +
+      '<label class="field" for="asTel"><span>' + esc(T('Numéro de dépannage')) + '</span><input id="asTel" type="tel" maxlength="24" required></label>' +
+      '<label class="field" for="asRef"><span>' + esc(T('N° de contrat (facultatif)')) + '</span><input id="asRef" type="text" maxlength="30"></label>' +
+      '<button class="btn block" type="submit">' + esc(T('Enregistrer')) + '</button><p class="muted small">' + esc(T('Reste uniquement sur ce téléphone.')) + '</p></form></details>';
+  }
+  function bindAssist(body) {
+    const f = body.querySelector('#asForm'); if (f) f.onsubmit = (e) => { e.preventDefault(); const name = body.querySelector('#asName').value.trim(), tel = body.querySelector('#asTel').value.trim(); if (!name || !/\d{3,}/.test(tel)) { toast(esc(T('Indique un nom et un numéro.'))); return; } const L = store.get('routa.assist', []); L.unshift({ name, tel, ref: body.querySelector('#asRef').value.trim() }); store.set('routa.assist', L.slice(0, 4)); openBreakdown(); };
+    body.querySelectorAll('[data-asdel]').forEach((b) => { b.onclick = () => { const L = store.get('routa.assist', []); L.splice(+b.dataset.asdel, 1); store.set('routa.assist', L); openBreakdown(); }; });
   }
 
   /* ---------- #054 checklists de voyage (Premium) ---------- */

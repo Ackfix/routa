@@ -646,3 +646,72 @@ body.navsoft .tripchip { display: none; }
 body.navlite.navigating #navThen, body.navlite.navigating .fabs-right, body.navlite.navigating .prochip, body.navlite.navigating .limitnext, body.navlite.navigating #btnOverview { display: none !important; }
 /* mention « infos indicatives » sous les listes */
 .sheet-note { margin: 0; padding: 8px max(14px, var(--sar, 0px)) calc(8px + var(--sab, 0px)); font-size: 11.5px; line-height: 1.35; color: var(--muted, #9AA3AF); border-top: 1px solid var(--line); background: var(--surface, #171B22); }
+/* favoris garages / assistance */
+.favrow { gap: 8px; align-items: center; }
+.favrow .tapzone { display: flex; flex-direction: column; align-items: flex-start; text-align: left; background: none; border: 0; color: inherit; font: inherit; padding: 0; min-width: 0; text-decoration: none; }
+.favstar { font-size: 20px; color: var(--muted, #9AA3AF); }
+.favstar.on { color: #F5C542; }
+/* ===== Cadran de conduite ===== */
+.dashov { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: calc(var(--sat, 0px) + 56px) 16px calc(var(--sab, 0px) + 16px); color: #F4F6FA; pointer-events: none; --dkc: #FF8A3D; }
+.dashov[hidden] { display: none; }
+.dashov.dm-full { background: radial-gradient(120% 80% at 50% 30%, #1B2130 0%, #0B0E13 60%, #07090C 100%); pointer-events: auto; }
+.dashov.dm-full.ds-neon { background: radial-gradient(120% 80% at 50% 30%, #12051F 0%, #05030A 70%); }
+.dashov.dm-full.ds-race { background: linear-gradient(160deg, #1A1A1A, #050505); }
+.dashov.dm-over { justify-content: flex-start; padding-top: calc(var(--sat, 0px) + 96px); }
+.dashov.dm-over .dk-main { width: min(62vw, 300px); background: rgba(11,14,19,.78); border-radius: 50%; padding: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.45); backdrop-filter: blur(6px); }
+.dashov.dm-over .dk-ws, .dashov.dm-over .dk-note { display: none; }
+.dk-top { position: absolute; top: calc(var(--sat, 0px) + 10px); right: 12px; display: flex; gap: 8px; pointer-events: auto; }
+.dk-btn { width: 44px; height: 44px; border-radius: 22px; border: 0; background: rgba(255,255,255,.12); color: #fff; font-size: 18px; }
+.dashov.dm-over .dk-top { top: calc(var(--sat, 0px) + 56px); }
+.dk-main { position: relative; width: min(92vw, 62vh, 460px); pointer-events: none; }
+.dk-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.dk-track { fill: none; stroke: rgba(255,255,255,.1); stroke-width: 14; stroke-linecap: round; }
+.dk-fill { fill: none; stroke-width: 14; stroke-linecap: round; transition: stroke .3s; }
+.dk-tick { stroke: rgba(255,255,255,.35); stroke-width: 2; }
+.dk-tick.big { stroke: rgba(255,255,255,.85); stroke-width: 3.5; }
+.dk-num { fill: rgba(255,255,255,.7); font: 600 13px Inter, system-ui, sans-serif; text-anchor: middle; }
+.dk-speed { fill: #fff; font-family: Inter, system-ui, sans-serif; font-weight: 800; text-anchor: middle; font-variant-numeric: tabular-nums; letter-spacing: -2px; }
+.dk-unit { fill: rgba(255,255,255,.55); font: 600 14px Inter, system-ui, sans-serif; text-anchor: middle; letter-spacing: 2px; }
+.dk-needle { stroke-width: 5; stroke-linecap: round; }
+.dk-hub { stroke: #0B0E13; stroke-width: 3; }
+.dk-trackbar { fill: rgba(255,255,255,.1); }
+.dk-classic .dk-track { stroke: rgba(255,255,255,.18); stroke-width: 3; }
+.dk-classic .dk-num { font-size: 15px; fill: #fff; }
+.dk-race .dk-track { stroke: #2A2A2A; stroke-width: 22; }
+.dk-race .dk-fill { stroke-width: 22; stroke-linecap: butt; }
+.dk-race .dk-num { font-style: italic; font-weight: 800; }
+.dk-race .dk-speed { font-style: italic; }
+.dk-neon .dk-track { stroke: rgba(255,255,255,.05); }
+.dk-neon .dk-fill { filter: url(#dkGlow); stroke-width: 10; }
+.dk-neon .dk-tick.big { stroke: var(--dkc); }
+.dk-digital .dk-speed { letter-spacing: -4px; }
+.dk-minimal .dk-unit { letter-spacing: 6px; }
+.dk-limit { position: absolute; right: 2%; top: 4%; width: 58px; height: 58px; border-radius: 50%; background: #fff; border: 7px solid #E5484D; color: #111; display: flex; align-items: center; justify-content: center; font: 800 20px Inter, system-ui, sans-serif; }
+.dk-limit.over { animation: dkpulse 1s infinite; }
+@keyframes dkpulse { 50% { transform: scale(1.12); } }
+.dashov.isover .dk-speed { fill: #FF6B6B; }
+.dk-ws { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; width: min(100%, 520px); pointer-events: none; }
+.dk-w { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 10px; text-align: center; }
+.dk-wv { font: 800 18px Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; color: #fff; }
+.dk-wl { font-size: 11px; color: rgba(255,255,255,.55); margin-top: 2px; }
+.dk-gw { grid-row: span 2; }
+.dk-gsvg { width: 72px; height: 72px; display: block; margin: 0 auto 4px; }
+.dk-gring { fill: none; stroke: rgba(255,255,255,.18); stroke-width: 1.5; }
+.dk-note { margin: 0; font-size: 10.5px; color: rgba(255,255,255,.4); text-align: center; pointer-events: none; }
+body.dashon .fab-menu, body.dashon .fab-search { z-index: 41; }
+/* réglages du cadran */
+.dk-preview { background: radial-gradient(120% 90% at 50% 30%, #1B2130, #0B0E13); border-radius: 20px; padding: 14px 30px 6px; margin-bottom: 6px; }
+.dk-styles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.dk-sty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px; border-radius: 14px; border: 2px solid transparent; background: #0E1116; color: #F4F6FA; font: inherit; font-size: 12px; }
+.dk-sty.on { border-color: var(--accent); }
+.dk-sty > span { display: block; width: 100%; }
+.dk-cols { display: flex; flex-wrap: wrap; gap: 10px; }
+.dk-col { width: 40px; height: 40px; border-radius: 50%; border: 3px solid var(--line); }
+.dk-col.on { border-color: var(--fg, #fff); box-shadow: 0 0 0 2px var(--accent); }
+/* curseur deux-roues : pictogramme droit + flèche de direction */
+.mk-me.cur-up { position: relative; }
+.mk-me .cur-ptr { position: absolute; top: 1px; left: 50%; margin-left: -7px; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 10px solid var(--info); filter: drop-shadow(0 -1px 0 #fff); }
+.mk-me svg.upr { width: 70%; height: 70%; fill: none; }
+.mk-me.cur-up i { width: 70%; height: 70%; }
+.dk-svg text { stroke: none; }
+.dk-gw .dk-wv { font-size: 14px; }
