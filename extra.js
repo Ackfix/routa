@@ -1,9 +1,9 @@
-/* ROUTA – amis, convois, rassemblements, points, partage de trajet, navigation TomTom,
+/* ROUTA – convois, rassemblements, points, partage de trajet, navigation TomTom,
    bornes et parkings libres, cols et météo, carnet de la voiture, voiture garée. */
 (function () {
 'use strict';
 const A = window.ROUTA; if (!A) return;
-const { S, DB, map, CFG, esc, ic, el, toast, openSheet, closeSheet, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials } = A;
+const { S, DB, map, CFG, esc, ic, el, toast, openSheet, closeSheet, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, chooseDestination, initials } = A;
 const BANNED_CTRL = /(radar|blitz|flash[ée]?|contr[ôo]le|kontroll|controll|polic|polizei|polizia|pol[ií]cia|flics?\b|keufs?\b|cond[ée]s?\b|gendarm|bullen|schmier|laser|r[ée]p[ée]titeur)/i;
 const ctrlBlocked = (...t) => t.some((x) => x && BANNED_CTRL.test(x));
 const ctrlSafe = (x) => (x && !BANNED_CTRL.test(x) ? x : '');
@@ -44,14 +44,6 @@ async function shareLink(title, text, url) {
     await navigator.clipboard.writeText(text + ' ' + url); toast('Lien copié, colle-le à tes potes !');
   } catch (e) { if (e && e.name !== 'AbortError') toast('Lien : ' + esc(url)); }
 }
-function icsDownload(title, start, minutes, lat, lon, desc) {
-  const f = (d) => d.getUTCFullYear() + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate()) + 'T' + pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + '00Z';
-  const end = new Date(start.getTime() + (minutes || 120) * 60000);
-  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ROUTA//FR', 'BEGIN:VEVENT', 'UID:' + uuid() + '@routa', 'DTSTAMP:' + f(new Date()), 'DTSTART:' + f(start), 'DTEND:' + f(end),
-    'SUMMARY:' + title.replace(/[,;]/g, ' '), 'DESCRIPTION:' + (desc || '').replace(/\n/g, ' ').replace(/[,;]/g, ' '), lat != null ? 'GEO:' + lat + ';' + lon : '',
-    'BEGIN:VALARM', 'TRIGGER:-PT60M', 'ACTION:DISPLAY', 'DESCRIPTION:' + title.replace(/[,;]/g, ' '), 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n');
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' })); a.download = 'routa.ics'; document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1000);
-}
 
 /* ======================= Points et classement ======================= */
 const PTS = { addAlert: 10, addSpot: 20, addPrice: 5, rate: 3 };
@@ -72,16 +64,13 @@ async function openRanking(scope) {
   const body = openSheet('Classement', '<p class="muted">Chargement…</p>', 'ranking');
   let rows = [], myRank = null, failed = false;
   const mine = S.me.points || 0;
-  const friendIds = (S.me.friends || []).map((f) => f.id).concat([S.me.id]);
   if (DB.sb) {
     try {
       let q = DB.sb.from('drivers').select('id,pseudo,color,points,car').gte('points', RANK_MIN).order('points', { ascending: false }).limit(50);
-      if (scope === 'friends') q = q.in('id', friendIds);
       const { data, error } = await q; if (error) throw error;
       rows = data || [];
       if (mine >= RANK_MIN) {
         let cq = DB.sb.from('drivers').select('id', { count: 'exact', head: true }).gt('points', mine);
-        if (scope === 'friends') cq = cq.in('id', friendIds);
         const { count } = await cq; if (typeof count === 'number') myRank = count + 1;
       }
     } catch (e) { failed = true; }
@@ -100,78 +89,6 @@ async function openRanking(scope) {
       : '<div class="empty">' + esc(TRX('Personne n\'a encore 100 points ici.')) + '</div>') +
     '<p class="muted small">' + esc(TRX('On apparaît dans le classement à partir de 100 points.')) + ' Points : alerte signalée +10, alerte confirmée +2, spot ajouté +20, prix signalé +5, avis +3.</p>';
   body.querySelectorAll('#rkSeg button').forEach((b) => { b.onclick = () => openRanking(b.dataset.s); });
-}
-
-/* ======================= Amis : demandes depuis la carte ======================= */
-const isFriendId = (id) => (S.me.friends || []).some((f) => f.id === id);
-let pendingReq = store.get('routa.freq', []);
-const saveReq = () => store.set('routa.freq', pendingReq);
-X.requestFriend = async (d) => {
-  if (isFriendId(d.id)) { toast('Vous êtes déjà amis.'); return; }
-  const ok = await DB.sendMsg({ id: uuid(), from_id: S.me.id, from_name: S.me.pseudo, to_id: d.id, kind: 'friend_req', body: S.me.car || null, created_at: nowIso() });
-  if (ok) { addFriend({ id: d.id, pseudo: d.pseudo }); toast('Demande envoyée à <b>' + esc(d.pseudo) + '</b>. Dès qu\'il accepte, vous vous voyez sur la carte.'); }
-};
-async function acceptFriend(r) {
-  addFriend({ id: r.id, pseudo: r.pseudo });
-  pendingReq = pendingReq.filter((x) => x.id !== r.id); saveReq(); updateTileBadge();
-  await DB.sendMsg({ id: uuid(), from_id: S.me.id, from_name: S.me.pseudo, to_id: r.id, kind: 'friend_ok', body: null, created_at: nowIso() });
-}
-function refuseFriend(r) { pendingReq = pendingReq.filter((x) => x.id !== r.id); saveReq(); updateTileBadge(); }
-function handleFriendMsg(m, live) {
-  if (m.kind === 'friend_req' || m.kind === 'friend_ok') return true; // amis supprimés : ces anciens messages sont ignorés
-  if (m.kind === 'friend_req' && m.to_id === S.me.id) {
-    if (isFriendId(m.from_id)) return true;
-    if (!pendingReq.some((x) => x.id === m.from_id)) { pendingReq.push({ id: m.from_id, pseudo: m.from_name || 'Conducteur', car: m.body || '', at: m.created_at }); saveReq(); }
-    if (live) {
-      vibrate([60, 40, 60]);
-      const r = pendingReq.find((x) => x.id === m.from_id);
-      toast('<b>' + esc(r.pseudo) + '</b> veut t\'ajouter en ami', { action: 'Accepter', onAction: () => { acceptFriend(r); }, ms: 12000 });
-    }
-    updateTileBadge(); return true;
-  }
-  if (m.kind === 'friend_ok' && m.to_id === S.me.id) {
-    if (!isFriendId(m.from_id)) addFriend({ id: m.from_id, pseudo: m.from_name || 'Conducteur' });
-    if (live) toast('<b>' + esc(m.from_name || 'Ton ami') + '</b> a accepté ta demande d\'ami.');
-    return true;
-  }
-  return false;
-}
-X.onMsg = (m) => {
-  if (m.kind === 'friend_req' || m.kind === 'friend_ok') return handleFriendMsg(m, true);
-  return false;
-};
-function sweepMessages() {
-  if (!Array.isArray(S.messages)) return;
-  const keep = [];
-  S.messages.forEach((m) => { if (m.kind === 'friend_req' || m.kind === 'friend_ok') handleFriendMsg(m, false); else keep.push(m); });
-  if (keep.length !== S.messages.length) S.messages.splice(0, S.messages.length, ...keep);
-}
-function openFriends() {
-  A.openK('drivers'); return; // amis supprimés : la liste des conducteurs remplace cet écran
-  sweepMessages();
-  const fr = S.me.friends || [];
-  const body = openSheet('Amis et conducteurs',
-    '<div class="row wrap hubrow"><button class="btn soft grow" id="hubDrivers">Conducteurs autour</button><button class="btn soft grow" id="hubRank">' + IC.trophy + 'Classement · ' + (S.me.points || 0) + ' pts</button><button class="btn soft grow" id="hubShare">' + IC.share + ((X.share && X.share.until > Date.now()) ? 'Position partagée' : 'Partager ma position') + '</button></div>' +
-    (pendingReq.length ? '<h3>Demandes reçues</h3>' + pendingReq.map((r, i) => '<div class="card"><div class="ico" style="background:#FF8A3D;border-radius:22px">' + esc(initials(r.pseudo)) + '</div><div class="grow"><b>' + esc(r.pseudo) + '</b><div class="sub">' + esc(r.car || '') + '</div></div><button class="btn small" data-ok="' + i + '">Accepter</button><button class="iconbtn small" data-no="' + i + '" aria-label="Refuser">' + ic('trash') + '</button></div>').join('') : '') +
-    '<h3>Mes amis</h3>' +
-    (fr.length ? fr.map((f, i) => { const d = S.drivers.get(f.id); const on = d && Date.now() - Date.parse(d.updated_at) < 3 * 60000; return '<div class="card"><div class="ico" style="background:' + esc((d && d.color) || '#4DA3FF') + ';border-radius:22px">' + esc(initials(f.pseudo)) + '</div><div class="grow"><b>' + esc(f.pseudo) + '</b><div class="sub">' + (on ? 'En ligne' + (S.pos && d.lat != null ? ' · ' + fmtDist(dist(S.pos, d)) : '') : 'Hors ligne') + '</div></div><button class="btn small" data-msg="' + i + '">Bump</button></div>'; }).join('') : '<div class="empty">Pas encore d\'amis. Touche un conducteur sur la carte puis « Demander en ami », ou entre le code d\'un pote ci-dessous.</div>') +
-    '<form id="frCodeF" class="row"><label class="field grow" for="frCode">Code ami<input id="frCode" maxlength="6" autocapitalize="characters" placeholder="Ex. : K7P2QX"></label><button class="btn" type="submit">Ajouter</button></form>' +
-    '<p class="muted small">Ton code : <b class="code">' + esc(S.me.code || '') + '</b></p>', 'friends');
-  body.querySelector('#hubDrivers').onclick = () => A.openK('drivers');
-  body.querySelector('#hubRank').onclick = () => openRanking('all');
-  body.querySelector('#hubShare').onclick = openShareSheet;
-  body.querySelectorAll('[data-ok]').forEach((b) => { b.onclick = async () => { await acceptFriend(pendingReq[+b.dataset.ok]); openFriends(); }; });
-  body.querySelectorAll('[data-no]').forEach((b) => { b.onclick = () => { refuseFriend(pendingReq[+b.dataset.no]); openFriends(); }; });
-  body.querySelectorAll('[data-msg]').forEach((b) => { b.onclick = () => A.bump(fr[+b.dataset.msg]); });
-  body.querySelector('#frCodeF').onsubmit = async (e) => {
-    e.preventDefault();
-    const c = $('frCode').value.trim().toUpperCase();
-    if (c.length !== 6) { toast('Le code fait 6 caractères.'); return; }
-    if (c === S.me.code) { toast('C\'est ton propre code.'); return; }
-    const d = await DB.findByCode(c);
-    if (!d) { toast('Code introuvable. Ton ami doit avoir ouvert l\'app au moins une fois.'); return; }
-    await X.requestFriend(d); openFriends();
-  };
 }
 
 /* ======================= Partager mon trajet en direct ======================= */
@@ -1008,8 +925,6 @@ function carnetInto(root) {
     };
     inp.addEventListener('change', save); inp.addEventListener('blur', save);
   });
-  const evOf = (k) => ({ t: TRX((DUE.find((x) => x[0] === k) || [k, k])[1]), d: carnet.dates[k] });
-  // ajout au calendrier : retiré pour l'instant (il sera remis quand il marchera dans l'app iPhone)
   body.querySelector('#fAdd').onclick = () => {
     const km = parseInt(body.querySelector('#fKm').value, 10) || null, liters = parseFloat(String(body.querySelector('#fL').value).replace(',', '.')) || null, price = parseFloat(String(body.querySelector('#fP').value).replace(',', '.'));
     if (!liters) { toast(esc(TRX('Indique au moins les litres.'))); return; }
@@ -1017,15 +932,6 @@ function carnetInto(root) {
   };
   body.querySelectorAll('[data-fdel]').forEach((b) => { b.onclick = () => { carnet.fills = carnet.fills.filter((f) => String(f.date) !== b.dataset.fdel); saveCarnet(); carnetInto(root); }; });
   if (X.onCarnet) X.onCarnet(root);
-}
-/* Calendrier : une page dédiée crée le fichier et l'ouvre dans le calendrier du téléphone.
-   Dans l'app iPhone/Android, elle s'ouvre dans le navigateur du téléphone (seul lui sait l'ajouter au calendrier). */
-function calOpen(events) {
-  const lang = (window.ROUTA_I18N && ROUTA_I18N.lang) || 'fr';
-  const data = btoa(unescape(encodeURIComponent(JSON.stringify({ l: lang, e: events })))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-  if (native) { location.href = 'https://ackfix.github.io/routa/calendrier.html#' + data; return; }
-  const w = window.open('calendrier.html#' + data, '_blank'); if (!w) location.href = 'calendrier.html#' + data;
 }
 X.carnetInto = carnetInto;
 function openCarnet() {
@@ -1143,7 +1049,6 @@ setTimeout(() => {
 }, 25000);
 
 /* ======================= Menu ======================= */
-function updateTileBadge() { const b = $('menuBadge'); if (b && pendingReq.length && b.hidden) { b.hidden = false; b.textContent = pendingReq.length; } }
 X.tiles = () => [
   ['convoy', IC.convoy, X.convoy ? 'Convoi · ' + esc(X.convoy.name) : 'Convoi'],
   ['events', IC.event, 'Rassemblements'],
@@ -1155,9 +1060,8 @@ X.tiles = () => [
   ['parked', IC.car, 'Ma voiture garée']
 ];
 X.icons = IC;
-X.pendingCount = () => pendingReq.length;
 X.open = (k) => {
-  const f = { install: openInstall, friends: openFriends, convoy: openConvoy, events: openEvents, ranking: () => openRanking('all'), shareme: openShareSheet, chargers: openChargers, parkfree: openFreeParking, cols: openCols, carnet: openCarnet, parked: openParked, trips: openTrips, offline: openOffline, pro: openPro }[k];
+  const f = { install: openInstall, convoy: openConvoy, events: openEvents, ranking: () => openRanking('all'), shareme: openShareSheet, chargers: openChargers, parkfree: openFreeParking, cols: openCols, carnet: openCarnet, parked: openParked, trips: openTrips, offline: openOffline, pro: openPro }[k];
   if (f) { f(); return true; }
   return false;
 };
@@ -1206,24 +1110,6 @@ function routeHazard() {
   hz.hidden = false;
 }
 setInterval(routeHazard, 3000);
-
-/* ======================= Un ami est tout près ======================= */
-const friendSeen = new Map();
-function checkFriendsNear() {
-  return; // plus d'amis : plus d'alerte
-  if (!S.pos || !S.me) return;
-  S.drivers.forEach((d) => {
-    if (!d || !Array.isArray(d.friends) || !d.friends.includes(S.me.id) || d.lat == null) return;
-    if (Date.now() - Date.parse(d.updated_at) > 3 * 60000) return;
-    const m = dist(S.pos, d);
-    const last = friendSeen.get(d.id) || 0;
-    if (m <= 2000 && Date.now() - last > 30 * 60000) {
-      friendSeen.set(d.id, Date.now());
-      toast(TRX('{n} est à {d} de toi', { n: '<b>' + esc(d.pseudo || TRX('Un ami')) + '</b>', d: fmtDist(m) }), { action: TRX('Voir'), onAction: () => A.openDriver && A.openDriver(d.id), ms: 7000 });
-    }
-  });
-}
-setInterval(checkFriendsNear, 15000);
 
 /* ======================= Carte hors connexion de ma région ======================= */
 const RMAP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RoutaMap;
@@ -1630,14 +1516,12 @@ setInterval(lowCheck, 4000);
 async function start() {
   for (let i = 0; i < 40 && !(S.me && S.me.pseudo && DB.sb); i++) await new Promise((r) => setTimeout(r, 500));
   if (!S.me || !S.me.pseudo) { setTimeout(start, 3000); return; }
-  setTimeout(sweepMessages, 4000); setTimeout(sweepMessages, 12000);
   drawParked(); carnetReminders();
   await loadEvents(); setInterval(loadEvents, 5 * 60000);
   if (X.convoy) { subscribeConvoy(); loadConvoyMsgs(); }
   const qs = new URLSearchParams(location.search);
   if (qs.get('convoi')) { if (await joinConvoy(qs.get('convoi'))) openConvoy(); history.replaceState(null, '', location.pathname); }
   else if (qs.get('event')) { const id = qs.get('event'); history.replaceState(null, '', location.pathname); setTimeout(() => openEvent(id), 800); }
-  updateTileBadge();
 }
 start();
 })();

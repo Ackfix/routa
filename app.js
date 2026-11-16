@@ -781,7 +781,7 @@ function renderMe() {
 function visibleDriver(d) {
   if (!d || d.id === S.me.id || d.lat == null || d.lon == null) return null;
   if (Date.now() - Date.parse(d.updated_at) > 3 * 60000) return null;
-  const isFriend = (Array.isArray(d.friends) && d.friends.includes(S.me.id)) || !!(window.ROUTA_X && ROUTA_X.isMate && ROUTA_X.isMate(d));
+  const isFriend = !!(window.ROUTA_X && ROUTA_X.isMate && ROUTA_X.isMate(d)); // membres du même convoi
   if (d.visibility === 'amis' && !isFriend) return null;
   if (d.visibility === 'invisible') return null;
   if (isFriend) return { lat: d.lat, lon: d.lon, fuzzy: false };
@@ -812,7 +812,6 @@ function renderDrivers() {
     m.setLngLat([d.vlon, d.vlat]);
   });
   S.markers.drivers.forEach((m, id) => { if (!seen.has(id)) { m.remove(); S.markers.drivers.delete(id); } });
-  if (S.sheetView === 'drivers') openDrivers();
 }
 setInterval(() => { if (!document.hidden) renderDrivers(); }, 30000);
 
@@ -2768,18 +2767,6 @@ function bindVisSeg(root, id, after) {
     };
   });
 }
-function openDrivers() {
-  const list = driversList();
-  const keepScroll = S.sheetView === 'drivers' ? $('sheetBody').scrollTop : 0;
-  const body = openSheet('Conducteurs autour', '<h3>' + esc(I18N.t('Visibilité sur la carte')) + '</h3>' + visSeg('dvVis') +
-    (!S.online ? '<div class="banner">' + ic('info') + '<span>Mode solo : active le mode en ligne (voir le guide) pour voir les autres conducteurs.</span></div>' : '') +
-    (list.length ? list.map((d, i) => '<div class="card"><div class="ico" style="background:' + esc(d.color || '#FF8A3D') + ';border-radius:22px">' + esc(initials(d.pseudo)) + '</div><button class="grow" data-open="' + i + '" style="background:none;border:0;text-align:left;padding:0"><b>' + esc(d.pseudo) + '</b><div class="sub">' + esc(d.car || 'Voiture inconnue') + ' · ' + (d.dist != null ? (d.fuzzy ? 'env. ' : '') + fmtDist(d.dist) : '') + (d.speed ? ' · ' + d.speed + ' km/h' : '') + '</div></button></div>').join('')
-      : '<div class="empty">Personne de visible pour le moment.</div>'), 'drivers');
-  body.scrollTop = keepScroll;
-  bindVisSeg(body, 'dvVis');
-  body.querySelectorAll('[data-bump]').forEach((b) => { b.onclick = () => bump(list[+b.dataset.bump]); });
-  body.querySelectorAll('[data-open]').forEach((b) => { b.onclick = () => openDriver(list[+b.dataset.open].id); });
-}
 function openDriver(id) {
   const d = driversList().find((x) => x.id === id); if (!d) { toast("Ce conducteur n'est plus visible."); return; }
   const body = openSheet(d.pseudo,
@@ -2789,68 +2776,9 @@ function openDriver(id) {
   body.querySelector('#dReport').onclick = () => openFeedback({ kind: 'autre', page: 'signalement pseudo ' + d.id, text: I18N.t('Pseudo signalé :') + ' ' + (d.pseudo || '') + (d.car ? ' (' + d.car + ')' : '') + '\n' });
   body.querySelector('#dJoin').onclick = () => { closeSheet(); chooseDestination({ name: d.pseudo, sub: d.car || '', lat: d.vlat, lon: d.vlon }); };
 }
-function canBump() {
-  const now = Date.now(); const list = store.get('routa.bumps', []).filter((t) => now - t < 15 * 60000);
-  if (list.length >= 3) { const wait = Math.ceil((list[0] + 15 * 60000 - now) / 60000); toast('Maximum 3 bumps par quart d\'heure. Prochain bump possible dans ' + wait + ' min.'); return false; }
-  list.push(now); store.set('routa.bumps', list); return true;
-}
-async function bump(d) {
-  if (!canBump()) return;
-  const ok = await DB.sendMsg({ id: uuid(), from_id: S.me.id, from_name: S.me.pseudo, to_id: d.id, kind: 'bump', body: null, created_at: new Date().toISOString() });
-  if (ok) { vibrate(40); toast('Bump envoyé à <b>' + esc(d.pseudo) + '</b>'); }
-}
-function nameOf(id) {
-  const d = S.drivers.get(id); if (d) return d.pseudo;
-  const f = (S.me.friends || []).find((x) => x.id === id); if (f) return f.pseudo;
-  const m = S.messages.find((x) => x.from_id === id && x.from_name); return m ? m.from_name : 'Conducteur';
-}
-function onIncoming(m) {
-  if (S.messages.some((x) => x.id === m.id)) return;
-  if (window.ROUTA_X && ROUTA_X.onMsg && ROUTA_X.onMsg(m)) return;
-  return; // bumps et messages entre conducteurs supprimés : rien n'est affiché
-  S.messages.push(m);
-  updateBadge();
-  const who = m.from_name || nameOf(m.from_id);
-  if (m.kind === 'bump') {
-    vibrate([80, 60, 80]);
-    toast('<b>' + esc(who) + '</b> t\'a envoyé un bump !', { action: 'Bump en retour', onAction: () => bump({ id: m.from_id, pseudo: who }) });
-  }
-  if (S.sheetView === 'thread:' + m.from_id) openThread(m.from_id);
-  else if (S.sheetView === 'messages') openMessages();
-}
-function updateBadge() {
-  const n = S.messages.filter((m) => m.to_id === S.me.id && Date.parse(m.created_at) > S.lastRead).length;
-  $('msgBadge').hidden = !n; $('msgBadge').textContent = n;
-  $('menuBadge').hidden = !n; $('menuBadge').textContent = n;
-}
-function markRead() { S.lastRead = Date.now(); store.set('routa.lastRead', S.lastRead); updateBadge(); }
-function openMessages() {
-  markRead();
-  const convs = new Map();
-  S.messages.forEach((m) => { const other = m.from_id === S.me.id ? m.to_id : m.from_id; convs.set(other, m); });
-  const list = [...convs.entries()].sort((a, b) => Date.parse(b[1].created_at) - Date.parse(a[1].created_at));
-  const body = openSheet('Bumps reçus',
-    (!S.online ? '<div class="banner">' + ic('info') + '<span>Les messages demandent le mode en ligne (voir le guide).</span></div>' : '') +
-    (list.length ? list.map(([id, m], i) => '<button class="card tap" data-i="' + i + '"><div class="ico" style="background:' + esc((S.drivers.get(id) || {}).color || '#FF8A3D') + ';border-radius:22px">' + esc(initials(nameOf(id))) + '</div><div class="grow"><b>' + esc(nameOf(id)) + '</b><div class="sub">' + (m.from_id === S.me.id ? 'Toi : ' : '') + (m.kind === 'bump' ? 'Bump !' : esc(m.body)) + '</div></div><div class="val"><small>' + ago(m.created_at) + '</small></div></button>').join('')
-      : '<div class="empty">Aucun message. Envoie un bump à un conducteur depuis la carte.</div>'), 'messages');
-  body.querySelectorAll('.card').forEach((b) => { b.onclick = () => openThread(list[+b.dataset.i][0]); });
-}
-function openThread(otherId) {
-  markRead();
-  const msgs = S.messages.filter((m) => (m.from_id === otherId && m.to_id === S.me.id) || (m.from_id === S.me.id && m.to_id === otherId)).slice(-40);
-  const body = openSheet(nameOf(otherId),
-    '<div style="display:flex;flex-direction:column;gap:8px">' + (msgs.length ? msgs.map((m) => '<div class="msg' + (m.from_id === S.me.id ? ' mine' : '') + '">' + (m.kind === 'bump' ? '<b>Bump !</b>' : esc(m.body)) + '<div class="meta">' + ago(m.created_at) + '</div></div>').join('') : '<div class="empty">Pas encore de message.</div>') + '</div>' +
-    '<button class="btn block" id="thBump">Envoyer un bump</button><p class="muted small">Maximum 3 bumps par quart d\'heure.</p>', 'thread:' + otherId);
-  body.scrollTop = body.scrollHeight;
-  body.querySelector('#thBump').onclick = async () => { await bump({ id: otherId, pseudo: nameOf(otherId) }); openThread(otherId); };
-}
+function onIncoming(m) { /* bumps, amis et messages entre conducteurs retirés : rien à afficher */ }
 
 /* Amis */
-function addFriend(f) {
-  S.me.friends = (S.me.friends || []).filter((x) => x.id !== f.id).concat([f]);
-  saveMe(); pushPresence(true);
-  toast('<b>' + esc(f.pseudo) + '</b> est ton ami : il te voit quand tu es visible.');
-}
 
 /* ======================= Mon véhicule ======================= */
 function updateVehChip() {
@@ -3376,9 +3304,8 @@ function onboarding() {
 /* ======================= Boutons ======================= */
 function openK(k) {
     if (k === 'backstart') { closeSheet(); goBackStart(); }
-    else if (k === 'drivers') openDrivers();
+    else if (k === 'drivers') openProfile();
     else if (k === 'spots') openSpots();
-    else if (k === 'messages') openMessages();
     else if (k === 'feedback') openFeedback();
     else if (k === 'vehicle') openVehicle(S.preview ? (() => { const d = S.preview.dest; return () => chooseDestination(d); })() : null);
     else if (k === 'restrictions') openRestrictions();
@@ -3428,7 +3355,6 @@ function openCredits() {
   openSheet(I18N.t('Crédits de la carte'), L.map(([n, d, u]) => '<a class="card tap" href="' + esc(u) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span class="grow"><b>' + esc(n) + '</b><span class="sub">' + esc(d) + '</span></span></a>').join(''), 'credits');
 }
 function openMenu() {
-  const n = +($('msgBadge').hidden ? 0 : $('msgBadge').textContent) || 0;
   const X = window.ROUTA_X || {}; const XI = X.icons || {};
   const fr = X.pendingCount ? X.pendingCount() : 0;
   const v = veh();
@@ -3532,7 +3458,7 @@ async function boot() {
   startGps();
   await DB.init();
   try { await DB.loadAll(); } catch (e) { console.warn(e); }
-  const draw = () => { renderAlerts(); renderSpots(); renderDrivers(); updateBadge(); };
+  const draw = () => { renderAlerts(); renderSpots(); renderDrivers(); };
   draw();
   DB.subscribe();
   pushPresence(true);
@@ -3552,7 +3478,7 @@ if (!store.get('routa.mig096', false)) { S.settings.voice = false; S.settings.re
 if (!store.get('routa.mig0913', false)) { S.settings.traffic = true; S.settings.showPlaces = true; S.settings.showTransit = false; saveSettings(); store.set('routa.mig0913', true); }
 S.settings.mapType = 'plan';
 S.settings.relief3d = false;
-window.ROUTA = { reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, bump, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, addFriend, openThread, chooseDestination, initials, veh, nameOf, openDriver, startNav, openSpot, openPoi, goBackStart, capLimit, openCursor, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
+window.ROUTA = { reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, chooseDestination, initials, veh, openDriver, startNav, openSpot, openPoi, goBackStart, capLimit, openCursor, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
 if (!S.me || !S.me.pseudo) onboarding(); else boot();
 
 })();
