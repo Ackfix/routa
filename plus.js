@@ -148,6 +148,22 @@
     } catch (e) { return []; }
   }
 
+  /* ---------- #027 · dangers connus sur le trajet (OpenStreetMap : passages à niveau et panneaux de danger cartographiés) ---------- */
+  const HZ = { level_crossing: 'Passage à niveau', falling_rocks: 'Chutes de pierres', landslide: 'Chutes de pierres', dangerous_curve: 'Virage dangereux', curve: 'Virage dangereux', curves: 'Virages dangereux', slippery: 'Chaussée glissante', ice: 'Risque de verglas signalé', school_zone: 'Zone d\'école', children: 'Enfants', fog: 'Brouillard fréquent', side_winds: 'Vent latéral' };
+  async function hazardsOnRoute(R) {
+    if (!A.overpass || !R || R.total < 2000) return [];
+    const pts = sample(R, 400, 150000);
+    if (pts.length < 2) return [];
+    const line = pts.map((p) => p.lat.toFixed(5) + ',' + p.lon.toFixed(5)).join(',');
+    const q = '[out:json][timeout:25];(node["railway"="level_crossing"](around:25,' + line + ');node["hazard"~"^(falling_rocks|landslide|dangerous_curve|curve|curves|slippery|ice|school_zone|children|fog|side_winds)$"](around:40,' + line + '););out 300;';
+    try {
+      const els = await Promise.race([A.overpass(q, pts.every((p) => A.inCH && A.inCH(p))), new Promise((_, rej) => setTimeout(() => rej(new Error('lent')), 30000))]);
+      const fine = sample(R, 40, 150000);
+      return (els || []).map((e) => { const t = e.tags || {}; const k = t.railway === 'level_crossing' ? 'level_crossing' : t.hazard; const h = nearRoute(fine, { lat: e.lat, lon: e.lon }, k === 'level_crossing' ? 30 : 60); return h && HZ[k] ? { id: e.id, k, lat: e.lat, lon: e.lon, along: h.along } : null; })
+        .filter(Boolean).sort((a, b) => a.along - b.along).filter((x, i, arr) => i === 0 || x.k !== arr[i - 1].k || x.along - arr[i - 1].along > 300);
+    } catch (e) { return []; }
+  }
+
   /* ---------- aires de repos sur la suite du trajet (pour les pauses) ---------- */
   async function restAreas(R) {
     if (!A.overpass || !R || R.total < 20000) return [];
@@ -201,15 +217,19 @@
         box.appendChild(avoidBtn(T('Contourner cette zone'), dest, [{ id: 'zfe:' + z.n, s: bb, w: a, n: d, e: c }]));
       }
     });
-    const [works, animals] = await Promise.all([worksOnRoute(R), animalsOnRoute(R)]);
+    const [works, animals, hazards] = await Promise.all([worksOnRoute(R), animalsOnRoute(R), (!R.mode || R.mode === 'car') ? hazardsOnRoute(R) : Promise.resolve([])]);
     if (P.R !== R || !box.isConnected) return;
-    P.works = works; P.animals = animals;
+    P.works = works; P.animals = animals; P.hazards = hazards;
     if (works.length) {
       const closed = works.filter((w) => w.cat === 8).length;
       const lines = works.slice(0, 4).map((w) => '<br>· ' + esc(fmtDist(Math.round(w.along / 100) * 100)) + ' : ' + esc(w.cat === 8 ? T('route fermée') : T('travaux')) + (w.road ? ' ' + esc(w.road) : '') + (w.where ? ' (' + esc(w.where) + ')' : '') + (w.delay > 60 ? ' · +' + esc(fmtDur(w.delay)) : '')).join('');
       box.appendChild(banner(IC.work, '<b>' + esc(T(closed ? 'Travaux et fermetures sur le trajet' : 'Travaux sur le trajet')) + ' : ' + works.length + '</b>' + lines, closed > 0));
       // #057 : recalculer en évitant ces endroits (données TomTom en cours, pas de suppositions)
       if (X.avoidAdd) box.appendChild(avoidBtn(T(closed ? 'Éviter ces fermetures et travaux' : 'Éviter ces travaux'), dest, works.slice(0, 8).map(workRect)));
+    }
+    if (hazards.length) {
+      const cnt = {}; hazards.forEach((h) => { const n = HZ[h.k]; cnt[n] = (cnt[n] || 0) + 1; });
+      box.appendChild(banner(IC.work, '<b>' + esc(T('Dangers connus sur le trajet')) + '</b><br>' + Object.keys(cnt).map((n) => '· ' + esc(T(n)) + ' × ' + cnt[n]).join('<br>') + '<br><span class="muted small">' + esc(T('Source : OpenStreetMap. Rappel visuel discret pendant la navigation.')) + '</span>'));
     }
     if (animals.length) box.appendChild(banner(IC.deer, esc(T('{n} passages d\'animaux sauvages signalés sur le trajet. Prudence surtout la nuit.', { n: animals.length }))));
   }
@@ -281,6 +301,11 @@
       pauseToast(T('Il est tard et tu roules depuis un moment. Au moindre bâillement, fais une pause.'));
     }
     const a = alongNow();
+    /* #027 · danger connu : 400 m avant, visuel seulement */
+    if (moving && S.speed > 8) {
+      const hz = (P.R === N.R ? (P.hazards || []) : []).find((x) => x.along > a && x.along - a < 400 && !P.warned['h' + x.id]);
+      if (hz) { P.warned['h' + hz.id] = 1; toast(IC.work + ' ' + esc(T('{n} dans {d}', { n: T(HZ[hz.k]), d: fmtDist(Math.round((hz.along - a) / 50) * 50) })), { ms: 6000 }); }
+    }
     /* 40 · faune : la nuit, 600 m avant */
     if (moving && isDark()) {
       const an = (P.R === N.R ? P.animals : []).find((x) => x.along > a && x.along - a < 600 && !P.warned['a' + x.along]);
@@ -291,7 +316,7 @@
       D.worksAt = now; const R0 = N.R;
       worksOnRoute(R0).then((w) => {
         if (S.nav && S.nav.R === R0) {
-          if (P.R !== R0) { P.R = R0; P.animals = []; }
+          if (P.R !== R0) { P.R = R0; P.animals = []; P.hazards = []; if (!N.mode || N.mode === 'car') hazardsOnRoute(R0).then((h) => { if (P.R === R0) P.hazards = h; }); }
           P.works = w;
           const a2 = alongNow();
           const cl = w.find((x) => x.cat === 8 && x.along > a2 + 300 && x.along - a2 < 30000 && !P.warned['c' + x.id]);
