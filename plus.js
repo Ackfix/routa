@@ -223,7 +223,7 @@
         box.appendChild(avoidBtn(T('Contourner cette zone'), dest, [{ id: 'zfe:' + z.n, s: bb, w: a, n: d, e: c }]));
       }
     });
-    const [works, animals, hazards] = await Promise.all([worksOnRoute(R), animalsOnRoute(R), (!R.mode || R.mode === 'car') ? hazardsOnRoute(R) : Promise.resolve([])]);
+    const [works, [animals, hazards]] = await Promise.all([worksOnRoute(R), animalsOnRoute(R).then(async (an) => [an, (!R.mode || R.mode === 'car') ? await hazardsOnRoute(R) : []])]);
     if (P.R !== R || !box.isConnected) return;
     P.works = works; P.animals = animals; P.hazards = hazards;
     if (works.length) {
