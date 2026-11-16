@@ -170,6 +170,7 @@
     } catch (e) { return []; }
   }
 
+  X.hazardsOnRoute = hazardsOnRoute;
   /* ---------- aires de repos sur la suite du trajet (pour les pauses) ---------- */
   async function restAreas(R) {
     if (!A.overpass || !R || R.total < 20000) return [];
