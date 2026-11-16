@@ -550,6 +550,7 @@ X.preview = (R, dest, body) => {
   box.appendChild(viaBox(dest, R));
   if (!/parking/i.test(dest.sub || '')) { const pb = el('<button class="btn soft block">' + ic('parking') + esc(TRX('Parkings près de la destination')) + '</button>'); pb.onclick = () => X.parkingsNear(dest); box.appendChild(pb); }
   if (R.total > 30000 && (!R.mode || R.mode === 'car')) { const rb = el('<button class="btn soft block">' + ic(A.veh && A.veh().ev ? 'charge' : 'fuel') + esc(TRX('Autonomie sur ce trajet')) + ' <span class="prem">Premium</span></button>'); rb.onclick = () => X.rangeAssist(R, dest); box.appendChild(rb); }
+  if (X.planSave) { const pb2 = el('<button class="btn soft block">' + '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>' + esc(TRX('Planifier ce voyage')) + ' <span class="prem">Premium</span></button>'); pb2.onclick = () => X.planSave(R, dest); box.appendChild(pb2); }
   if ((R.duration || 0) > 7200 && (!R.mode || R.mode === 'car')) { const bb = el('<button class="btn soft block">' + ic('truckstop') + esc(TRX('Pauses conseillées sur le trajet')) + ' <span class="prem">Premium</span></button>'); bb.onclick = () => X.smartBreaks(R, dest); box.appendChild(bb); }
   go.parentNode.insertBefore(box, go.nextSibling);
   routeWeather(R, box);
@@ -637,6 +638,8 @@ const MAX_VIA = 5;
 const routeDest = () => (S.nav && S.nav.dest) || (S.preview && S.preview.dest) || null;
 const curRoute = () => (S.nav && S.nav.R) || (S.preview && S.preview.R) || null;
 const openVias = (d) => (d && X.via.length && X.viaFor === keyOf(d) ? X.via.filter((v) => !v.done) : []);
+X.viasFor = (d) => openVias(d).map((v) => ({ name: v.name, lat: v.lat, lon: v.lon }));
+X.setVias = (d, list) => { X.via = (list || []).map((v) => ({ name: v.name, lat: v.lat, lon: v.lon })); X.viaFor = keyOf(d); X.altIdx = 0; };
 function nearIdx(R, p) { let b = 0, bd = Infinity; for (let i = 0; i < R.coords.length; i += 2) { const x = dist(R.coords[i], p); if (x < bd) { bd = x; b = i; } } return b; }
 function viaChanged(d) {
   X.altIdx = 0;

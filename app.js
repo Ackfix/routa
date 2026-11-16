@@ -3259,6 +3259,7 @@ function openMenu() {
       X.open && ['events', XI.event || ic('spot'), 'Rassemblements'],
       ['spots', ic('spot'), 'Spots, routes et cols'],
       XO('cols') && xt('cols'),
+      XO('plan') && xt('plan'),
       XO('voyage') && xt('voyage')
     ]],
     ['Carte et routes', [

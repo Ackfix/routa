@@ -615,3 +615,11 @@ body.navsoft .tripchip { display: none; }
 .card.wxwarn { box-shadow: inset 3px 0 0 var(--warn, #F5C542); }
 #wxOff { margin-bottom: 10px; }
 #wxOff button { font-size: 12.5px; }
+/* #026 planification */
+.planline { margin: 6px 0 14px; padding-left: 4px; }
+.plstop { position: relative; display: flex; align-items: center; gap: 12px; min-height: 40px; }
+.plstop i { position: relative; z-index: 1; width: 12px; height: 12px; border-radius: 50%; background: #7C5CFF; flex: none; margin-left: 4px; }
+.plstop.end i { width: 18px; height: 18px; margin-left: 1px; background: var(--accent); }
+.plstop:not(:last-child)::after { content: ""; position: absolute; left: 9px; top: 26px; bottom: -14px; width: 2px; background: var(--line); }
+.plstop span { font-weight: 600; }
+.plstop.end span { font-weight: 800; }
