@@ -545,6 +545,7 @@ function updateCompass() {
   n.classList.toggle('active', !!(S.nav && S.settings.navNorth));
 }
 map.on('rotate', updateCompass);
+map.on('rotate', () => meOnRotate());
 map.on('rotatestart', (e) => { if (e.originalEvent) stopFollow(); });
 
 /* Plan, satellite et relief 3D */
@@ -661,7 +662,8 @@ function myView(ahead) {
   if (N && N.snap && Date.now() - N.snap.t < 4000) {
     if (!go || N.along == null || !N.R) return { lat: N.snap.lat, lon: N.snap.lon, heading: N.snap.heading };
     const P0 = pointAt(N.R, N.along + go), P1 = pointAt(N.R, N.along + go + 40);
-    return { lat: P0.lat, lon: P0.lon, heading: dist(P0, P1) > 5 ? bearing(P0, P1) : N.snap.heading };
+    const H0 = pointAt(N.R, N.along + Math.min(go, spd * 0.8)), H1 = pointAt(N.R, N.along + Math.min(go, spd * 0.8) + 30);
+    return { lat: P0.lat, lon: P0.lon, heading: dist(H0, H1) > 5 ? bearing(H0, H1) : N.snap.heading };
   }
   if (go && S.heading != null && S.moving) {
     const m = Math.min(go, 70), h = toRad(S.heading);
@@ -766,6 +768,8 @@ function puckEl() {
   if (!p) { p = el('<div id="mePuck" class="mepuck" hidden aria-hidden="true">' + meHtml() + '</div>'); document.body.appendChild(p); }
   return p;
 }
+var meRaf = 0;
+function meOnRotate() { if (meRaf || !S.follow || !S.camOff) return; meRaf = requestAnimationFrame(() => { meRaf = 0; try { renderMe(); } catch (e) { /* */ } }); }
 function renderMe() {
   if (!S.pos) return;
   const v = myView();
@@ -776,7 +780,7 @@ function renderMe() {
     const r = map.getContainer().getBoundingClientRect();
     pk.style.left = Math.round(r.left + r.width / 2 + S.camOff[0]) + 'px';
     pk.style.top = Math.round(r.top + r.height / 2 + S.camOff[1]) + 'px';
-    const rot = S.settings.navNorth ? (v.heading || 0) : (S.moving || S.nav) ? 0 : ((v.heading || 0) - map.getBearing() + 360) % 360; // en roulant, la carte suit la route : le curseur pointe vers le haut
+    const rot = S.settings.navNorth ? (v.heading || 0) : ((v.heading || 0) - map.getBearing() + 360) % 360; // cap du véhicule moins rotation actuelle de la carte : le curseur reste aligné sur la route, même pendant que la carte tourne dans un virage
     pk.firstChild.style.transform = 'rotate(' + Math.round(rot) + 'deg)';
     const u1 = pk.querySelector('svg.upr'); if (u1) u1.style.transform = 'rotate(' + (-Math.round(rot)) + 'deg)';
     pk.hidden = false;
@@ -1094,7 +1098,7 @@ function followCam() {
   const moving = !!S.moving || !!S.nav;
   // zoom continu selon la vitesse, changé seulement par petites marches
   const zt = Math.max(15, Math.min(17.3, 17.6 - Math.max(0, kmh - 20) * 0.022));
-  if (S.camZoom == null || Math.abs(zt - S.camZoom) > 0.3 || !moving) S.camZoom = moving ? Math.round(zt * 10) / 10 : Math.max(map.getZoom(), 16);
+  if (S.camZoom == null || Math.abs(zt - S.camZoom) > 0.5 || !moving) S.camZoom = moving ? Math.round(zt * 5) / 5 : Math.max(map.getZoom(), 16); // le zoom bouge par paliers plus larges : la carte ne « pompe » plus quand la vitesse varie
   const zoom = moving ? S.camZoom : (S.lastCam && !S.lastCam.moving ? map.getZoom() : 16.5);
   const north = S.settings.navNorth;
   const DUR = 1100;
@@ -1384,7 +1388,7 @@ function decodePoly6(str) {
 }
 const VTYPE = { 1: ['depart'], 2: ['depart'], 3: ['depart'], 4: ['arrive'], 5: ['arrive', 'right'], 6: ['arrive', 'left'], 7: ['new name', 'straight'], 8: ['continue', 'straight'], 9: ['turn', 'slight right'], 10: ['turn', 'right'], 11: ['turn', 'sharp right'], 12: ['turn', 'uturn'], 13: ['turn', 'uturn'], 14: ['turn', 'sharp left'], 15: ['turn', 'left'], 16: ['turn', 'slight left'], 17: ['on ramp', 'straight'], 18: ['on ramp', 'right'], 19: ['on ramp', 'left'], 20: ['off ramp', 'right'], 21: ['off ramp', 'left'], 22: ['fork', 'straight'], 23: ['fork', 'slight right'], 24: ['fork', 'slight left'], 25: ['merge', 'straight'], 26: ['roundabout'], 27: ['exit roundabout'], 37: ['merge', 'slight right'], 38: ['merge', 'slight left'] };
 async function fetchValhalla(from, to, costing, opts) {
-  const body = { locations: [{ lat: from.lat, lon: from.lon }, { lat: to.lat, lon: to.lon }], costing, directions_options: { language: I18N.valhalla, units: 'kilometers' } };
+  const body = { locations: [Object.assign({ lat: from.lat, lon: from.lon }, from.hd != null ? { heading: from.hd, heading_tolerance: 60 } : {}), { lat: to.lat, lon: to.lon }], costing, directions_options: { language: I18N.valhalla, units: 'kilometers' } };
   if (opts) body.costing_options = { [costing]: opts };
   const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), 30000);
   try {
@@ -1423,7 +1427,7 @@ async function fetchRoute(from, to) {
   catch (e) { return await fetchValhalla(from, to, 'auto'); }
 }
 async function fetchOsrm(from, to) {
-  const url = CFG.routingUrl + '/route/v1/driving/' + from.lon + ',' + from.lat + ';' + to.lon + ',' + to.lat + '?overview=full&geometries=geojson&steps=true&alternatives=false';
+  const url = CFG.routingUrl + '/route/v1/driving/' + from.lon + ',' + from.lat + ';' + to.lon + ',' + to.lat + '?overview=full&geometries=geojson&steps=true&alternatives=false' + (from.hd != null ? '&bearings=' + from.hd + ',60;' : '');
   const r = await fetch(url);
   if (!r.ok) throw new Error('route ' + r.status);
   const j = await r.json();
@@ -1857,9 +1861,10 @@ async function reroute() {
   $('navInstr').textContent = 'Nouveau calcul…';
   say('Nouveau calcul du trajet');
   try {
-    const R = await fetchRoute(S.pos, N.dest);
+    const hd = S.heading != null && (S.speed || 0) > 2.5 ? Math.round(S.heading) : null; // le nouveau calcul part dans le sens où roule la voiture (pas de demi-tour inutile)
+    const R = await fetchRoute(Object.assign({}, S.pos, { hd }), N.dest);
     if (!S.nav) return;
-    Object.assign(S.nav, { R, along: 0, seg: 0, spoken: {} });
+    Object.assign(S.nav, { R, along: 0, seg: 0, spoken: {}, snap: null, offCount: 0 });
     drawRoute(R, 0); checkRoundabouts(R); navUpdate();
   } catch (e) { toast("Impossible de recalculer pour l'instant. On réessaie."); }
 }
@@ -2751,7 +2756,7 @@ function setAvatar() {
   b.firstChild.nodeType === 3 ? (b.firstChild.nodeValue = initials(S.me.pseudo)) : b.insertBefore(document.createTextNode(initials(S.me.pseudo)), b.firstChild);
   const cc = curColor(), ink = lum(cc) > 0.5 ? '#0E1116' : '#FFFFFF'; // même couleur que le curseur GPS
   b.style.background = cc; b.style.color = ink;
-  const m = $('fabMenu'); if (m) { m.textContent = initials(S.me.pseudo); m.style.background = cc; m.style.color = ink; }
+  const m = $('fabMenu'); if (m) { m.textContent = initials(S.me.pseudo); m.style.background = cc; m.style.color = ink; m.classList.toggle('ringed', lum(cc) < 0.2 || lum(cc) > 0.86); }
 }
 function updateVisChip() {
   if (S.me && S.me.vis === 'amis') { S.me.vis = 'invisible'; saveMe(); }
@@ -3424,6 +3429,7 @@ $('btnProfile').onclick = openMenu;
 $('btnLocate').onclick = () => {
   if (!S.pos) { startGps(); toast('Recherche de ta position…'); return; }
   S.follow = true; $('btnLocate').classList.add('active');
+  S.lastCam = null; S.camZoom = null; // retour au zoom par défaut, centré sur ma position
   S.puckAt = Date.now() + 1100; S.camAt = 0; followCam(); setTimeout(renderMe, 1150);
 };
 $('btnPlaces').onclick = () => {

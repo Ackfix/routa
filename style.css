@@ -511,8 +511,6 @@ body:not(.navigating) .lowchip { top: calc(var(--sat) + 88px); }
   .eta { font-size: 22px; }
   .etarest { font-size: 13px; }
   .etadest { display: none; }
-  body.navigating .speedbox { left: var(--eL); bottom: calc(var(--sab) + 92px); }
-  body.navigating .limitsign { left: calc(var(--eL) + 76px); bottom: calc(var(--sab) + 92px); }
   body.navigating .limitnext { display: none; }
   body.navigating .fab-report { bottom: calc(var(--sab) + 12px); }
   body.navigating .fabs-right { bottom: calc(var(--sab) + 90px); }
@@ -525,7 +523,7 @@ body.navigating .geochip { top: calc(var(--sat) + 150px); }
 body.navigating .toasts { top: calc(var(--nbB, 150px) + 10px); }
 body.navigating .geochip { top: calc(var(--nbB, 150px) + 10px); }
 @media (orientation: landscape) and (max-height: 540px) {
-  body.navigating .toasts, body.navigating .geochip { top: calc(var(--sat) + 8px); left: auto; right: calc(var(--eR) + 8px); transform: none; width: min(44vw, 400px); }
+  body.navigating .toasts, body.navigating .geochip { top: calc(var(--sat) + 96px); left: auto; right: calc(var(--eR) + 8px); transform: none; width: min(44vw, 400px); }
 }
 .limitsign.over { transform: scale(1.12); box-shadow: 0 0 0 6px rgba(229,72,77,.35), 0 6px 18px rgba(0,0,0,.35); transition: transform .2s, box-shadow .2s; }
 .vehcard.sel { outline: 2px solid var(--accent); }
@@ -778,3 +776,12 @@ body:has(#geoChip:not([hidden])):not(.navigating) .toasts { top: calc(var(--sat)
 .procard .prorow + .prorow { margin-top: 8px; }
 
 .field.langsel { margin: 8px 0 12px; }
+
+.fab-menu.ringed { box-shadow: 0 0 0 3px var(--accent), 0 6px 18px rgba(0,0,0,.45); }
+
+/* Paysage : compteur en haut à droite, aligné sur le bandeau de navigation (en haut) et sur le bouton « + » (à droite) */
+@media (orientation: landscape) and (max-height: 540px) {
+  html body.navigating .speedbox, html body:not(.navigating) .speedbox { left: auto; right: var(--eR); top: calc(var(--sat) + 8px); bottom: auto; }
+  html body.navigating .limitsign, html body:not(.navigating) .limitsign { left: auto; right: calc(var(--eR) + 76px); top: calc(var(--sat) + 8px); bottom: auto; }
+  html body:not(.navigating) .limitnext { display: none; }
+}
