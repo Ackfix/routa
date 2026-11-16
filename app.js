@@ -2772,12 +2772,12 @@ function openVehicle(after, editId) {
   const opt = (v, l, sel) => '<option value="' + esc(v) + '"' + (sel ? ' selected' : '') + '>' + esc(l) + '</option>';
   const yNow = new Date().getFullYear();
   const body = openSheet('Ton véhicule',
-    (list.length > 1 || editId === 'new' ? '<h3>Mes véhicules</h3>' + list.map((x) => '<button class="card tap vehcard' + (x.id === V.id ? ' sel' : '') + '" data-vid="' + esc(x.id) + '"><span class="ico">' + ic((VEHICLES[x.type] || VEHICLES.voiture).icon) + '</span><span class="grow"><b>' + esc(vehName(x)) + '</b><span class="sub">' + esc([x.year, x.energy && (x.energy === 'essence' && I18N.lang !== 'fr' ? I18N.t('Essence (moteur)') : I18N.t((ENERGIES.find((e) => e[0] === x.energy) || [0, ''])[1])), x.id === curId ? I18N.t('Véhicule actif') : ''].filter(Boolean).join(' · ')) + '</span></span></button>').join('') : '') +
+    (list.length > 1 || editId === 'new' ? '<h3>Mes véhicules <span class="prem">Premium</span></h3>' + list.map((x) => '<button class="card tap vehcard' + (x.id === V.id ? ' sel' : '') + '" data-vid="' + esc(x.id) + '"><span class="ico">' + ic((VEHICLES[x.type] || VEHICLES.voiture).icon) + '</span><span class="grow"><b>' + esc(vehName(x)) + '</b><span class="sub">' + esc([x.year, x.energy && (x.energy === 'essence' && I18N.lang !== 'fr' ? I18N.t('Essence (moteur)') : I18N.t((ENERGIES.find((e) => e[0] === x.energy) || [0, ''])[1])), x.id === curId ? I18N.t('Véhicule actif') : ''].filter(Boolean).join(' · ')) + '</span></span></button>').join('') : '') +
     '<p class="muted small">Le trajet, les alertes et les lieux proposés s\'adaptent à ton véhicule.</p>' +
     '<h3>Type</h3><div class="vehgrid" id="vehGrid">' + KINDS.map(([k, v]) => '<button class="typebtn' + (k === kind() ? ' sel' : '') + '" data-v="' + k + '">' + ic(v.icon) + esc(v.label) + '</button>').join('') + '</div>' +
     '<div id="vehAsst"></div><div id="vehDims"></div>' +
     '<button class="btn block" id="vehSave">Enregistrer</button>' +
-    '<button class="btn soft block" id="vehAdd">' + ic('plus') + 'Ajouter un autre véhicule</button>' +
+    '<button class="btn soft block" id="vehAdd">' + ic('plus') + 'Ajouter un autre véhicule <span class="prem">Premium</span></button>' +
     (list.length > 1 && editId !== 'new' ? '<button class="btn ghost" id="vehDel">Retirer ce véhicule</button>' : ''), 'vehicle');
   const drawAsst = () => {
     const brands = Object.keys(DB0).sort((a, b) => a.localeCompare(b));
@@ -3055,6 +3055,33 @@ function profileForm(isNew) {
     }
   };
 }
+/* #024 : catégories de permis — champ privé, gardé seulement sur ce téléphone (jamais envoyé) */
+const LIC_CATS = ['AM', 'A1', 'A2', 'A', 'B', 'BE', 'C1', 'C1E', 'C', 'CE', 'D1', 'D1E', 'D', 'DE'];
+const licGet = () => store.get('routa.licence', { cats: [], country: '', since: '' });
+function licSummary() { const l = licGet(); return (l.cats || []).join(', '); }
+function openLicence() {
+  const L = licGet();
+  const info = (c) => c === 'CH'
+    ? '<p class="muted small">' + esc(I18N.t('Suisse : le permis à l\'essai dure trois ans. En cas de retrait pour une infraction moyennement grave ou grave, la période d\'essai est prolongée d\'une année.')) + ' <a href="https://ch.ch/fr/circulation-et-vehicules/permis-de-conduire/obtention-du-permis-de-conduire" target="_blank" rel="noopener" style="color:var(--info)">' + esc(I18N.t('Source officielle')) + '</a></p>'
+    : c === 'FR'
+      ? '<p class="muted small">' + esc(I18N.t('France : le premier permis est probatoire. Il dure 3 ans (2 ans après la conduite accompagnée), moins avec la formation complémentaire. Le signe « A » doit être apposé à l\'arrière du véhicule. Des limites de vitesse plus basses s\'appliquent : vérifie-les sur la fiche officielle.')) + ' <a href="https://www.service-public.gouv.fr/particuliers/vosdroits/F2390" target="_blank" rel="noopener" style="color:var(--info)">' + esc(I18N.t('Source officielle')) + '</a></p>'
+      : '';
+  const body = openSheet(I18N.t('Mon permis de conduire'),
+    '<p class="muted small">' + esc(I18N.t('Privé : ces informations restent sur ce téléphone et ne sont jamais partagées.')) + '</p>' +
+    '<h3>' + esc(I18N.t('Catégories')) + '</h3><div class="chips" id="licCats">' + LIC_CATS.map((c) => '<button class="chip' + ((L.cats || []).includes(c) ? ' on' : '') + '" data-c="' + c + '" aria-pressed="' + ((L.cats || []).includes(c) ? 'true' : 'false') + '">' + c + '</button>').join('') + '</div>' +
+    '<h3>' + esc(I18N.t('Pays du permis')) + '</h3><div class="seg" id="licCountry">' + [['CH', 'Suisse'], ['FR', 'France'], ['', 'Autre']].map(([k, n]) => '<button data-k="' + k + '"' + (L.country === k ? ' class="on"' : '') + '>' + esc(I18N.t(n)) + '</button>').join('') + '</div>' +
+    '<label class="field" for="licSince"><span>' + esc(I18N.t('Date d\'obtention (facultatif)')) + '</span><input id="licSince" type="month" value="' + esc(L.since || '') + '"></label>' +
+    '<div id="licInfo">' + info(L.country) + '</div>' +
+    '<button class="btn block" id="licSave">' + esc(I18N.t('Enregistrer')) + '</button>', 'licence');
+  body.querySelectorAll('#licCats .chip').forEach((b) => { b.onclick = () => { b.classList.toggle('on'); b.setAttribute('aria-pressed', b.classList.contains('on') ? 'true' : 'false'); }; });
+  body.querySelectorAll('#licCountry button').forEach((b) => { b.onclick = () => { body.querySelectorAll('#licCountry button').forEach((x) => x.classList.toggle('on', x === b)); body.querySelector('#licInfo').innerHTML = info(b.dataset.k); }; });
+  body.querySelector('#licSave').onclick = () => {
+    const cats = [...body.querySelectorAll('#licCats .chip.on')].map((b) => b.dataset.c);
+    const on = body.querySelector('#licCountry button.on');
+    store.set('routa.licence', { cats, country: on ? on.dataset.k : '', since: body.querySelector('#licSince').value || '' });
+    toast(esc(I18N.t('Enregistré sur ce téléphone.'))); openProfile();
+  };
+}
 function openProfile() {
   const f = profileForm(false);
   const body = openSheet('Mon profil', '<button class="card tap menuprof" id="pfSettings"><span class="ico">' + ic('gear') + '</span><span class="grow"><b>' + esc(I18N.t('Réglages')) + '</b><span class="sub">' + esc(I18N.t('Navigation, carte, véhicule, notifications, confidentialité et compte')) + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' + f.html +
@@ -3064,6 +3091,7 @@ function openProfile() {
     ((S.me.friends || []).length ? (S.me.friends.map((fr, i) => '<div class="card"><div class="grow"><b>' + esc(fr.pseudo) + '</b><div class="sub">Peut te voir quand tu es visible</div></div><button class="iconbtn small" data-rm="' + i + '" aria-label="Retirer ' + esc(fr.pseudo) + '">' + ic('trash') + '</button></div>').join('')) : '<div class="empty">Pas encore d\'amis.</div>') +
     '<button class="btn block" id="pfFeedback">' + ic('msg') + 'Signaler un problème ou une idée</button>' +
     '<a class="btn soft block" href="aide.html" style="text-decoration:none">' + ic('info') + 'Aide et installation (iPhone, Android)</a>' +
+    '<button class="btn soft block" id="pfLic">' + ic('info') + esc(I18N.t('Mon permis de conduire')) + (licSummary() ? ' : ' + esc(licSummary()) : '') + '</button>' +
     '<button class="btn soft block" id="pfVeh">' + ic(veh().icon) + esc(I18N.t('Ton véhicule')) + ' : ' + esc(vehSummary()) + '</button>' +
     '<div class="banner">' + ic('info') + '<span>' + (S.online ? 'Mode en ligne : alertes, spots, conducteurs et messages partagés.' : 'Mode solo : tes alertes et spots restent sur ce téléphone.') + ' Version ' + VERSION + '. Carte © OpenStreetMap, OpenFreeMap. Itinéraires OSRM et Valhalla. Recherche Photon.</span></div>' +
     '<p class="muted small"><a href="confidentialite.html" style="color:var(--info)">Confidentialité et règles d\'utilisation</a></p>', 'profile');
@@ -3071,6 +3099,7 @@ function openProfile() {
   body.querySelector('#pfSave').onclick = () => { if (save()) { toast('Profil enregistré.'); closeSheet(); } };
   body.querySelector('#pfFeedback').onclick = () => openFeedback();
   body.querySelector('#pfVeh').onclick = () => openVehicle();
+  body.querySelector('#pfLic').onclick = () => openLicence();
   body.querySelector('#pfSettings').onclick = () => openSettings();
   body.querySelector('#pfCopy').onclick = async () => { try { await navigator.clipboard.writeText(S.me.code); toast('Code copié.'); } catch (e) { toast('Ton code : <b>' + esc(S.me.code) + '</b>'); } };
   body.querySelector('#frForm').onsubmit = async (e) => {
@@ -3255,13 +3284,13 @@ function openMenu() {
     ]]
   ];
   // #008 : fonctions classées Premium (étiquette seulement pendant les tests, rien n'est verrouillé)
-  const PREM_TILES = ['plan'];
+  const PREM_TILES = ['plan', 'convoy', 'events'];
   const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + (PREM_TILES.includes(t[0]) ? '<i class="prem tileprem">Premium</i>' : '') + t[1] + '<span>' + t[2] + '</span></button>';
   const body = openSheet('Menu',
     '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + esc(S.me.color || '#FF8A3D') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     '<button class="card tap menusos" data-k="country"><span class="sosdot big">SOS</span><span class="grow"><b>Urgences et infos pays</b><span class="sub">' + ($('ctryLabel').textContent === 'Infos pays' ? 'Numéros d\'urgence, règles, vignettes' : esc($('ctryLabel').textContent)) + '</span></span></button>' +
     '<button class="card tap menufb" data-k="feedback"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg></span><span class="grow"><b>Donner mon avis</b><span class="sub">Un bug, un truc pas clair, une idée : dis-le-nous</span></span></button>' +
-    groups.map(([g, ts]) => { const list = ts.filter(Boolean); if (!list.length) return ''; return '<h3 class="menuh' + (g === 'Pro' ? ' menupro' : '') + '">' + (g === 'Pro' ? esc(I18N.t('Outils pour les professionnels de la route')) : g) + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
+    groups.map(([g, ts]) => { const list = ts.filter(Boolean); if (!list.length) return ''; return '<h3 class="menuh' + (g === 'Pro' ? ' menupro' : '') + '">' + (g === 'Pro' ? esc(I18N.t('Outils pour les professionnels de la route')) + ' <span class="prem">Premium</span>' : g) + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
     '<div class="menulinks">' + (X.canInstall && X.canInstall() ? '<button data-k="install">Installer l\'app</button>' : '') + '<button data-k="share">Partager ROUTA</button><button data-k="help">Aide</button><button data-k="privacy">Confidentialité</button></div>' +
     '<p class="menusig">ROUTA par <b>ACKFIX</b></p>' +
     langSeg(), 'menu');

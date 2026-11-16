@@ -606,3 +606,7 @@ body.navsoft .tripchip { display: none; }
 .curbtn .cp .mk-me { width: 46px; height: 46px; }
 .tile { position: relative; }
 .tileprem { position: absolute; top: 8px; right: 8px; font-style: normal; font-size: 9.5px; padding: 1px 6px; }
+/* #024 permis */
+#licCats { flex-wrap: wrap; overflow: visible; margin-right: 0; padding-right: 0; }
+#licCats .chip { box-shadow: none; border: 1px solid var(--line); height: 36px; min-width: 48px; justify-content: center; }
+#licCats .chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
