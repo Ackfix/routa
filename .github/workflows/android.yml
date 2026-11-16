@@ -81,7 +81,8 @@ jobs:
         run: |
           cd /tmp/app/android
           chmod +x gradlew
-          ./gradlew --no-daemon bundleRelease assembleDebug
+          set -o pipefail
+          ./gradlew --no-daemon bundleRelease assembleDebug 2>&1 | tee $GITHUB_WORKSPACE/build.log
           mkdir -p $GITHUB_WORKSPACE/out
           cp app/build/outputs/bundle/release/app-release.aab $GITHUB_WORKSPACE/out/routa-unsigned.aab
           cp app/build/outputs/apk/debug/app-debug.apk $GITHUB_WORKSPACE/out/routa-test.apk
@@ -93,3 +94,12 @@ jobs:
         run: |
           gh release delete android-build --yes --cleanup-tag || true
           gh release create android-build out/routa-unsigned.aab out/routa-test.apk --title "Android build ${{ github.run_number }}" --notes "Fichier Android non signé (signature faite sur le Mac)." --prerelease
+
+      - name: Journal de construction
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-log --yes --cleanup-tag || true
+          tail -c 200000 build.log > build-tail.log || echo "pas de journal" > build-tail.log
+          gh release create android-log build-tail.log --title "Journal Android ${{ github.run_number }}" --notes "Journal de construction" --prerelease
