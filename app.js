@@ -1853,7 +1853,7 @@ function arrive() {
   S.nav.arrived = true;
   stopNav(true);
   if (window.ROUTA_X && ROUTA_X.arrived) ROUTA_X.arrived(arrDest);
-  openSheet('Tu es arrivé', '<p>' + esc(name) + '</p><div class="row"><button class="btn soft grow" id="arrSpot">' + ic('spot') + 'Ajouter en spot</button><button class="btn soft grow" id="arrPark">' + ic('parking') + 'Parkings autour</button></div><button class="btn ghost" id="arrFb">Un souci pendant ce trajet ? Dis-le-nous</button>', 'arrive');
+  openSheet(I18N.t('Destination atteinte'), '<p>' + esc(name) + '</p><div class="row"><button class="btn soft grow" id="arrSpot">' + ic('spot') + 'Ajouter en spot</button><button class="btn soft grow" id="arrPark">' + ic('parking') + 'Parkings autour</button></div><button class="btn ghost" id="arrFb">Un souci pendant ce trajet ? Dis-le-nous</button>', 'arrive');
   $('arrFb').onclick = () => openFeedback({ kind: 'bug', page: 'navigation' });
   $('arrSpot').onclick = () => openAddSpot(S.pos);
   $('arrPark').onclick = () => openPoiList('parking');
@@ -2860,7 +2860,7 @@ function updateVehChip() {
   document.querySelectorAll('.chip.heavy-only').forEach((c) => { c.hidden = !v.heavy; });
   document.querySelectorAll('.chip.ev-only').forEach((c) => { c.hidden = !v.ev; });
 }
-/* ======================= Ton véhicule : assistant type › marque › modèle › année › motorisation › version, plusieurs véhicules ======================= */
+/* ======================= Mon véhicule : assistant type › marque › modèle › année › motorisation › version, plusieurs véhicules ======================= */
 const ENERGIES = [['essence', 'Essence'], ['diesel', 'Diesel'], ['hybride', 'Hybride'], ['phev', 'Hybride rechargeable'], ['electrique', 'Électrique'], ['gaz', 'Gaz (GPL, GNV)']];
 const CAR_TYPES = ['voiture', 'electrique', 'hybride'];
 function loadVehicles() {
@@ -2887,7 +2887,7 @@ function openVehicle(after, editId) {
   const KINDS = Object.entries(VEHICLES).filter(([k]) => k !== 'electrique' && k !== 'hybride');
   const opt = (v, l, sel) => '<option value="' + esc(v) + '"' + (sel ? ' selected' : '') + '>' + esc(l) + '</option>';
   const yNow = new Date().getFullYear();
-  const body = openSheet('Ton véhicule',
+  const body = openSheet('Mon véhicule',
     (list.length > 1 || editId === 'new' ? '<h3>Mes véhicules <span class="prem">Premium</span></h3>' + list.map((x) => '<button class="card tap vehcard' + (x.id === V.id ? ' sel' : '') + '" data-vid="' + esc(x.id) + '"><span class="ico">' + ic((VEHICLES[x.type] || VEHICLES.voiture).icon) + '</span><span class="grow"><b>' + esc(vehName(x)) + '</b><span class="sub">' + esc([x.year, x.energy && (x.energy === 'essence' && I18N.lang !== 'fr' ? I18N.t('Essence (moteur)') : I18N.t((ENERGIES.find((e) => e[0] === x.energy) || [0, ''])[1])), x.rental ? I18N.t('location') : '', x.id === curId ? I18N.t('Véhicule actif') : ''].filter(Boolean).join(' · ')) + '</span></span></button>').join('') : '') +
     '<p class="muted small">Le trajet, les alertes et les lieux proposés s\'adaptent à ton véhicule.</p>' +
     '<button class="card tap" id="vehLic"><span class="ico">' + ic('info') + '</span><span class="grow"><b>' + esc(I18N.t('Mon permis de conduire')) + '</b><span class="sub">' + esc(licSummary() || I18N.t('Catégories, pays, date')) + '</span></span></button>' +
@@ -2986,7 +2986,7 @@ function openVehicle(after, editId) {
     if (ctrlBlocked(V.brand || '', (V.model || '') + ' ' + (V.version || ''))) { toast('Pas de mention de contrôles de police ou de radars : c\'est interdit en Suisse.'); return; }
     if (V.rental && !loadVehicles().some((x) => x.id === V.id)) store.set('routa.rentalPrev', store.get('routa.vehicleId', null) || (loadVehicles()[0] || {}).id || null);
     useVehicle(V);
-    if (!S.me.car && V.model) { S.me.car = vehName(V).slice(0, 30); saveMe(); pushPresence(true); }
+    if (V.model) { S.me.car = vehName(V).slice(0, 30); saveMe(); pushPresence(true); }
     toast('Véhicule : <b>' + esc(vehSummary()) + '</b>');
     closeSheet();
     if (after) after();
@@ -3079,7 +3079,7 @@ function openCountry(code, tab) {
     if (c.must.length) h += '<div class="card"><div class="grow"><b>Obligatoire</b><div class="sub">' + c.must.map(esc).join('<br>') + '</div></div></div>';
     if (veh().heavy) {
       const L = vehLimits(code);
-      h += '<h3>' + esc(I18N.t('Ton véhicule')) + ' : ' + esc(vehSummary()) + '</h3>' + (L
+      h += '<h3>' + esc(I18N.t('Mon véhicule')) + ' · ' + esc(vehSummary()) + '</h3>' + (L
         ? '<div class="limgrid">' + [['Ville', L.lim[0]], ['Hors localité', L.lim[1]], ['Autoroute', L.lim[2]]].map(([l, v]) => '<div class="limcell"><div class="limv">' + esc(v) + '</div><div class="sub">' + l + '</div></div>').join('') + '</div>' +
           (L.lim.join('').includes('*') ? '<p class="muted small">' + esc(I18N.t('* Seulement sous conditions (homologation, équipement, poids) : vérifie la source officielle.')) + '</p>' : '') +
           '<a class="btn soft block linkbtn" href="' + esc(L.src[1]) + '" target="_blank" rel="noopener">' + ic('web') + esc(L.src[0]) + '</a>'
@@ -3092,7 +3092,7 @@ function openCountry(code, tab) {
     h += '<div class="row wrap"><span class="pill ' + badge[1] + '">' + badge[0] + '</span></div><p>' + esc(c.toll.text) + '</p>';
     h += c.toll.links.map(([l, u]) => '<a class="btn soft block linkbtn" href="' + esc(u) + '" target="_blank" rel="noopener">' + ic('web') + esc(l) + '</a>').join('');
     if (c.toll.type === 'vignette') h += '<div class="banner">' + ic('info') + '<span>Achète sur le <b>site officiel</b> : les sites revendeurs facturent souvent des frais en plus.</span></div>';
-    if (c.toll.heavy && veh().heavy) h += '<div class="card"><div class="grow"><b>Ton véhicule (' + esc(vehSummary()) + ')</b><div class="sub">' + esc(c.toll.heavy) + '</div></div></div>' + (c.toll.heavyLinks || []).map(([l, u]) => '<a class="btn soft block linkbtn" href="' + esc(u) + '" target="_blank" rel="noopener">' + ic('web') + esc(l) + '</a>').join('');
+    if (c.toll.heavy && veh().heavy) h += '<div class="card"><div class="grow"><b>' + esc(I18N.t('Mon véhicule')) + ' (' + esc(vehSummary()) + ')</b><div class="sub">' + esc(c.toll.heavy) + '</div></div></div>' + (c.toll.heavyLinks || []).map(([l, u]) => '<a class="btn soft block linkbtn" href="' + esc(u) + '" target="_blank" rel="noopener">' + ic('web') + esc(l) + '</a>').join('');
     h += '<p class="muted small">Prix et règles changent souvent : vérifie toujours sur le site officiel avant de partir.</p>';
   }
   h += '<label class="field" for="ctSel">Autre pays<select id="ctSel">' + Object.entries(CTRY).sort((x, y) => x[1].name.localeCompare(y[1].name, 'fr')).map(([cc, v]) => '<option value="' + cc + '"' + (cc === code ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('') + '</select></label>';
@@ -3180,7 +3180,6 @@ function profileForm(isNew) {
   return {
     html:
       '<label class="field" for="pfName">Pseudo<input id="pfName" type="text" maxlength="20" value="' + esc(S.me.pseudo || '') + '" placeholder="Ex. : Pilote_GT"></label>' +
-      '<label class="field" for="pfCar">Ton véhicule<input id="pfCar" type="text" maxlength="30" value="' + esc(S.me.car || '') + '" placeholder="Ex. : Golf 8 GTI"></label>' +
       '<h3>Qui peut me voir sur la carte ?</h3>' + visSeg('pfVis') +
       '<p class="muted small">Tes amis voient ta position exacte. Les autres voient seulement une zone d\'environ 1 km.</p>',
     bind(root) {
@@ -3189,9 +3188,9 @@ function profileForm(isNew) {
       return () => {
         const name = $('pfName').value.trim();
         if (name.length < 2) { toast('Choisis un pseudo d\'au moins 2 caractères.'); return false; }
-        if (ctrlBlocked(name, $('pfCar').value)) { toast('Pas de mention de contrôles de police ou de radars : c\'est interdit en Suisse.'); return false; }
-        if (rudeText(name) || rudeText($('pfCar').value)) { toast(I18N.t('Choisis un pseudo correct, sans insulte, e-mail ni numéro de téléphone.')); return false; }
-        S.me.pseudo = name; S.me.car = $('pfCar').value.trim(); S.me.color = color;
+        if (ctrlBlocked(name, '')) { toast('Pas de mention de contrôles de police ou de radars : c\'est interdit en Suisse.'); return false; }
+        if (rudeText(name)) { toast(I18N.t('Choisis un pseudo correct, sans insulte, e-mail ni numéro de téléphone.')); return false; }
+        S.me.pseudo = name; S.me.color = color;
         saveMe(); updateVisChip(); setAvatar();
         pushPresence(true);
         return true;
@@ -3229,7 +3228,7 @@ function openLicence() {
 function openProfile() {
   const f = profileForm(false);
   const body = openSheet('Mon profil', '<button class="card tap menuprof" id="pfSettings"><span class="ico">' + ic('gear') + '</span><span class="grow"><b>' + esc(I18N.t('Réglages')) + '</b><span class="sub">' + esc(I18N.t('Navigation, carte, véhicule, notifications, confidentialité et compte')) + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
-    '<div class="row"><button class="btn soft grow" id="pfVeh">' + ic(veh().icon) + esc(I18N.t('Ton véhicule')) + '</button><button class="btn soft grow" id="pfLic">' + ic('info') + esc(I18N.t('Mon permis de conduire')) + '</button></div>' + f.html +
+    '<button class="btn soft block" id="pfVeh">' + ic(veh().icon) + esc(I18N.t('Mon véhicule')) + ' · ' + esc(vehSummary()) + '</button>' + f.html +
     '<button class="btn block" id="pfSave">Enregistrer</button>' +
     '<h3>Mon code ami</h3><div class="card"><div class="grow"><div class="code">' + esc(S.me.code) + '</div><div class="sub">Donne-le à tes potes : ils l\'entrent dans « Ajouter un ami ».</div></div><button class="iconbtn small" id="pfCopy" aria-label="Copier le code">' + ic('copy') + '</button></div>' +
     '<h3>Ajouter un ami</h3><form id="frForm" class="row"><label class="field grow" for="frCode"><span class="sr">Code ami</span><input id="frCode" type="text" maxlength="6" placeholder="Code à 6 caractères" autocapitalize="characters" autocomplete="off"></label><button class="btn" type="submit">Ajouter</button></form>' +
@@ -3242,7 +3241,6 @@ function openProfile() {
   body.querySelector('#pfSave').onclick = () => { if (save()) { toast('Profil enregistré.'); closeSheet(); } };
   body.querySelector('#pfFeedback').onclick = () => openFeedback();
   body.querySelector('#pfVeh').onclick = () => openVehicle();
-  body.querySelector('#pfLic').onclick = () => openLicence();
   body.querySelector('#pfSettings').onclick = () => openSettings();
   body.querySelector('#pfCopy').onclick = async () => { try { await navigator.clipboard.writeText(S.me.code); toast('Code copié.'); } catch (e) { toast('Ton code : <b>' + esc(S.me.code) + '</b>'); } };
   body.querySelector('#frForm').onsubmit = async (e) => {
@@ -3278,7 +3276,7 @@ function openSettings() {
     '<button class="card tap curbtn" id="stCursor"><span class="cp">' + meHtml() + '</span><span class="grow"><b>' + esc(I18N.t('Curseur GPS')) + ' <span class="prem">Premium</span></b><span class="sub">' + esc(I18N.t('Forme, couleur, taille et halo')) + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
     '<button class="btn soft block" id="stMapView">' + ic('layers') + 'Plan, satellite, trafic et transports</button>' +
     '<h3>Véhicule</h3>' +
-    '<button class="btn soft block" id="stVeh">' + ic(veh().icon) + esc(I18N.t('Ton véhicule')) + ' : ' + esc(vehSummary()) + '</button>' +
+    '<button class="btn soft block" id="stVeh">' + ic(veh().icon) + esc(I18N.t('Mon véhicule')) + ' · ' + esc(vehSummary()) + '</button>' +
     '<h3>Notifications</h3>' +
     sw('stReminders', 'Rappels d\'entretien (pneus, service, batterie)', S.settings.reminders !== false) +
     sw('stReadMsgs', 'Lire les messages reçus à voix haute', S.settings.readMsgs) +
@@ -3413,16 +3411,16 @@ function openMenu() {
       XO('voyage') && xt('voyage')
     ]],
     ['Carte et routes', [
-      ['favs', ic('star'), 'Favoris'],
+      ['favs', ic('star'), 'Mes favoris'],
       XO('smart') && xt('smart'),
       XO('explore') && xt('explore'),
       v.ev && X.open && ['chargers', XI.plug || ic('charge'), 'Bornes libres'],
-      ['mapview', '<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>', 'Affichage carte'],
+      ['mapview', '<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>', 'Affichage de la carte'],
       X.openTrips && ['trips', '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', 'Mes trajets'],
       X.openOffline && ['offline', '<svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>', 'Carte hors connexion']
     ]],
     ['Mes déplacements', [
-      ['vehicle', ic(v.icon), 'Véhicule · ' + v.label],
+      ['vehicle', ic(v.icon), esc(I18N.t('Mon véhicule')) + ' · ' + esc(I18N.t(v.label))],
       X.open && ['carnet', XI.book || ic('info'), 'Carnet du véhicule'],
       X.open && ['parked', XI.park || ic('parking'), 'Parking'],
       XO('drive') && xt('drive'),

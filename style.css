@@ -762,3 +762,6 @@ body.hzfar .hzmk { display: none; }
 .sheet-body > div[id]:not([class]) { display: flex; flex-direction: column; gap: 12px; }
 .sheet-body > div[id]:not([class]):empty { display: none; }
 .sheet-body .card + .row, .sheet-body .row + .card { margin-top: 0; }
+/* Alerte GPS affichée : les messages passent juste en dessous, jamais l'un sur l'autre */
+body:has(#geoChip:not([hidden])):not(.navigating) .toasts { top: calc(var(--sat) + 136px); }
+@media (orientation: portrait) { body.navigating:has(#geoChip:not([hidden])) .toasts { top: calc(var(--nbB, 150px) + 52px); } }

@@ -381,7 +381,7 @@
     ctx.best = ctx.trip ? null : list.filter((d) => d.km >= 5).sort((x, y) => y.score - x.score || y.km - x.km)[0] || null;
     const opts = SOPT.filter(([k]) => !(k === 'hours' && !ctx.trip) && !(k === 'trips' && ctx.trip) && !(k === 'cities' && !hasPos) && !(k === 'map' && !ctx.tracks.length) && !(k === 'best' && !ctx.best));
     let cities = '', blob = null, url = '', ver = 0;
-    const body = openSheet(T('Ta story'),
+    const body = openSheet(T('Ma story'),
       '<div style="text-align:center"><img id="stImg" alt="" style="max-width:100%;max-height:48vh;aspect-ratio:9/16;border-radius:18px;background:#0E1116;display:inline-block"></div>' +
       '<div class="seg" id="stStyle" style="margin-top:12px">' + [['dark', 'Sombre'], ['orange', 'Orange'], ['light', 'Clair']].map(([k, l]) => '<button data-st="' + k + '" class="' + (SCFG.style === k ? 'on' : '') + '">' + esc(T(l)) + '</button>').join('') + '</div>' +
       '<p class="muted small" style="margin:10px 0 6px">' + esc(T('Touche les éléments pour les afficher ou les cacher.')) + '</p>' +

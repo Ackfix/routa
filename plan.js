@@ -95,7 +95,7 @@
   }
   function planStory(p) {
     const cv = draw(p), url = cv.toDataURL('image/png');
-    const body = openSheet(T('Ta story'),
+    const body = openSheet(T('Ma story'),
       '<img class="storyimg" alt="" src="' + url + '" style="width:100%;border-radius:16px;display:block">' +
       '<button class="btn primary block" id="psShare">' + esc(T('Partager')) + '</button>' +
       '<button class="btn soft block" id="psDl">' + esc(T('Télécharger')) + '</button>' +
