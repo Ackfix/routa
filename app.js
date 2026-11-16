@@ -1655,7 +1655,6 @@ function startNav(R, dest) {
   S.nav = { R, dest, along: 0, seg: 0, offCount: 0, lastReroute: 0, spoken: {}, startedAt: Date.now(), mode: R.mode || 'car' };
   { const tb = $('toasts'); if (tb) tb.innerHTML = ''; } // aucun ancien message (ex. « Reprendre ») ne reste au démarrage
   // #065 : point de départ gardé pour proposer le retour
-  if (S.pos && dist(S.pos, dest) > 300) store.set('routa.navStart', { lat: +S.pos.lat.toFixed(5), lon: +S.pos.lon.toFixed(5), at: Date.now(), to: dest.name, mode: R.mode || 'car' });
   document.body.classList.toggle('navsoft', !!R.mode && R.mode !== 'car');
   document.body.classList.add('navigating');
   $('navBanner').hidden = false; $('navBar').hidden = false;
@@ -1873,17 +1872,6 @@ function arrive() {
   $('arrFb').onclick = () => openFeedback({ kind: 'bug', page: 'navigation' });
   $('arrSpot').onclick = () => openAddSpot(S.pos);
   $('arrPark').onclick = () => openPoiList('parking');
-  const st = store.get('routa.navStart', null);
-  if (st && Date.now() - st.at < 24 * 3600000 && S.pos && dist(S.pos, st) > 300) {
-    const bk = el('<button class="btn soft block" id="arrBack">' + ic('nav') + esc(I18N.t('Retour au point de départ')) + '</button>');
-    bk.onclick = () => goBackStart(); const sb = $('sheetBody'); if (sb) sb.appendChild(bk);
-  }
-}
-/* #065 : retour au point de départ du dernier trajet */
-function goBackStart() {
-  const st = store.get('routa.navStart', null); if (!st) return;
-  if (st.mode && MODES.some((m) => m[0] === st.mode)) { S.mode = st.mode; store.set('routa.mode', S.mode); }
-  chooseDestination({ name: I18N.t('Point de départ'), sub: I18N.t('Départ du trajet vers {d}').split('{d}').join(st.to || ''), lat: st.lat, lon: st.lon });
 }
 
 /* Écran allumé pendant la navigation */
@@ -3317,8 +3305,7 @@ function onboarding() {
 
 /* ======================= Boutons ======================= */
 function openK(k) {
-    if (k === 'backstart') { closeSheet(); goBackStart(); }
-    else if (k === 'drivers') openProfile();
+    if (k === 'drivers') openProfile();
     else if (k === 'spots') openSpots();
     else if (k === 'feedback') openFeedback();
     else if (k === 'vehicle') openVehicle(S.preview ? (() => { const d = S.preview.dest; return () => chooseDestination(d); })() : null);
@@ -3388,7 +3375,6 @@ function openMenu() {
       XO('activity') && xt('activity'),
       XO('repair') && xt('repair'),
       XO('breakdown') && xt('breakdown'),
-      (() => { const st = store.get('routa.navStart', null); return st && Date.now() - st.at < 24 * 3600000 && (!S.pos || dist(S.pos, st) > 300) ? ['backstart', ic('nav'), I18N.t('Retour au point de départ')] : null; })()
     ]],
     ['Carte et routes', [
       ['favs', ic('star'), 'Mes favoris'],
@@ -3492,7 +3478,7 @@ if (!store.get('routa.mig096', false)) { S.settings.voice = false; S.settings.re
 if (!store.get('routa.mig0913', false)) { S.settings.traffic = true; S.settings.showPlaces = true; S.settings.showTransit = false; saveSettings(); store.set('routa.mig0913', true); }
 S.settings.mapType = 'plan';
 S.settings.relief3d = false;
-window.ROUTA = { reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, chooseDestination, initials, veh, openDriver, startNav, openSpot, openPoi, goBackStart, capLimit, openCursor, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
+window.ROUTA = { reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, chooseDestination, initials, veh, openDriver, startNav, openSpot, openPoi, capLimit, openCursor, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
 if (!S.me || !S.me.pseudo) onboarding(); else boot();
 
 })();
