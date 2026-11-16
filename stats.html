@@ -24,6 +24,20 @@ form{display:flex;gap:8px;margin-top:14px}
 input{flex:1;min-width:0;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:0 12px;font-size:16px}
 button{height:46px;border-radius:12px;border:0;background:var(--accent);color:#1A1205;font-weight:700;padding:0 16px;font-size:15px}
 .err{color:#FF8F94;margin-top:10px}
+
+.tabs{display:flex;gap:8px;margin:14px 0 4px}
+.tabs button{flex:1;height:42px;background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.tabs button.on{background:var(--accent);color:#1A1205;border-color:var(--accent)}
+.flt{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.flt button{height:34px;font-size:13px;padding:0 12px;background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.flt button.on{background:var(--accent);color:#1A1205;border-color:var(--accent)}
+.fb{padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.fb .t{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.fb .m{margin-top:4px;font-size:14px;line-height:1.35;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.fb.open .m{display:block}
+.fb .x{display:none;margin-top:6px;font-size:12px;color:var(--muted)}
+.fb.open .x{display:block}
+.tag{font-weight:700}
 </style>
 </head>
 <body>
@@ -75,6 +89,37 @@ button{height:46px;border-radius:12px;border:0;background:var(--accent);color:#1
     for (var i = 0; i < zs.length; i++) { if (!cache[zs[i].lat + ',' + zs[i].lon]) { await where(zs[i], cache); draw(zs, cache); } }
     draw(zs, cache);
   }
+  var KIND = { bug: ['Problème', '#FF8F94'], idee: ['Idée', '#3DD68C'], autre: ['Autre', '#9AA3AF'] };
+  function fdate(t) { try { return new Date(t).toLocaleString('fr-CH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
+  function tabs() {
+    var t1 = document.getElementById('t1'), t2 = document.getElementById('t2'), p1 = document.getElementById('p1'), p2 = document.getElementById('p2'), done = false;
+    t1.onclick = function () { t1.className = 'on'; t2.className = ''; p1.hidden = false; p2.hidden = true; };
+    t2.onclick = function () { t2.className = 'on'; t1.className = ''; p1.hidden = true; p2.hidden = false; if (!done) { done = true; retours(p2); } };
+  }
+  async function retours(box) {
+    box.innerHTML = '<p class="muted">Chargement…</p>';
+    var list = [];
+    try {
+      var r = await fetch(CFG.supabaseUrl + '/rest/v1/rpc/routa_retours', { method: 'POST', headers: { apikey: CFG.supabaseKey, Authorization: 'Bearer ' + CFG.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ k: getKey() }) });
+      if (r.status === 404) { box.innerHTML = '<p class="err">La lecture des retours n\'est pas encore activée dans Supabase (script 07 à lancer).</p>'; return; }
+      list = await r.json(); if (!Array.isArray(list)) throw 0;
+    } catch (e) { box.innerHTML = '<p class="err">Retours inaccessibles. Réessaie.</p>'; return; }
+    var f = 'all', n = 25;
+    function show() {
+      var L = list.filter(function (x) { return f === 'all' || x.kind === f; });
+      var cnt = function (k) { return list.filter(function (x) { return k === 'all' || x.kind === k; }).length; };
+      box.innerHTML = '<div class="flt">' + [['all', 'Tous'], ['bug', 'Problèmes'], ['idee', 'Idées'], ['autre', 'Autre']].map(function (c) { return '<button data-f="' + c[0] + '" class="' + (c[0] === f ? 'on' : '') + '">' + c[1] + ' ' + cnt(c[0]) + '</button>'; }).join('') + '</div>' +
+        (L.length ? L.slice(0, n).map(function (x) {
+          var k = KIND[x.kind] || KIND.autre;
+          return '<div class="card fb"><div class="t"><span><span class="tag" style="color:' + k[1] + '">' + k[0] + '</span> · ' + esc(x.pseudo || 'Anonyme') + '</span><span>' + esc(fdate(x.created_at)) + '</span></div><div class="m">' + esc(x.message || '') + '</div><div class="x">' + esc([x.app_version && ('Version ' + x.app_version), x.page && ('Écran : ' + x.page), x.device].filter(Boolean).join(' · ') || 'Pas d\'infos techniques') + '</div></div>';
+        }).join('') : '<p class="muted">Aucun retour pour l\'instant.</p>') +
+        (L.length > n ? '<p><button id="more">Voir plus (' + (L.length - n) + ')</button></p>' : '');
+      Array.prototype.forEach.call(box.querySelectorAll('.flt button'), function (b) { b.onclick = function () { f = b.getAttribute('data-f'); n = 25; show(); }; });
+      Array.prototype.forEach.call(box.querySelectorAll('.fb'), function (c) { c.onclick = function () { c.classList.toggle('open'); }; });
+      var mo = document.getElementById('more'); if (mo) mo.onclick = function () { n += 25; show(); };
+    }
+    show();
+  }
   async function load() {
     var k = getKey(); if (!k) { ask(''); return; }
     out.innerHTML = '<p class="muted">Chargement…</p>';
@@ -85,12 +130,14 @@ button{height:46px;border-radius:12px;border:0;background:var(--accent);color:#1
       if (!d || d.code || d.message) { setKey(''); ask('Code incorrect.'); return; }
       var days = d.par_jour || []; var max = Math.max.apply(null, days.map(function (x) { return x.n; }).concat([1]));
       out.innerHTML =
+        '<div class="tabs"><button id="t1" class="on">Résumé</button><button id="t2">Retours (' + esc(d.retours || 0) + ')</button></div><div id="p1">' +
         '<h2>Conducteurs</h2><div class="grid">' + card(d.profils, 'profils créés') + card(d.actifs_24h, 'actifs ces 24 h') + card(d.actifs_7j, 'actifs sur 7 jours') + card(d.actifs_30j, 'actifs sur 30 jours') + '</div>' +
         '<h2>Dernière activité par jour (14 jours)</h2><div class="card bars">' + (days.length ? days.map(function (x) { return '<div class="bar"><span>' + esc(x.j.slice(5).split('-').reverse().join('.')) + '</span><i style="width:' + Math.max(4, Math.round(x.n / max * 100)) + '%"></i><b>' + esc(x.n) + '</b></div>'; }).join('') : '<span class="muted">Pas encore de données.</span>') + '</div>' +
         '<p class="muted">Chaque conducteur compte le jour de sa dernière ouverture de l\'app.</p>' +
         '<h2>Pays et villes les plus actifs (30 jours)</h2><div class="card" id="zn"><span class="muted">Chargement…</span></div>' +
         '<p class="muted">Villes déduites de la zone d\'activité des conducteurs (environ 10 km), jamais de position exacte.</p>' +
-        '<p><button id="rf">Actualiser</button></p>';
+        '<p><button id="rf">Actualiser</button></p></div><div id="p2" hidden></div>';
+      tabs();
       document.getElementById('rf').onclick = load;
       places(d.zones || []);
     } catch (e) { out.innerHTML = '<p class="err">Connexion impossible. Réessaie.</p>'; }
