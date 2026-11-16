@@ -107,6 +107,7 @@ const P = {
   shops: '<path d="M4 8h16l-1 12H5z"/><path d="M9 8V6a3 3 0 016 0v2"/>',
   truckstop: '<path d="M2 16V6h11v10M13 9h4l3 4v3h-7"/><circle cx="6" cy="17.5" r="1.8"/><circle cx="16.5" cy="17.5" r="1.8"/>',
   car: '<path d="M5 15l2-6h10l2 6v3H5z"/><circle cx="8" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/>',
+  motoi: '<circle cx="5.5" cy="16.5" r="3"/><circle cx="18.5" cy="16.5" r="3"/><path d="M5.5 16.5l4-6h5l4 6M9.5 10.5L8 7H5.5M14.5 10.5l1.5-3.5h2.5"/><path d="M10 14h4"/>',
   bike: '<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l4-8h5l3 8M10 8l-1-2H7M12 16l3-8"/>',
   ebike: '<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l4-8h5l3 8M12 16l3-8"/><path d="M11 3l-2 3h3l-2 3"/>',
   walk: '<circle cx="13" cy="4" r="2"/><path d="M11 21l2-6-3-3 1-5 4 3 3 1M10 12l-2 4"/>',
@@ -162,6 +163,8 @@ const VEHICLES = {
   voiture: { label: 'Voiture', icon: 'car' },
   electrique: { label: 'Électrique', icon: 'ev', ev: true },
   hybride: { label: 'Hybride', icon: 'ev', ev: true },
+  moto: { label: 'Moto ou scooter', icon: 'motoi', two: true, tt: 'motorcycle' },
+  cyclo: { label: 'Scooter ou cyclomoteur 45 km/h', icon: 'motoi', two: true, cyclo: true },
   camping: { label: 'Camping-car', icon: 'camper', heavy: true, costing: 'truck', dims: { height: 3.2, width: 2.3, length: 7.5, weight: 3.5 } },
   remorque: { label: 'Voiture + caravane ou remorque', icon: 'camper', heavy: true, costing: 'auto', dims: { height: 2.6, width: 2.5, length: 12, weight: 3.5 } },
   minibus: { label: 'Minibus', icon: 'minibus', heavy: true, costing: 'bus', dims: { height: 2.9, width: 2.1, length: 7, weight: 5 } },
@@ -208,6 +211,7 @@ function vehLimits(cc) {
 }
 /* Plafond = vitesse la plus haute permise à ce véhicule dans le pays (jamais plus bas que la loi). Pays non vérifié : pas de plafond. */
 function vehCap() {
+  if (veh().cyclo) return 45; // #005 : un cyclomoteur ou scooter 45 km/h ne peut pas aller plus vite
   const L = vehLimits(); if (!L) return null;
   const n = L.lim.join(' ').match(/\d+/g); return n ? Math.max(...n.map(Number)) : null;
 }
@@ -1337,7 +1341,9 @@ async function fetchRoute(from, to) {
     try { const R = await fetchValhalla(from, to, v.costing, o); R.vehicle = vehSummary(); return R; }
     catch (e) { console.warn('valhalla', e); const R = await fetchOsrm(from, to); R.fallback = true; return R; }
   }
-  if (window.ROUTA_X && ROUTA_X.route) { try { const R = await ROUTA_X.route(from, to); if (R) return R; } catch (e) { console.warn('tomtom', e); } }
+  if (window.ROUTA_X && ROUTA_X.route) { try { const R = await ROUTA_X.route(from, to); if (R) { if (v.two) R.vehicle = vehSummary(); return R; } } catch (e) { console.warn('tomtom', e); } }
+  // #005 : secours sans TomTom — cyclomoteur / scooter 45 km/h sans autoroute (Valhalla « motor_scooter »), moto (« motorcycle »)
+  if (v.two) { try { const R = await fetchValhalla(from, to, v.cyclo ? 'motor_scooter' : 'motorcycle', v.cyclo ? { top_speed: 45 } : undefined); R.vehicle = vehSummary(); return R; } catch (e) { console.warn('valhalla deux-roues', e); } }
   try { return await fetchOsrm(from, to); }
   catch (e) { return await fetchValhalla(from, to, 'auto'); }
 }
@@ -2835,9 +2841,10 @@ function openVehicle(after, editId) {
   const drawAsst = () => {
     const brands = Object.keys(DB0).sort((a, b) => a.localeCompare(b));
     const models = V.brand && DB0[V.brand] ? DB0[V.brand] : [];
-    const free = V.manual || (V.brand && !DB0[V.brand]) || (V.model && models.length && !models.includes(V.model));
-    let h = '<label class="field" for="vaBrand">Marque' + (free ? '<input id="vaBrand" type="text" maxlength="30" value="' + esc(V.brand || '') + '" placeholder="Ex. : Peugeot">' : '<select id="vaBrand">' + opt('', '—', !V.brand) + brands.map((x) => opt(x, x, x === V.brand)).join('') + '</select>') + '</label>';
-    if (V.brand || free) h += '<label class="field" for="vaModel">Modèle' + (free ? '<input id="vaModel" type="text" maxlength="30" value="' + esc(V.model || '') + '" placeholder="Ex. : 2008">' : '<select id="vaModel">' + opt('', '—', !V.model) + models.map((x) => opt(x, x, x === V.model)).join('') + '</select>') + '</label>';
+    const two = !!(VEHICLES[V.type] || {}).two;
+    const free = two || V.manual || (V.brand && !DB0[V.brand]) || (V.model && models.length && !models.includes(V.model));
+    let h = '<label class="field" for="vaBrand">Marque' + (free ? '<input id="vaBrand" type="text" maxlength="30" value="' + esc(V.brand || '') + '" placeholder="' + (two ? 'Ex. : Yamaha' : 'Ex. : Peugeot') + '">' : '<select id="vaBrand">' + opt('', '—', !V.brand) + brands.map((x) => opt(x, x, x === V.brand)).join('') + '</select>') + '</label>';
+    if (V.brand || free) h += '<label class="field" for="vaModel">Modèle' + (free ? '<input id="vaModel" type="text" maxlength="30" value="' + esc(V.model || '') + '" placeholder="' + (two ? 'Ex. : MT-07' : 'Ex. : 2008') + '">' : '<select id="vaModel">' + opt('', '—', !V.model) + models.map((x) => opt(x, x, x === V.model)).join('') + '</select>') + '</label>';
     if (V.model) h += '<label class="field" for="vaYear">Année<select id="vaYear">' + opt('', '—', !V.year) + Array.from({ length: yNow - 1979 }, (_, i) => yNow + 1 - i).map((y) => opt(String(y), String(y), String(V.year) === String(y))).join('') + '</select></label>';
     if (V.year) h += '<h3>Motorisation</h3><div class="seg energyseg" id="vaEnergy">' + ENERGIES.map(([k, l]) => '<button data-v="' + k + '" class="' + (V.energy === k ? 'on' : '') + '">' + esc(k === 'essence' && I18N.lang !== 'fr' ? I18N.t('Essence (moteur)') : I18N.t(l)) + '</button>').join('') + '</div>';
     if (V.energy) h += '<label class="field" for="vaVersion">Version (facultatif)<input id="vaVersion" type="text" maxlength="40" value="' + esc(V.version || '') + '" placeholder="Ex. : 1.2 PureTech 130 GT"></label>';
@@ -2871,7 +2878,7 @@ function openVehicle(after, editId) {
       V.type = k === 'voiture' ? (V.energy === 'electrique' ? 'electrique' : (V.energy === 'hybride' || V.energy === 'phev') ? 'hybride' : 'voiture') : k;
       V.dims = Object.assign({}, (VEHICLES[V.type] || {}).dims || {});
       body.querySelectorAll('#vehGrid .typebtn').forEach((x) => x.classList.toggle('sel', x === b));
-      drawDims();
+      drawAsst(); drawDims();
     };
   });
   body.querySelectorAll('[data-vid]').forEach((b) => { b.onclick = () => { const x = loadVehicles().find((y) => y.id === b.dataset.vid); if (!x) return; useVehicle(x); toast(I18N.t('Véhicule actif') + ' : <b>' + esc(vehName(x)) + '</b>'); openVehicle(after); }; });

@@ -491,6 +491,7 @@ async function ttRoutes(from, to, vias) {
     if (X.opts.motorways) avoid.push('motorways');
     const vv = A.veh ? A.veh() : {}, vd = vv.dims || {};
     const vp = {};
+    if (vv.two) { vp.travelMode = 'motorcycle'; if (vv.cyclo) { vp.vehicleMaxSpeed = 45; if (!avoid.includes('motorways')) avoid.push('motorways'); } } // #005 : moto et scooter 45 km/h (sans autoroute)
     if (vv.heavy) {
       vp.travelMode = vv.costing === 'bus' ? 'bus' : vv.costing === 'auto' ? 'car' : 'truck';
       if (vd.height) vp.vehicleHeight = vd.height; if (vd.width) vp.vehicleWidth = vd.width; if (vd.length) vp.vehicleLength = vd.length;
