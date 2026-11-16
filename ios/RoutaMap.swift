@@ -122,8 +122,7 @@ public class RoutaMapPlugin: CAPPlugin, CAPBridgedPlugin, MLNMapViewDelegate, UI
                 mv.compassView.isHidden = true
                 mv.showsScale = false
                 mv.allowsTilting = false   // carte toujours à plat (2D)
-                mv.attributionButtonPosition = .bottomLeft
-                mv.attributionButtonMargins = CGPoint(x: 6, y: 4)
+                mv.attributionButton.isHidden = true   // crédits de la carte : dans le menu (Crédits de la carte)
                 mv.preferredFramesPerSecond = .maximum
                 mv.maximumPitch = 75
                 mv.setCenter(CLLocationCoordinate2D(latitude: lat, longitude: lng), zoomLevel: zoom, animated: false)

@@ -472,7 +472,7 @@ const map = new maplibregl.Map({
   style: CFG.mapStyle,
   center: CFG.defaultCenter || [6.6323, 46.5197],
   zoom: CFG.defaultZoom || 11,
-  attributionControl: { compact: true },
+  attributionControl: false, // crédits : dans le menu (Crédits de la carte), rien sur la carte
   pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
   fadeDuration: 0,
   renderWorldCopies: false,
@@ -2768,7 +2768,7 @@ function bindVisSeg(root, id, after) {
 function openDrivers() {
   const list = driversList();
   const keepScroll = S.sheetView === 'drivers' ? $('sheetBody').scrollTop : 0;
-  const body = openSheet('Conducteurs autour', '<h3>Qui me voit ?</h3>' + visSeg('dvVis') +
+  const body = openSheet('Conducteurs autour', '<h3>' + esc(I18N.t('Visibilité sur la carte')) + '</h3>' + visSeg('dvVis') +
     (!S.online ? '<div class="banner">' + ic('info') + '<span>Mode solo : active le mode en ligne (voir le guide) pour voir les autres conducteurs.</span></div>' : '') +
     (list.length ? list.map((d, i) => '<div class="card"><div class="ico" style="background:' + esc(d.color || '#FF8A3D') + ';border-radius:22px">' + esc(initials(d.pseudo)) + '</div><button class="grow" data-open="' + i + '" style="background:none;border:0;text-align:left;padding:0"><b>' + esc(d.pseudo) + '</b><div class="sub">' + esc(d.car || 'Voiture inconnue') + ' · ' + (d.dist != null ? (d.fuzzy ? 'env. ' : '') + fmtDist(d.dist) : '') + (d.speed ? ' · ' + d.speed + ' km/h' : '') + '</div></button><button class="btn small" data-bump="' + i + '">Bump</button></div>').join('')
       : '<div class="empty">Personne de visible pour le moment.</div>'), 'drivers');
@@ -2874,6 +2874,41 @@ function useVehicle(v) {
   S.vehicle = v; store.set('routa.vehicle', v);
   updateVehChip();
 }
+/* Finitions par marque (noms commerciaux de la marque, Europe) : seules celles de la marque choisie sont proposées. « Autre » pour tout le reste. */
+const BRAND_TRIMS = {
+  'Peugeot': ['Like', 'Active', 'Active Pack', 'Allure', 'Allure Pack', 'GT', 'GT Line', 'GT Pack', 'Style'],
+  'Citroën': ['Feel', 'Feel Pack', 'Shine', 'Shine Pack', 'Live', 'You', 'Plus', 'Max', 'C-Series'],
+  'DS': ['Bastille', 'Performance Line', 'Rivoli', 'Opéra', 'Pallas', 'Étoile'],
+  'Opel': ['Edition', 'Elegance', 'GS', 'GS Line', 'Ultimate', 'Innovation'],
+  'Renault': ['Life', 'Zen', 'Intens', 'Equilibre', 'Evolution', 'Techno', 'Iconic', 'Esprit Alpine', 'R.S. Line', 'R.S.'],
+  'Dacia': ['Access', 'Essential', 'Expression', 'Comfort', 'Journey', 'Extreme', 'Prestige'],
+  'Volkswagen': ['Trendline', 'Comfortline', 'Highline', 'Life', 'Style', 'Elegance', 'R-Line', 'GTI', 'GTD', 'GTE', 'R'],
+  'Škoda': ['Active', 'Ambition', 'Style', 'Selection', 'Sportline', 'Monte Carlo', 'Scout', 'RS', 'Laurin & Klement'],
+  'Seat': ['Reference', 'Style', 'Xcellence', 'FR'],
+  'Cupra': ['VZ', 'VZ1', 'VZ2', 'VZ3'],
+  'Audi': ['Attraction', 'Ambition', 'Ambiente', 'Advanced', 'Design', 'S line', 'Black Edition'],
+  'BMW': ['Advantage', 'Sport Line', 'Luxury Line', 'Modern Line', 'M Sport', 'xLine'],
+  'Mercedes-Benz': ['Style', 'Progressive', 'Avantgarde', 'Exclusive', 'AMG Line'],
+  'Mini': ['Classic', 'Favoured', 'Essential', 'Classic Trim', 'JCW Trim', 'John Cooper Works'],
+  'Toyota': ['Comfort', 'Active', 'Trend', 'Style', 'Premium', 'GR Sport', 'Lounge'],
+  'Ford': ['Trend', 'Cool & Connect', 'Titanium', 'ST-Line', 'ST-Line X', 'Active', 'Vignale', 'ST'],
+  'Fiat': ['Pop', 'Easy', 'Lounge', 'Cross', 'Sport', 'La Prima', 'Dolcevita'],
+  'Hyundai': ['Origo', 'Amplia', 'Vertex', 'N Line', 'N'],
+  'Kia': ['Power', 'Style', 'GT-Line', 'GT'],
+  'Mazda': ['Prime-Line', 'Centre-Line', 'Exclusive-Line', 'Homura', 'Takumi', 'Ambition', 'Revolution'],
+  'Nissan': ['Visia', 'Acenta', 'N-Connecta', 'N-Design', 'Tekna', 'Tekna+'],
+  'Volvo': ['Kinetic', 'Momentum', 'Inscription', 'R-Design', 'Core', 'Plus', 'Ultimate'],
+  'Tesla': ['Propulsion', 'Grande Autonomie', 'Performance'],
+  'Suzuki': ['Unico', 'Compact', 'Compact+', 'Compact Top', 'Piz Sulai'],
+  'Subaru': ['Advantage', 'Swiss two', 'Swiss four', 'Luxury'],
+  'Jeep': ['Longitude', 'Limited', 'Trailhawk', 'Summit', 'Altitude'],
+  'Alfa Romeo': ['Super', 'Sprint', 'Ti', 'Veloce', 'Quadrifoglio'],
+  'Honda': ['Comfort', 'Elegance', 'Advance', 'Sport', 'Type R'],
+  'Porsche': ['Base', 'S', 'GTS', 'Turbo', 'Turbo S', 'GT3'],
+  'Land Rover': ['S', 'SE', 'HSE', 'Dynamic', 'Autobiography'],
+  'MG': ['Comfort', 'Luxury'],
+  'Lexus': ['Comfort', 'Executive', 'F Sport', 'Excellence']
+};
 function openVehicle(after, editId) {
   const list = loadVehicles();
   const curId = store.get('routa.vehicleId', list[0].id);
@@ -2924,18 +2959,18 @@ function openVehicle(after, editId) {
     // Version : choisie avec des listes (puissance, boîte, finition) plutôt qu'écrite à la main
     if (V.energy) {
       const PS = [60, 70, 75, 80, 90, 100, 110, 115, 120, 130, 136, 140, 150, 156, 160, 170, 180, 190, 200, 204, 220, 245, 250, 265, 300, 340, 400, 450, 500];
-      const TRIMS = ['Base', 'Comfort', 'Style', 'Business', 'Sport', 'GT', 'GT Line', 'Premium', 'Luxe', 'Executive', 'R-Line', 'AMG Line', 'M Sport', 'S line', 'ST', 'RS', 'GTI', 'Allure', 'Active', 'Edition'];
+      const TRIMS = BRAND_TRIMS[V.brand] || [];
       h += '<h3>' + esc(I18N.t('Version')) + '</h3><div class="row">' +
         '<label class="field grow" for="vaPs">' + esc(I18N.t('Puissance')) + '<select id="vaPs">' + opt('', '—', !V.ps) + PS.map((p) => opt(String(p), p + ' ch', String(V.ps) === String(p))).join('') + opt('__o', I18N.t('Autre'), V.ps && !PS.includes(+V.ps)) + '</select></label>' +
         '<label class="field grow" for="vaGear">' + esc(I18N.t('Boîte')) + '<select id="vaGear">' + opt('', '—', !V.gear) + opt('man', I18N.t('Manuelle'), V.gear === 'man') + opt('auto', I18N.t('Automatique'), V.gear === 'auto') + '</select></label></div>' +
         (V.ps && !PS.includes(+V.ps) ? '<label class="field" for="vaPsO">' + esc(I18N.t('Puissance (ch)')) + '<input id="vaPsO" type="number" inputmode="numeric" value="' + esc(V.ps === '__o' ? '' : V.ps) + '"></label>' : '') +
-        '<label class="field" for="vaTrim">' + esc(I18N.t('Finition')) + '<select id="vaTrim">' + opt('', '—', !V.trim) + TRIMS.map((t) => opt(t, t, V.trim === t)).join('') + opt('__o', I18N.t('Autre'), V.trim && !TRIMS.includes(V.trim)) + '</select></label>' +
-        (V.trim && !TRIMS.includes(V.trim) ? '<label class="field" for="vaTrimO">' + esc(I18N.t('Finition')) + '<input id="vaTrimO" type="text" maxlength="30" value="' + esc(V.trim === '__o' ? '' : V.trim) + '"></label>' : '');
+        (TRIMS.length ? '<label class="field" for="vaTrim">' + esc(I18N.t('Finition')) + '<select id="vaTrim">' + opt('', '—', !V.trim) + TRIMS.map((t) => opt(t, t, V.trim === t)).join('') + opt('__o', I18N.t('Autre'), V.trim && !TRIMS.includes(V.trim)) + '</select></label>' : '') +
+        (!TRIMS.length || (V.trim && !TRIMS.includes(V.trim)) ? '<label class="field" for="vaTrimO">' + esc(I18N.t('Finition')) + '<input id="vaTrimO" type="text" maxlength="30" value="' + esc(V.trim === '__o' ? '' : (V.trim || '')) + '"></label>' : '');
     }
     h += '<p class="muted small">' + (free ? '' : '<button class="txtlink" id="vaManual">Je ne trouve pas mon véhicule</button> · ') + '<button class="txtlink" id="vaMissing">Signaler un véhicule manquant</button></p>';
     $('vehAsst').innerHTML = h;
     const on = (id, ev, fn) => { const e = $(id); if (e) e[ev] = fn; };
-    on('vaBrand', free ? 'oninput' : 'onchange', (e) => { V.brand = e.target.value.trim(); if (!free) { V.model = ''; V.year = ''; drawAsst(); } });
+    on('vaBrand', free ? 'oninput' : 'onchange', (e) => { V.brand = e.target.value.trim(); V.trim = ''; if (!free) { V.model = ''; V.year = ''; drawAsst(); } });
     on('vaModel', free ? 'oninput' : 'onchange', (e) => { V.model = e.target.value.trim(); if (!free) drawAsst(); else if (V.model && !$('vaYear')) drawAsst(); });
     on('vaYear', 'onchange', (e) => { V.year = e.target.value; drawAsst(); });
     const verUpd = () => { V.version = [V.ps && V.ps !== '__o' ? V.ps + ' ch' : '', V.gear === 'auto' ? I18N.t('Automatique') : V.gear === 'man' ? I18N.t('Manuelle') : '', V.trim && V.trim !== '__o' ? V.trim : ''].filter(Boolean).join(' · '); };
@@ -3195,7 +3230,7 @@ function profileForm(isNew) {
   return {
     html:
       '<label class="field" for="pfName">Pseudo<input id="pfName" type="text" maxlength="20" value="' + esc(S.me.pseudo || '') + '" placeholder="Ex. : Pilote_GT"></label>' +
-      '<h3>Qui peut me voir sur la carte ?</h3>' + visSeg('pfVis') +
+      '<h3>' + esc(I18N.t('Visibilité sur la carte')) + '</h3>' + visSeg('pfVis') +
       '<p class="muted small">Visible : les autres conducteurs voient seulement une zone d\'environ 1 km autour de toi. Invisible : personne ne te voit.</p>',
     bind(root) {
       root.querySelectorAll('#pfColors .swatch').forEach((b) => { b.onclick = () => { color = b.dataset.c; root.querySelectorAll('#pfColors .swatch').forEach((x) => x.classList.toggle('sel', x === b)); }; });
@@ -3368,6 +3403,7 @@ function openK(k) {
     else if (k === 'mapview') openMapView();
     else if (k === 'profile') openProfile();
     else if (k === 'settings') openSettings();
+    else if (k === 'credits') openCredits();
     else if (k === 'licence') openLicence();
     else if (k === 'share') shareApp();
     else if (k === 'help') location.href = 'aide.html';
@@ -3384,6 +3420,25 @@ function langSeg() {
 }
 function bindLangSeg(root) {
   root.querySelectorAll('#langSeg button').forEach((b) => { b.onclick = () => { if (b.dataset.l !== I18N.lang) I18N.setLang(b.dataset.l); }; });
+}
+/* Crédits des cartes et des données (retirés de la carte pour la garder propre) */
+function openCredits() {
+  const L = [
+    ['OpenStreetMap', '© ' + I18N.t('les contributeurs OpenStreetMap') + ' (ODbL)', 'https://www.openstreetmap.org/copyright'],
+    ['OpenMapTiles', '© OpenMapTiles', 'https://openmaptiles.org'],
+    ['OpenFreeMap', I18N.t('Fond de carte'), 'https://openfreemap.org'],
+    ['Sentinel-2 cloudless', 'EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016)', 'https://s2maps.eu'],
+    ['IGN', I18N.t('Photos aériennes (France)'), 'https://geoservices.ign.fr'],
+    ['swisstopo', I18N.t('Photos aériennes (Suisse)'), 'https://www.swisstopo.admin.ch'],
+    ['TomTom', I18N.t('Trafic, itinéraires, travaux'), 'https://www.tomtom.com'],
+    ['RainViewer', I18N.t('Radar de pluie'), 'https://www.rainviewer.com'],
+    ['Open-Meteo', I18N.t('Météo'), 'https://open-meteo.com'],
+    ['Valhalla / OSRM', I18N.t('Itinéraires'), 'https://valhalla.github.io/valhalla/'],
+    ['Photon (komoot)', I18N.t('Recherche d\'adresses'), 'https://photon.komoot.io'],
+    ['Mapzen / AWS Terrain Tiles', I18N.t('Relief'), 'https://registry.opendata.aws/terrain-tiles/'],
+    ['Wikipédia', 'CC BY-SA', 'https://www.wikipedia.org']
+  ];
+  openSheet(I18N.t('Crédits de la carte'), L.map(([n, d, u]) => '<a class="card tap" href="' + esc(u) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span class="grow"><b>' + esc(n) + '</b><span class="sub">' + esc(d) + '</span></span></a>').join(''), 'credits');
 }
 function openMenu() {
   const n = +($('msgBadge').hidden ? 0 : $('msgBadge').textContent) || 0;
@@ -3446,7 +3501,7 @@ function openMenu() {
     '<button class="card tap menusos" data-k="country"><span class="sosdot big">SOS</span><span class="grow"><b>Urgences et infos pays</b><span class="sub">' + ($('ctryLabel').textContent === 'Infos pays' ? 'Numéros d\'urgence, règles, vignettes' : esc($('ctryLabel').textContent)) + '</span></span></button>' +
     groups.map(([g, ts]) => { const list = ts.filter(Boolean); if (!list.length) return ''; return '<h3 class="menuh' + (g === 'Pro' ? ' menupro' : '') + '">' + (g === 'Pro' ? esc(I18N.t('Outils pour les professionnels de la route')) : g) + '</h3><div class="tiles' + (list.length % 3 === 1 ? ' two' : '') + '">' + list.map(tile).join('') + '</div>'; }).join('') +
     '<button class="card tap menufb" data-k="feedback"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg></span><span class="grow"><b>Donner mon avis</b><span class="sub">Un bug, un truc pas clair, une idée : dis-le-nous</span></span></button>' +
-    '<div class="menulinks">' + (X.canInstall && X.canInstall() ? '<button data-k="install">Installer l\'app</button>' : '') + '<button data-k="share">Partager ROUTA</button><button data-k="help">Aide</button><button data-k="privacy">Confidentialité</button></div>' +
+    '<div class="menulinks">' + (X.canInstall && X.canInstall() ? '<button data-k="install">Installer l\'app</button>' : '') + '<button data-k="share">Partager ROUTA</button><button data-k="help">Aide</button><button data-k="privacy">Confidentialité</button><button data-k="credits">' + esc(I18N.t('Crédits de la carte')) + '</button></div>' +
     langSeg() +
     '<p class="menusig">ROUTA par <b>ACKFIX</b></p>', 'menu');
   body.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => openK(b.dataset.k); });
