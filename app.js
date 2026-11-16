@@ -508,6 +508,26 @@ map.on('load', () => {
   drawFavs();
 });
 map.on('error', (e) => console.warn('carte', e && e.error));
+// Morceaux de carte qui n'ont pas pu charger (réseau faible, tunnel) : on les redemande automatiquement, sans rien faire de la part de l'utilisateur
+let mapRetryT = 0;
+const mapRetry = () => {
+  if (mapRetryT) return; // au plus une relance toutes les 5 s
+  mapRetryT = setTimeout(() => {
+    mapRetryT = 0;
+    try {
+      const caches = (map.style && map.style.sourceCaches) || {};
+      let n = 0;
+      Object.keys(caches).forEach((id) => {
+        const sc = caches[id]; if (!sc || !sc._tiles || typeof sc._removeTile !== 'function') return;
+        Object.keys(sc._tiles).forEach((k) => { if (sc._tiles[k] && sc._tiles[k].state === 'errored') { sc._removeTile(k); n++; } });
+      });
+      if (n) { if (typeof map._update === 'function') map._update(true); else map.triggerRepaint(); }
+    } catch (e) { /* */ }
+  }, 5000);
+};
+map.on('error', (e) => { if (e && (e.tile || e.sourceId)) mapRetry(); });
+window.addEventListener('online', mapRetry);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') mapRetry(); });
 
 const stopFollow = () => { if (S.follow) { S.follow = false; $('btnLocate').classList.remove('active'); updateCompass(); if (S.pos) renderMe(); } };
 map.on('movestart', (e) => { if (e.originalEvent) { stopFollow(); S.lastTouch = Date.now(); document.body.classList.add('panning'); } });
