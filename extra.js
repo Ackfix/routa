@@ -918,7 +918,10 @@ X.parkingsNear = async (dest) => {
   if (S.sheetView !== 'parkdest') return;
   if (!els) { body.innerHTML = '<p class="muted">' + esc(TRX('Données indisponibles pour le moment. Réessaie plus tard.')) + '</p>'; return; }
   const list = els.map((e) => { const c = e.center || e; const t = e.tags || {}; return { name: t.name || (t.parking === 'underground' ? TRX('Parking souterrain') : t.parking === 'multi-storey' ? TRX('Parking couvert') : TRX('Parking')), lat: c.lat, lon: c.lon, t }; })
-    .filter((p) => p.lat != null).map((p) => Object.assign(p, { d: dist(p, dest) })).sort((a, b) => a.d - b.d).slice(0, 12);
+    .filter((p) => p.lat != null && !/street_side|lane|on_street/.test(p.t.parking || '') && (p.t.name || p.t.parking === 'underground' || p.t.parking === 'multi-storey' || !(+p.t.capacity > 0 && +p.t.capacity < 8)))
+    .map((p) => Object.assign(p, { d: dist(p, dest), big: !!(p.t.name || p.t.parking === 'underground' || p.t.parking === 'multi-storey' || +p.t.capacity >= 30) }))
+    .filter((p, i, all) => !p.t.name || all.findIndex((q) => q.t.name === p.t.name) === i)
+    .sort((a, b) => (b.big - a.big) || (a.d - b.d)).slice(0, 12);
   if (!list.length) { body.innerHTML = '<p class="muted">' + esc(TRX('Aucun parking public connu à moins de 700 m.')) + '</p>'; return; }
   body.innerHTML = list.map((p, i) => {
     const t = p.t, info = [];
