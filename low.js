@@ -62,8 +62,8 @@
     let els; try { els = await osm(['["tourism"="picnic_site"]', '["leisure"="picnic_table"]', '["amenity"="bbq"]', '["leisure"="park"]["name"]', '["leisure"="beach_resort"]', '["natural"="beach"]["name"]'], 6000, c, 150); } catch (e) { fail(view); return; }
     if (S.sheetView !== view) return;
     const lab = (t) => t.amenity === 'bbq' ? T('Place de grillade') : t.tourism === 'picnic_site' ? T('Aire de pique-nique') : t.leisure === 'picnic_table' ? T('Table de pique-nique') : t.leisure === 'park' ? T('Parc') : T('Plage');
-    const items = els.map(pt).filter((x) => x.lat != null).map((x) => ({ name: x.t.name || lab(x.t), lat: x.lat, lon: x.lon, d: dist(c, x), sub: [lab(x.t), fmtDist(dist(c, x)), x.t.covered === 'yes' ? T('couvert') : '', x.t.fireplace === 'yes' || x.t.amenity === 'bbq' ? T('foyer') : ''].filter(Boolean).join(' · '), color: '#16A05A', icon: IC.tree }))
-      .sort((a, b) => a.d - b.d).filter((x, i, arr) => i === 0 || dist(x, arr[i - 1]) > 60).slice(0, 40);
+    const items = els.map(pt).filter((x) => x.lat != null).map((x) => ({ name: x.t.name || lab(x.t), lat: x.lat, lon: x.lon, d: dist(c, x), sub: [lab(x.t), fmtDist(dist(c, x)), x.t.covered === 'yes' ? T('couvert') : '', x.t.fireplace === 'yes' || x.t.amenity === 'bbq' ? T('foyer') : ''].filter(Boolean).join(' · '), color: '#16A05A', icon: IC.tree, r: x.t.tourism === 'picnic_site' || x.t.amenity === 'bbq' ? 0 : x.t.name ? 1 : 2 }))
+      .sort((a, b) => a.r - b.r || a.d - b.d).filter((x, i, arr) => i === 0 || dist(x, arr[i - 1]) > 60).slice(0, 40);
     listSheet(title, view, esc(T('Aires de pique-nique, grillades, parcs et plages à moins de 6 km.')), items, { foot: esc(T('Source : OpenStreetMap. Vérifie les règles sur place (feu, horaires).')) });
     document.getElementById('sheetTitle').innerHTML = esc(title) + PREM;
   }
@@ -114,7 +114,7 @@
     if (S.sheetView !== view) return;
     const lab = (t) => t.leisure === 'dog_park' ? T('Parc à chiens') : t.amenity === 'dog_toilet' ? T('Toilettes pour chiens') : t.vending ? T('Distributeur de sacs') : T('Parc où les chiens sont admis');
     const leash = (t) => t.dog === 'leashed' ? T('en laisse') : t.dog === 'yes' ? T('chiens admis') : '';
-    const items = els.map(pt).filter((x) => x.lat != null).map((x) => ({ name: x.t.name || lab(x.t), lat: x.lat, lon: x.lon, d: dist(c, x), sub: [lab(x.t), leash(x.t), fmtDist(dist(c, x))].filter(Boolean).join(' · '), color: '#B07A3E', icon: IC.dog })).sort((a, b) => a.d - b.d).slice(0, 40);
+    const items = els.map(pt).filter((x) => x.lat != null).map((x) => ({ name: x.t.name || lab(x.t), lat: x.lat, lon: x.lon, d: dist(c, x), sub: [lab(x.t), leash(x.t), fmtDist(dist(c, x))].filter(Boolean).join(' · '), color: '#B07A3E', icon: IC.dog, r: x.t.leisure === 'dog_park' ? 0 : x.t.leisure === 'park' ? 1 : 2 })).sort((a, b) => a.r - b.r || a.d - b.d).filter((x, i, arr) => x.r < 2 || arr.slice(0, i).filter((y) => y.r === 2).length < 5).slice(0, 40);
     listSheet(title, view, esc(T('Parcs à chiens et lieux équipés à moins de 5 km. La règle de laisse n\'est affichée que si elle est indiquée pour le lieu.')), items, { foot: esc(T('Source : OpenStreetMap. Les règles locales peuvent varier : respecte les panneaux.')) });
   }
 
