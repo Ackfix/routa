@@ -66,17 +66,66 @@
   }
   let rainStyleT = 0;
   map.on('styledata', () => { if (!S.settings.rain) return; clearTimeout(rainStyleT); rainStyleT = setTimeout(() => { if (!map.getLayer('rain')) rainApply(false); }, 600); });
-  if (S.settings.rain) { if (map.isStyleLoaded && map.isStyleLoaded()) rainApply(true); else map.once('load', () => rainApply(true)); }
+  if (S.settings.rain) { S.settings.rain = false; saveSettings(); } // le radar bleu sur la carte est remplacé par le bouton météo
+
+
+  /* ---------- Météo : bouton rond sur la carte (icône du temps actuel), prévisions au toucher ---------- */
+  const W = (d) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>';
+  const SUN = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/>';
+  const CLOUD = '<path d="M7 18a4 4 0 1 1 .6-8A5.5 5.5 0 0 1 18 11a3.5 3.5 0 0 1-.5 7z"/>';
+  const WXI = {
+    sun: W(SUN),
+    moon: W('<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/>'),
+    partly: W('<circle cx="8.5" cy="8" r="3"/><path d="M8.5 2v1.4M2.5 8h1.4M4.2 3.7l1 1M12.8 3.7l-1 1"/><path d="M9 20a3.6 3.6 0 1 1 .5-7.2A5 5 0 0 1 19 14a3.2 3.2 0 0 1-.4 6z"/>'),
+    cloud: W(CLOUD),
+    fog: W('<path d="M7 13a4 4 0 1 1 .6-8A5.5 5.5 0 0 1 18 6.5 3.5 3.5 0 0 1 17.5 13z"/><path d="M4 16.5h16M6 20h12"/>'),
+    rain: W('<path d="M7 14a4 4 0 1 1 .6-8A5.5 5.5 0 0 1 18 7a3.5 3.5 0 0 1-.5 7z"/><path d="M8 17l-1 3M12 17l-1 3M16 17l-1 3"/>'),
+    snow: W('<path d="M7 14a4 4 0 1 1 .6-8A5.5 5.5 0 0 1 18 7a3.5 3.5 0 0 1-.5 7z"/><path d="M8 17.5v.1M12 19v.1M16 17.5v.1M10 21v.1M14 21v.1"/>'),
+    storm: W('<path d="M7 14a4 4 0 1 1 .6-8A5.5 5.5 0 0 1 18 7a3.5 3.5 0 0 1-.5 7z"/><path d="M12.5 14l-2.5 4h3l-2 4"/>')
+  };
+  const wxKind = (c, day) => c === 0 ? (day === 0 ? 'moon' : 'sun') : c <= 2 ? 'partly' : c === 3 ? 'cloud' : c <= 48 ? 'fog' : c <= 67 ? 'rain' : c <= 77 ? 'snow' : c <= 82 ? 'rain' : c <= 86 ? 'snow' : 'storm';
+  const wxLabel = (c) => T(c === 0 ? 'Ciel clair' : c <= 2 ? 'Peu nuageux' : c === 3 ? 'Couvert' : c <= 48 ? 'Brouillard' : c <= 57 ? 'Bruine' : c <= 67 ? 'Pluie' : c <= 77 ? 'Neige' : c <= 82 ? 'Averses' : c <= 86 ? 'Averses de neige' : 'Orage');
+  let WX = null, wxAt = 0, wxPos = null, wxBusy = false;
+  const wxBtn = el('<button id="btnWx" class="iconbtn wx" aria-label="' + esc(T('Météo')) + '">' + WXI.cloud + '</button>');
+  const wxHost = document.querySelector('.fabs-right');
+  if (wxHost) wxHost.appendChild(wxBtn);
+  function wxShow() { wxBtn.hidden = S.settings.wx === false; }
+  wxShow();
+  async function wxLoad() {
+    if (wxBusy || !S.pos) return; wxBusy = true;
+    try {
+      const j = await getJson('https://api.open-meteo.com/v1/forecast?latitude=' + S.pos.lat.toFixed(3) + '&longitude=' + S.pos.lon.toFixed(3) + '&current=temperature_2m,apparent_temperature,weather_code,is_day,wind_speed_10m&hourly=temperature_2m,weather_code,precipitation_probability,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=5&timezone=auto', 9000);
+      WX = j; wxAt = Date.now(); wxPos = { lat: S.pos.lat, lon: S.pos.lon };
+      wxBtn.innerHTML = WXI[wxKind(j.current.weather_code, j.current.is_day)];
+      wxBtn.setAttribute('aria-label', T('Météo') + ' : ' + wxLabel(j.current.weather_code) + ', ' + Math.round(j.current.temperature_2m) + '°');
+    } catch (e) { /* météo indisponible : l'icône reste neutre */ } finally { wxBusy = false; }
+  }
+  setInterval(() => { if (document.hidden || S.settings.wx === false || !S.pos) return; if (!WX || Date.now() - wxAt > 900000 || (wxPos && dist(wxPos, S.pos) > 15000)) wxLoad(); }, 5000);
+  const wxDay = (t) => { try { return new Date(t).toLocaleDateString(A.I18N && A.I18N.speech || 'fr-FR', { weekday: 'short' }); } catch (e) { return t.slice(5, 10); } };
+  wxBtn.onclick = async () => {
+    const body = openSheet(T('Météo'), '<p class="muted">' + esc(T('Chargement…')) + '</p>', 'wx');
+    if (!WX || Date.now() - wxAt > 300000) await wxLoad();
+    if (!WX) { body.innerHTML = '<p class="muted">' + esc(T('Météo indisponible pour le moment.')) + '</p>'; return; }
+    const c = WX.current, h = WX.hourly, d = WX.daily;
+    const nowI = Math.max(0, h.time.findIndex((t) => Date.parse(t) >= Date.now() - 1800000));
+    const hrs = []; for (let i = nowI; i < Math.min(h.time.length, nowI + 12); i++) hrs.push(i);
+    body.innerHTML =
+      '<div class="wxnow"><span class="wxbig">' + WXI[wxKind(c.weather_code, c.is_day)] + '</span><div><b class="wxt">' + Math.round(c.temperature_2m) + '°</b><div>' + esc(wxLabel(c.weather_code)) + '</div><div class="muted small">' + esc(T('Ressenti')) + ' ' + Math.round(c.apparent_temperature) + '° · ' + esc(T('Vent')) + ' ' + Math.round(c.wind_speed_10m) + ' km/h</div></div></div>' +
+      '<h3>' + esc(T('Prochaines heures')) + '</h3><div class="wxh">' + hrs.map((i) => '<div><span>' + esc(h.time[i].slice(11, 13)) + ' h</span>' + WXI[wxKind(h.weather_code[i], h.is_day[i])] + '<b>' + Math.round(h.temperature_2m[i]) + '°</b><small>' + (h.precipitation_probability[i] != null ? h.precipitation_probability[i] + ' %' : '') + '</small></div>').join('') + '</div>' +
+      '<h3>' + esc(T('Prochains jours')) + '</h3><div class="wxd">' + d.time.map((t, i) => '<div><span>' + esc(i === 0 ? T('Aujourd\'hui') : wxDay(t)) + '</span>' + WXI[wxKind(d.weather_code[i], 1)] + '<small>' + (d.precipitation_probability_max[i] != null ? d.precipitation_probability_max[i] + ' %' : '') + '</small><b>' + Math.round(d.temperature_2m_min[i]) + '° / ' + Math.round(d.temperature_2m_max[i]) + '°</b></div>').join('') + '</div>' +
+      '<p class="muted small">' + esc(T('Prévisions Open-Meteo. Indicatif : fie-toi à la réalité sur place.')) + '</p>';
+  };
+  wxLoad();
 
   /* ---------- réglages ajoutés dans « Affichage de la carte » ---------- */
   function onSheet() {
     const body = $('sheetBody'); if (!body) return;
-    if (S.sheetView === 'mapview' && !body.querySelector('#mvRain')) {
+    if (S.sheetView === 'mapview' && !body.querySelector('#mvWx')) {
       const after = body.querySelector('label[for="mvTransit"]') || body.querySelector('label[for="mvTraffic"]');
       if (!after) return;
-      const lab = el('<label class="switch" for="mvRain"><span><b>' + esc(T('Radar de pluie')) + '</b><br><span class="muted small">' + esc(T('Pluie et neige en direct, mises à jour toutes les 10 minutes.')) + '</span></span><input id="mvRain" type="checkbox"' + (S.settings.rain ? ' checked' : '') + '></label>');
+      const lab = el('<label class="switch" for="mvWx"><span><b>' + esc(T('Bouton météo')) + '</b><br><span class="muted small">' + esc(T('Une icône sur la carte montre le temps qu\'il fait. Touche-la pour voir les prévisions.')) + '</span></span><input id="mvWx" type="checkbox"' + (S.settings.wx !== false ? ' checked' : '') + '></label>');
       after.parentNode.insertBefore(lab, after.nextSibling);
-      lab.querySelector('input').onchange = (e) => { S.settings.rain = e.target.checked; saveSettings(); rainApply(true); if (e.target.checked) toast(T('Radar de pluie activé. Dézoome pour voir les nuages de pluie autour de toi.')); };
+      lab.querySelector('input').onchange = (e) => { S.settings.wx = e.target.checked; saveSettings(); wxShow(); };
     }
   }
   const sb = $('sheetBody');
