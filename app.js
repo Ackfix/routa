@@ -145,8 +145,10 @@ const ALERT_TYPES = window.ROUTA_ALERT_TYPES = {
   fermee: { label: 'Route fermée', say: 'route fermée', cls: 'red' }
 };
 /* #032 Fiabilité des signalements : durée de vie selon le type, prolongée par les confirmations, raccourcie par les « plus là » */
-const ALERT_TTL_H = { trou: 24, objet: 2, accident: 1.5, travaux: 24, bouchon: 1, arret: 1.5, glissant: 3, animal: 1, feu: 6, contresens: 0.5, brouillard: 3, fermee: 12 };
-const alertTtl = (type) => (ALERT_TTL_H[type] || 2) * 3600000;
+/* Règle : tout signalement disparaît tout seul au bout d'1 h maximum (les confirmations ne prolongent plus) */
+const ALERT_TTL_H = { contresens: 0.5 };
+const ALERT_MAX = 3600000;
+const alertTtl = (type) => (ALERT_TTL_H[type] || 1) * 3600000;
 function alertReliability(a) {
   const c = a.confirms || 1, d = a.denies || 0, ageH = (Date.now() - Date.parse(a.created_at || 0)) / 3600000;
   if (c >= 3 && d === 0) return ['ok', 'Fiabilité élevée'];
@@ -560,12 +562,15 @@ function setupMapLayers() {
   map.addSource('sat-ch', { type: 'raster', tiles: ['https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg'], tileSize: 256, minzoom: 8, maxzoom: 20, bounds: [5.95, 45.81, 10.5, 47.81], attribution: '© <a href="https://www.swisstopo.admin.ch" target="_blank" rel="noopener">swisstopo</a>' });
   map.addLayer({ id: 'sat-ch', type: 'raster', source: 'sat-ch', minzoom: 8, layout: { visibility: 'none' } }, before);
   if (CFG.tomtomKey) {
-    const tt = (kind, style) => ['https://api.tomtom.com/traffic/map/4/tile/' + kind + '/' + style + '/{z}/{x}/{y}.png?tileSize=256&key=' + encodeURIComponent(CFG.tomtomKey)];
+    const tt = (kind, style) => ['https://api.tomtom.com/traffic/map/4/tile/' + kind + '/' + style + '/{z}/{x}/{y}.png?tileSize=512&key=' + encodeURIComponent(CFG.tomtomKey)];
     const top = map.getLayer('boundary_3') ? 'boundary_3' : undefined;
-    map.addSource('traffic', { type: 'raster', tiles: tt('flow', 'relative0'), tileSize: 256, maxzoom: 18, attribution: 'Trafic : TomTom' });
+    map.addSource('traffic', { type: 'raster', tiles: tt('flow', 'relative0'), tileSize: 512, maxzoom: 17, attribution: 'Trafic : TomTom' });
     map.addLayer({ id: 'traffic', type: 'raster', source: 'traffic', minzoom: 9, layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.85 } }, top);
-    map.addSource('incidents', { type: 'raster', tiles: tt('incidents', 's3'), tileSize: 256, maxzoom: 18 });
+    map.addSource('incidents', { type: 'raster', tiles: tt('incidents', 's3'), tileSize: 512, maxzoom: 17 });
     map.addLayer({ id: 'incidents', type: 'raster', source: 'incidents', minzoom: 12, layout: { visibility: 'none' } }, top);
+    map.addSource('jam', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({ id: 'jam-case', type: 'line', source: 'jam', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#7A1F22', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 7, 16, 16, 19, 26] } });
+    map.addLayer({ id: 'jam-line', type: 'line', source: 'jam', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#E5484D', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4, 16, 10, 19, 17] } });
     setInterval(() => {
       if (!S.nav || !S.settings.traffic || document.hidden) return;
       const t = '&t=' + Math.floor(Date.now() / 300000);
@@ -665,11 +670,13 @@ function myView(ahead) {
     const H0 = pointAt(N.R, N.along + Math.min(go, spd * 0.8)), H1 = pointAt(N.R, N.along + Math.min(go, spd * 0.8) + 30);
     return { lat: P0.lat, lon: P0.lon, heading: dist(H0, H1) > 5 ? bearing(H0, H1) : N.snap.heading };
   }
+  const so = S.snapOff && Date.now() - S.snapOff.t < 12000 ? S.snapOff : null;
+  const bl = S.pos.lat + (so ? so.dLat : 0), bo = S.pos.lon + (so ? so.dLon : 0);
   if (go && S.heading != null && S.moving) {
     const m = Math.min(go, 70), h = toRad(S.heading);
-    return { lat: S.pos.lat + (m * Math.cos(h)) / 111320, lon: S.pos.lon + (m * Math.sin(h)) / (111320 * Math.cos(toRad(S.pos.lat))), heading: S.heading };
+    return { lat: bl + (m * Math.cos(h)) / 111320, lon: bo + (m * Math.sin(h)) / (111320 * Math.cos(toRad(S.pos.lat))), heading: S.heading };
   }
-  return { lat: S.pos.lat, lon: S.pos.lon, heading: S.heading };
+  return { lat: bl, lon: bo, heading: S.heading };
 }
 /* Mon marqueur */
 /* En suivi, le curseur reste fixe à l'écran (la carte glisse dessous) : il ne disparaît plus et reste calé sur la route.
@@ -856,7 +863,7 @@ function softOpts() {
   return ['pedestrian', { walking_speed: 5, walkway_factor: 0.8, sidewalk_factor: 0.8, alley_factor: 2, driveway_factor: 5, step_penalty: 10, use_lit: dark ? 1 : 0.3, max_hiking_difficulty: 1, use_ferry: 0.5 }];
 }
 function putAlert(r) { if (!r || !r.id) return; if (r.type === 'lieu_ferme') S.closed.set(r.id, r); else S.alerts.set(r.id, r); }
-function alertVisible(a) { return a && Date.parse(a.expires_at) > Date.now() && (a.denies || 0) <= (a.confirms || 1); }
+function alertVisible(a) { return a && Date.parse(a.expires_at) > Date.now() && (!a.created_at || Date.parse(a.created_at) + ALERT_MAX > Date.now()) && (a.denies || 0) <= (a.confirms || 1); }
 function renderAlerts() {
   const seen = new Set();
   S.alerts.forEach((a) => {
@@ -872,6 +879,45 @@ function renderAlerts() {
     }
   });
   S.markers.alerts.forEach((m, id) => { if (!seen.has(id)) { m.remove(); S.markers.alerts.delete(id); } });
+  updateJams();
+}
+/* Bouchon signalé : la route passe en rouge sur ~150 m à l'endroit du signalement */
+S.jamSeg = S.jamSeg || new Map();
+function cutAround(shape, pt, half) {
+  const cosL = Math.cos(toRad(pt.lat)), X = (p) => (p.lon - pt.lon) * 111320 * cosL, Y = (p) => (p.lat - pt.lat) * 111320;
+  let bi = 0, bd = 1e12, bt = 0;
+  for (let i = 0; i < shape.length - 1; i++) {
+    const ax = X(shape[i]), ay = Y(shape[i]), bx = X(shape[i + 1]), by = Y(shape[i + 1]), dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / l2)), px = ax + dx * t, py = ay + dy * t, d = px * px + py * py;
+    if (d < bd) { bd = d; bi = i; bt = t; }
+  }
+  const start = { lat: shape[bi].lat + (shape[bi + 1].lat - shape[bi].lat) * bt, lon: shape[bi].lon + (shape[bi + 1].lon - shape[bi].lon) * bt };
+  const walk = (dir) => { const out = []; let rem = half, cur = start, i = dir > 0 ? bi + 1 : bi;
+    while (rem > 0 && i >= 0 && i < shape.length) { const d = dist(cur, shape[i]); if (d >= rem) { const f = rem / (d || 1); out.push([cur.lon + (shape[i].lon - cur.lon) * f, cur.lat + (shape[i].lat - cur.lat) * f]); rem = 0; } else { out.push([shape[i].lon, shape[i].lat]); rem -= d; cur = shape[i]; i += dir; } }
+    return out; };
+  return [...walk(-1).reverse(), [start.lon, start.lat], ...walk(1)];
+}
+async function loadJam(a) {
+  if (S.jamSeg.has(a.id)) return; S.jamSeg.set(a.id, null);
+  try {
+    const r = await fetch((CFG.valhallaUrl || 'https://valhalla1.openstreetmap.de') + '/locate', { method: 'POST', body: JSON.stringify({ locations: [{ lat: a.lat, lon: a.lon }], costing: 'auto', verbose: true }) });
+    const j = await r.json();
+    const e = (((j || [])[0] || {}).edges || []).filter((x) => x.edge_info && x.edge_info.shape).sort((x, y) => (x.distance || 0) - (y.distance || 0))[0];
+    const shape = e ? decodePoly6(e.edge_info.shape) : null;
+    S.jamSeg.set(a.id, shape && shape.length > 1 ? cutAround(shape, a, 60) : [[a.lon, a.lat]]);
+  } catch (err) { S.jamSeg.delete(a.id); return; }
+  updateJams();
+}
+function updateJams() {
+  const src = map.getSource && map.getSource('jam'); if (!src) return;
+  const f = [];
+  S.alerts.forEach((a) => {
+    if (a.type !== 'bouchon' || !alertVisible(a)) return;
+    const g = S.jamSeg.get(a.id);
+    if (g === undefined) loadJam(a);
+    else if (g && g.length > 1) f.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: g } });
+  });
+  src.setData({ type: 'FeatureCollection', features: f });
 }
 setInterval(() => { if (!document.hidden) renderAlerts(); }, 60000);
 
@@ -1066,9 +1112,11 @@ async function speedLimitTick() {
   limitBusy = true; lastLimitAt = Date.now(); lastLimitPos = S.pos;
   const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), 6000);
   try {
-    const r = await fetch((CFG.valhallaUrl || 'https://valhalla1.openstreetmap.de') + '/trace_attributes', { method: 'POST', signal: ac.signal, body: JSON.stringify({ shape: S.trail.slice(-4), costing: 'auto', shape_match: 'map_snap', filters: { attributes: ['edge.speed_limit', 'edge.names'], action: 'include' } }) });
+    const r = await fetch((CFG.valhallaUrl || 'https://valhalla1.openstreetmap.de') + '/trace_attributes', { method: 'POST', signal: ac.signal, body: JSON.stringify({ shape: S.trail.slice(-4), costing: 'auto', shape_match: 'map_snap', filters: { attributes: ['edge.speed_limit', 'edge.names', 'matched.point', 'matched.type', 'matched.distance_from_trace_point'], action: 'include' } }) });
     const j = await r.json();
     const edges = j.edges || [];
+    /* Recalage sur la route (hors navigation) : décalage entre le GPS et le point de route le plus proche */
+    try { const mp = (j.matched_points || []).slice(-1)[0], tp = S.trail.slice(-4).slice(-1)[0]; S.snapOff = (mp && mp.type === 'matched' && tp && (mp.distance_from_trace_point || 0) < 30) ? { dLat: mp.lat - tp.lat, dLon: mp.lon - tp.lon, t: Date.now() } : null; } catch (e2) { S.snapOff = null; }
     let lim = null;
     for (let i = edges.length - 1; i >= 0 && i >= edges.length - 3; i--) { const v = edges[i].speed_limit; if (v && v > 0 && v < 200) { lim = v; break; } }
     S.limit = lim;
@@ -1174,7 +1222,7 @@ function voteAlert(id, yes, quiet) {
   votedAlerts.add(id); store.set('routa.voted', [...votedAlerts].slice(-300));
   if (yes) {
     // une confirmation prolonge l'alerte (jamais plus courte qu'avant)
-    const exp = Math.max(Date.parse(a.expires_at) || 0, Date.now() + alertTtl(a.type));
+    const exp = Math.min(Date.parse(a.expires_at) || 0, (Date.parse(a.created_at) || Date.now()) + ALERT_MAX);
     DB.updateAlert(id, { confirms: (a.confirms || 1) + 1, expires_at: new Date(exp).toISOString() });
   } else {
     const d = (a.denies || 0) + 1, c = a.confirms || 1;
@@ -3487,7 +3535,7 @@ if (!store.get('routa.mig096', false)) { S.settings.voice = false; S.settings.re
 if (!store.get('routa.mig0913', false)) { S.settings.traffic = true; S.settings.showPlaces = true; S.settings.showTransit = false; saveSettings(); store.set('routa.mig0913', true); }
 S.settings.mapType = 'plan';
 S.settings.relief3d = false;
-window.ROUTA = { reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, chooseDestination, initials, veh, openDriver, startNav, openSpot, openPoi, capLimit, openCursor, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
+window.ROUTA = { renderAlerts, reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, chooseDestination, initials, veh, openDriver, startNav, openSpot, openPoi, capLimit, openCursor, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
 if (!S.me || !S.me.pseudo) onboarding(); else boot();
 
 })();
