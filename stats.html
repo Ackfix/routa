@@ -38,6 +38,13 @@ button{height:46px;border-radius:12px;border:0;background:var(--accent);color:#1
 .fb .x{display:none;margin-top:6px;font-size:12px;color:var(--muted)}
 .fb.open .x{display:block}
 .tag{font-weight:700}
+.chart{display:flex;align-items:flex-end;gap:3px;height:96px}.chart i{flex:1;background:var(--accent);border-radius:4px 4px 0 0;min-width:2px}
+.chartl{display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--muted)}
+.acts{display:flex;gap:8px;margin:18px 0}.acts button{flex:1}.acts .alt{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.chip{height:36px;font-size:13px;padding:0 12px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:999px}.chip.on{background:var(--accent);color:#1A1205;border-color:var(--accent)}
+.stov{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
+.stbox{background:var(--bg);border-radius:22px 22px 0 0;padding:14px 16px calc(18px + env(safe-area-inset-bottom));width:min(100%,560px);max-height:92vh;overflow:auto}
+.sthead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:18px}.sthead .x{width:40px;height:40px;background:var(--card);color:var(--ink);border-radius:50%;padding:0}
 </style>
 </head>
 <body>
@@ -78,6 +85,7 @@ button{height:46px;border-radius:12px;border:0;background:var(--accent);color:#1
     var P = {};
     zs.forEach(function (z) { var v = cache[z.lat + ',' + z.lon]; if (!v) return; var p = P[v.pays] || (P[v.pays] = { n: 0, v: {} }); p.n += z.n; p.v[v.ville] = (p.v[v.ville] || 0) + z.n; });
     var names = Object.keys(P).sort(function (a, b) { return P[b].n - P[a].n; });
+    COUNTRIES = names.map(function (n) { return [n, P[n].n]; });
     if (!names.length) { box.innerHTML = '<span class="muted">Pas encore de données.</span>'; return; }
     box.innerHTML = names.map(function (n) {
       return '<div class="zone"><b>' + esc(n) + '</b><b>' + esc(P[n].n) + '</b></div>';
@@ -120,30 +128,167 @@ button{height:46px;border-radius:12px;border:0;background:var(--accent);color:#1
     }
     show();
   }
-  async function load() {
+  /* ---------- périodes ---------- */
+  var PERIODS = [['24 h', 24, 'dernières 24 heures'], ['7 jours', 168, '7 derniers jours'], ['30 jours', 720, '30 derniers jours'], ['90 jours', 2160, '90 derniers jours'], ['Tout', 200000, 'depuis le début']];
+  var TYPES = { trou: 'Trou', objet: 'Objet', accident: 'Accident', travaux: 'Travaux', bouchon: 'Bouchon', arret: 'Véhicule arrêté', glissant: 'Route glissante', animal: 'Animal', feu: 'Feu hors service', contresens: 'Contresens', brouillard: 'Brouillard', fermee: 'Route fermée' };
+  var perH = 168; try { perH = +localStorage.getItem('routa.statsPer') || 168; } catch (e) { /* */ }
+  var D = null, COUNTRIES = [];
+  var ALLP = function () { return PERIODS.filter(function (p) { return p[1] === perH; })[0] || PERIODS[1]; };
+  async function rpc(name, body) { return fetch(CFG.supabaseUrl + '/rest/v1/rpc/' + name, { method: 'POST', headers: { apikey: CFG.supabaseKey, Authorization: 'Bearer ' + CFG.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+  async function fetchStats(k, h) {
+    var r = await rpc('routa_stats_p', { k: k, h: h });
+    if (r.status === 404) {
+      var r2 = await rpc('routa_stats', { k: k });
+      if (r2.status === 404) return { missing: true };
+      var o = await r2.json(); if (!o || o.code || o.message) return o;
+      var f = h <= 24 ? '24h' : h <= 168 ? '7j' : '30j';
+      return { fallback: true, h: h, profils: o.profils, actifs: o['actifs_' + f], alertes: o['alertes_' + f] != null ? o['alertes_' + f] : o.alertes_7j, alertes_types: o.alertes_types || [], avis: null, avis_total: o.retours, messages: o.messages_7j, spots: o.spots, spots_membres: o.spots_membres, convois: o.convois, serie_alertes: [], serie_actifs: (o.par_jour || []).map(function (x) { return { t: x.j, n: x.n }; }), zones: o.zones || [] };
+    }
+    return r.json();
+  }
+  /* graphique en barres : au plus 40 barres (regroupées si la période est longue) */
+  function chart(series) {
+    if (!series || !series.length) return '<span class="muted">Pas encore de données.</span>';
+    var g = Math.ceil(series.length / 40), S2 = [];
+    for (var i = 0; i < series.length; i += g) { var n = 0; for (var j = i; j < Math.min(series.length, i + g); j++) n += series[j].n; S2.push({ t: series[i].t, n: n }); }
+    var mx = Math.max.apply(null, S2.map(function (x) { return x.n; }).concat([1]));
+    var lab = function (t) { return t.length > 5 ? t.slice(5).split('-').reverse().join('.') : t; };
+    return '<div class="chart">' + S2.map(function (x) { return '<i title="' + esc(lab(x.t) + ' : ' + x.n) + '" style="height:' + Math.max(3, Math.round(x.n / mx * 100)) + '%"></i>'; }).join('') + '</div><div class="chartl"><span>' + esc(lab(S2[0].t)) + '</span><span>max ' + mx + '</span><span>' + esc(lab(S2[S2.length - 1].t)) + '</span></div>';
+  }
+  function view() {
+    var d = D, pl = ALLP();
+    var chips = '<div class="flt" id="per">' + PERIODS.map(function (p) { return '<button data-h="' + p[1] + '" class="' + (p[1] === perH ? 'on' : '') + '">' + esc(p[0]) + '</button>'; }).join('') + '</div>';
+    var types = (d.alertes_types || []);
+    var tot = types.reduce(function (a, x) { return a + x.n; }, 0) || 1;
+    var html = chips +
+      '<h2>Conducteurs</h2><div class="grid">' + card(d.actifs, 'actifs · ' + pl[2]) + card(d.profils, 'profils créés (total)') + '</div>' +
+      '<h2>Signalements</h2><div class="grid">' + card(d.alertes, 'signalements · ' + pl[2]) + (d.avis != null ? card(d.avis, 'avis · ' + pl[2]) : '') + '</div>' +
+      '<div class="card" style="margin-top:8px">' + (types.length ? types.map(function (x) { return '<div class="bar"><span>' + esc(TYPES[x.t] || x.t) + '</span><i style="width:' + Math.max(4, Math.round(x.n / tot * 100)) + '%"></i><b>' + esc(x.n) + '</b></div>'; }).join('') : '<span class="muted">Aucun signalement sur cette période.</span>') + '</div>' +
+      (d.serie_actifs && d.serie_actifs.length ? '<h2>Dernière activité des conducteurs</h2><div class="card">' + chart(d.serie_actifs) + '</div>' : '') +
+      (d.serie_alertes && d.serie_alertes.length ? '<h2>Signalements dans le temps</h2><div class="card">' + chart(d.serie_alertes) + '</div>' : '') +
+      '<h2>Communauté</h2><div class="grid">' + card(d.spots, 'spots (total)') + card(d.convois, 'convois (total)') + (d.messages != null ? card(d.messages, 'messages · ' + pl[2]) : '') + '</div>' +
+      '<h2>Pays les plus actifs · ' + esc(pl[2]) + '</h2><div class="card" id="zn"><span class="muted">Chargement…</span></div>' +
+      '<p class="muted">Pays déduits de la zone d\'activité des conducteurs, jamais de position exacte.</p>' +
+      (d.fallback ? '<p class="muted">Pour toutes les périodes et les graphiques, lance le script 09 dans Supabase (SQL Editor).</p>' : '') +
+      '<div class="acts"><button id="rf">Actualiser</button><button id="sh" class="alt">Partager en story</button></div>';
+    document.getElementById('p1').innerHTML = html;
+    Array.prototype.forEach.call(document.querySelectorAll('#per button'), function (b) { b.onclick = function () { perH = +b.getAttribute('data-h'); try { localStorage.setItem('routa.statsPer', String(perH)); } catch (e) { /* */ } load(true); }; });
+    document.getElementById('rf').onclick = function () { load(true); };
+    document.getElementById('sh').onclick = openStory;
+    places(d.zones || []);
+  }
+  async function load(keepTab) {
     var k = getKey(); if (!k) { ask(''); return; }
-    out.innerHTML = '<p class="muted">Chargement…</p>';
+    if (!keepTab || !document.getElementById('p1')) out.innerHTML = '<p class="muted">Chargement…</p>';
+    else document.getElementById('p1').style.opacity = '.5';
     try {
-      var r = await fetch(CFG.supabaseUrl + '/rest/v1/rpc/routa_stats', { method: 'POST', headers: { apikey: CFG.supabaseKey, Authorization: 'Bearer ' + CFG.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ k: k }) });
-      if (r.status === 404) { out.innerHTML = '<p class="err">Les statistiques ne sont pas encore activées dans Supabase.</p>'; return; }
-      var d = await r.json();
+      var d = await fetchStats(k, perH);
+      if (d && d.missing) { out.innerHTML = '<p class="err">Les statistiques ne sont pas encore activées dans Supabase.</p>'; return; }
       if (!d || d.code || d.message) { setKey(''); ask('Code incorrect.'); return; }
-      var days = d.par_jour || []; var max = Math.max.apply(null, days.map(function (x) { return x.n; }).concat([1]));
-      out.innerHTML =
-        '<div class="tabs"><button id="t1" class="on">Résumé</button><button id="t2">Avis (' + esc(d.retours || 0) + ')</button></div><div id="p1">' +
-        '<h2>Conducteurs</h2><div class="grid">' + card(d.profils, 'profils créés') + card(d.actifs_24h, 'actifs ces 24 h') + card(d.actifs_7j, 'actifs sur 7 jours') + card(d.actifs_30j, 'actifs sur 30 jours') + '</div>' +
-        '<h2>Dernière activité par jour (14 jours)</h2><div class="card bars">' + (days.length ? days.map(function (x) { return '<div class="bar"><span>' + esc(x.j.slice(5).split('-').reverse().join('.')) + '</span><i style="width:' + Math.max(4, Math.round(x.n / max * 100)) + '%"></i><b>' + esc(x.n) + '</b></div>'; }).join('') : '<span class="muted">Pas encore de données.</span>') + '</div>' +
-        '<p class="muted">Chaque conducteur compte le jour de sa dernière ouverture de l\'app.</p>' +
-        '<h2>Signalements</h2>' + (d.alertes_total == null ? '<div class="grid">' + card(d.alertes_7j || 0, 'sur 7 jours') + '</div><p class="muted">Pour voir le total et le détail par type, lance le script 08 dans Supabase.</p>' :
-          '<div class="grid">' + card(d.alertes_total, 'au total') + card(d.alertes_24h, 'ces 24 h') + card(d.alertes_7j, 'sur 7 jours') + card(d.alertes_30j, 'sur 30 jours') + '</div>' +
-          '<div class="card" style="margin-top:8px">' + ((d.alertes_types || []).length ? d.alertes_types.map(function (x) { return '<div class="bar"><span style="width:110px">' + esc(ATL[x.t] || x.t) + '</span><b style="margin-left:auto">' + esc(x.n) + '</b></div>'; }).join('') : '<span class="muted">Aucun signalement pour l\'instant.</span>') + '</div>') +
-        '<h2>Pays les plus actifs (30 jours)</h2><div class="card" id="zn"><span class="muted">Chargement…</span></div>' +
-        '<p class="muted">Pays déduits de la zone d\'activité des conducteurs, jamais de position exacte.</p>' +
-        '<p><button id="rf">Actualiser</button></p></div><div id="p2" hidden></div>';
-      tabs();
-      document.getElementById('rf').onclick = load;
-      places(d.zones || []);
+      D = d;
+      var av = d.avis_total != null ? d.avis_total : (d.retours || 0);
+      if (!document.getElementById('p1')) {
+        out.innerHTML = '<div class="tabs"><button id="t1" class="on">Résumé</button><button id="t2">Avis (' + esc(av) + ')</button></div><div id="p1"></div><div id="p2" hidden></div>';
+        tabs();
+      } else { document.getElementById('t2').textContent = 'Avis (' + av + ')'; document.getElementById('p1').style.opacity = ''; }
+      view();
     } catch (e) { out.innerHTML = '<p class="err">Connexion impossible. Réessaie.</p>'; }
+  }
+
+  /* ---------- story 1080 × 1920 ---------- */
+  var SKS = [['avis', 'Avis', 1, function (d) { return d.avis; }], ['profils', 'Profils créés', 1, function (d) { return d.profils; }], ['alertes', 'Signalements', 1, function (d) { return d.alertes; }], ['spots', 'Spots', 0, function (d) { return d.spots; }], ['convois', 'Convois', 0, function (d) { return d.convois; }], ['messages', 'Messages', 0, function (d) { return d.messages; }]];
+  var SBL = [['chart', 'Graphique d\'activité', 1], ['types', 'Types de signalements', 0], ['pays', 'Pays', 1]];
+  var SCF = { style: 'dark' }; SKS.forEach(function (x) { SCF[x[0]] = !!x[2]; }); SBL.forEach(function (x) { SCF[x[0]] = !!x[2]; });
+  try { var sv = JSON.parse(localStorage.getItem('routa.statsStory') || '{}'); for (var kk in sv) SCF[kk] = sv[kk]; } catch (e) { /* */ }
+  var SPAL = {
+    dark: { bg: '#0E1116', glow: 'rgba(255,138,61,.30)', ink: '#F4F6FA', muted: '#9AA3AF', card: '#171B22', line: 'rgba(255,255,255,.07)', bar: '#FF8A3D' },
+    light: { bg: '#F5F6F8', glow: 'rgba(255,138,61,.20)', ink: '#0E1116', muted: '#5B6472', card: '#FFFFFF', line: 'rgba(14,17,22,.08)', bar: '#E8711F' },
+    orange: { bg: '#FF9A4A', bg2: '#FF5F1F', glow: 'rgba(255,224,150,.5)', ink: '#1A1205', muted: 'rgba(26,18,5,.62)', card: 'rgba(255,255,255,.24)', line: 'rgba(255,255,255,.32)', bar: '#1A1205' }
+  };
+  var FONT = 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+  function loadImg(src) { return new Promise(function (res) { var i = new Image(); i.onload = function () { res(i); }; i.onerror = function () { res(null); }; i.src = src; }); }
+  async function drawStory() {
+    var W = 1080, H = 1920, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    var c = cv.getContext('2d'), K = SPAL[SCF.style] || SPAL.dark, d = D, pl = ALLP();
+    if (K.bg2) { var lg = c.createLinearGradient(0, 0, W, H); lg.addColorStop(0, K.bg); lg.addColorStop(1, K.bg2); c.fillStyle = lg; } else c.fillStyle = K.bg;
+    c.fillRect(0, 0, W, H);
+    var g = c.createRadialGradient(W / 2, 560, 40, W / 2, 560, 880); g.addColorStop(0, K.glow); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+    c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+    var cards = SKS.filter(function (x) { return SCF[x[0]] && x[3](d) != null; });
+    var rows = Math.ceil(cards.length / 2), gap = 26;
+    var blocks = SBL.filter(function (x) { return SCF[x[0]]; }).map(function (x) {
+      if (x[0] === 'chart') return (d.serie_actifs && d.serie_actifs.length) ? { k: 'chart', h: 330 } : null;
+      if (x[0] === 'types') return (d.alertes_types && d.alertes_types.length) ? { k: 'types', h: 110 + Math.min(3, d.alertes_types.length) * 66 } : null;
+      return COUNTRIES.length ? { k: 'pays', h: 110 + Math.min(3, COUNTRIES.length) * 66 } : null;
+    }).filter(Boolean);
+    var avail = 1690 - 700, ch = 170, need = function () { return (rows ? rows * ch + (rows - 1) * gap + gap : 0) + blocks.reduce(function (a, b) { return a + b.h + gap; }, 0); };
+    var f = Math.min(1, avail / Math.max(1, need())); ch = Math.round(ch * Math.max(0.7, f));
+    var bh = blocks.map(function (b) { return Math.round(b.h * Math.max(0.7, f)); });
+    var total = need(); var shift = Math.max(0, Math.min(150, Math.round((avail - total) / 2 - 20)));
+    c.save(); c.translate(0, shift);
+    c.fillStyle = K.bar; c.font = '800 36px ' + FONT; c.fillText('R O U T A  ·  S T A T S', W / 2, 200);
+    c.fillStyle = K.muted; c.font = '600 42px ' + FONT; c.fillText(pl[2].charAt(0).toUpperCase() + pl[2].slice(1), W / 2, 272);
+    c.fillStyle = K.ink; c.font = '800 280px ' + FONT; c.fillText(String(d.actifs), W / 2, 540);
+    c.fillStyle = K.muted; c.font = '700 44px ' + FONT; c.fillText('Conducteurs actifs', W / 2, 610);
+    var y = 700;
+    cards.forEach(function (it, i) {
+      var r = Math.floor(i / 2), last = i === cards.length - 1 && cards.length % 2 === 1, w = last ? 900 : 437, x = last ? 90 : 90 + (i % 2) * 463, yy = y + r * (ch + gap);
+      c.fillStyle = K.card; rr(c, x, yy, w, ch, 36); c.fill(); c.strokeStyle = K.line; c.lineWidth = 2; rr(c, x, yy, w, ch, 36); c.stroke();
+      c.fillStyle = K.ink; c.font = '800 ' + Math.round(ch * 0.36) + 'px ' + FONT; c.fillText(String(it[3](d)), x + w / 2, yy + ch * 0.58);
+      c.fillStyle = K.muted; c.font = '600 ' + Math.round(ch * 0.19) + 'px ' + FONT; c.fillText(it[1], x + w / 2, yy + ch * 0.85);
+    });
+    if (rows) y += rows * ch + (rows - 1) * gap + gap;
+    blocks.forEach(function (b, i) {
+      var h = bh[i], x = 90, w = 900;
+      c.fillStyle = K.card; rr(c, x, y, w, h, 36); c.fill(); c.strokeStyle = K.line; c.lineWidth = 2; rr(c, x, y, w, h, 36); c.stroke();
+      c.textAlign = 'left'; c.fillStyle = K.muted; c.font = '700 30px ' + FONT;
+      var title = b.k === 'chart' ? 'Activité des conducteurs' : b.k === 'types' ? 'Signalements par type' : 'Pays les plus actifs';
+      c.fillText(title, x + 40, y + 62);
+      if (b.k === 'chart') {
+        var S2 = [], gg = Math.ceil(d.serie_actifs.length / 40);
+        for (var q = 0; q < d.serie_actifs.length; q += gg) { var n = 0; for (var j = q; j < Math.min(d.serie_actifs.length, q + gg); j++) n += d.serie_actifs[j].n; S2.push(n); }
+        var mx = Math.max.apply(null, S2.concat([1])), bw = (w - 80) / S2.length, base = y + h - 36, mh = h - 130;
+        c.fillStyle = K.bar; S2.forEach(function (n, i2) { var hh = Math.max(6, Math.round(n / mx * mh)); rr(c, x + 40 + i2 * bw + bw * 0.14, base - hh, bw * 0.72, hh, Math.min(8, bw * 0.3)); c.fill(); });
+      } else {
+        var list = b.k === 'types' ? d.alertes_types.slice(0, 3).map(function (t) { return [TYPES[t.t] || t.t, t.n]; }) : COUNTRIES.slice(0, 3);
+        list.forEach(function (it, i2) { var ry = y + 120 + i2 * Math.round(66 * Math.max(0.7, f)); c.textAlign = 'left'; c.fillStyle = K.ink; c.font = '700 38px ' + FONT; c.fillText(it[0], x + 40, ry + 30); c.textAlign = 'right'; c.fillStyle = K.bar; c.font = '800 38px ' + FONT; c.fillText(String(it[1]), x + w - 40, ry + 30); });
+      }
+      c.textAlign = 'center'; y += h + gap;
+    });
+    c.restore();
+    var logo = await loadImg('icons/icon-512.png');
+    if (logo) { c.save(); c.globalAlpha = 0.96; rr(c, W / 2 - 44, 1740, 88, 88, 24); c.clip(); c.drawImage(logo, W / 2 - 44, 1740, 88, 88); c.restore(); }
+    c.textAlign = 'center'; c.fillStyle = K.muted; c.font = '800 28px ' + FONT; c.fillText('R O U T A', W / 2, 1876);
+    return cv;
+  }
+  async function openStory() {
+    var ov = document.getElementById('stOv'); if (ov) ov.remove();
+    ov = document.createElement('div'); ov.id = 'stOv'; ov.className = 'stov';
+    var opt = function (arr) { return arr.map(function (x) { return '<button class="chip" data-k="' + x[0] + '">' + esc(x[1]) + '</button>'; }).join(''); };
+    ov.innerHTML = '<div class="stbox"><div class="sthead"><b>Ma story</b><button id="stX" class="x" aria-label="Fermer">✕</button></div>' +
+      '<div style="text-align:center"><img id="stImg" alt="" style="max-width:100%;max-height:46vh;aspect-ratio:9/16;border-radius:16px;background:#0E1116"></div>' +
+      '<div class="flt" id="stSty" style="margin-top:12px">' + [['dark', 'Sombre'], ['orange', 'Orange'], ['light', 'Clair']].map(function (x) { return '<button data-st="' + x[0] + '" class="' + (SCF.style === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
+      '<p class="muted" style="margin:8px 0 6px">Touche les éléments pour les afficher ou les cacher.</p><div class="flt" id="stOpts">' + opt(SKS.map(function (x) { return [x[0], x[1]]; }).concat(SBL.map(function (x) { return [x[0], x[1]]; }))) + '</div>' +
+      '<div class="acts" style="margin-top:12px"><button id="stShare">Partager</button><button id="stDl" class="alt">Télécharger l\'image</button></div></div>';
+    document.body.appendChild(ov);
+    var img = ov.querySelector('#stImg'), blob = null, ver = 0;
+    var paint = function (b) { b.className = 'chip' + (SCF[b.getAttribute('data-k')] ? ' on' : ''); };
+    var render = async function () { var v = ++ver; var cv = await drawStory(); if (v !== ver) return; img.src = cv.toDataURL('image/png'); cv.toBlob(function (b) { if (v === ver) blob = b; }, 'image/png'); };
+    var persist = function () { try { localStorage.setItem('routa.statsStory', JSON.stringify(SCF)); } catch (e) { /* */ } };
+    Array.prototype.forEach.call(ov.querySelectorAll('#stOpts button'), function (b) { paint(b); b.onclick = function () { var k = b.getAttribute('data-k'); SCF[k] = !SCF[k]; persist(); paint(b); render(); }; });
+    Array.prototype.forEach.call(ov.querySelectorAll('#stSty button'), function (b) { b.onclick = function () { SCF.style = b.getAttribute('data-st'); persist(); Array.prototype.forEach.call(ov.querySelectorAll('#stSty button'), function (x) { x.className = x === b ? 'on' : ''; }); render(); }; });
+    ov.querySelector('#stX').onclick = function () { ov.remove(); };
+    ov.onclick = function (e) { if (e.target === ov) ov.remove(); };
+    ov.querySelector('#stShare').onclick = async function () {
+      var file = blob && new File([blob], 'routa-stats.png', { type: 'image/png' });
+      try { if (file && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'ROUTA' }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+      alert('Utilise « Télécharger l\'image », puis ajoute-la à ta story.');
+    };
+    ov.querySelector('#stDl').onclick = function () {
+      if (!blob) return; var u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = 'routa-stats-' + new Date().toISOString().slice(0, 10) + '.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 5000);
+    };
+    render();
   }
   load();
 })();
