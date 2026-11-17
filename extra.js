@@ -1067,7 +1067,7 @@ function routeHazard() {
   const R = N.R, from = Math.max(0, (N.seg || 0) - 1);
   let best = null;
   S.alerts.forEach((a) => {
-    if (!alertVisible(a)) return;
+    if (!A.alertVisible(a)) return;
     if (dist(S.pos, a) > 6000) return;
     let bi = -1, bd = 45;
     for (let i = from; i < R.coords.length; i++) {
