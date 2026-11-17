@@ -787,3 +787,10 @@ body:has(#geoChip:not([hidden])):not(.navigating) .toasts { top: calc(var(--sat)
 }
 #vehLic .ico { background: var(--surface-2); border-radius: 14px; }
 #vehLic .ico svg { color: var(--info); }
+
+/* Charte : boutons de la carte. Jour = orange avec contour sombre (comme le +) ; nuit = sombre avec contour orange. */
+html body:not(.night) .speedbox, html body:not(.night) .fab-search { background: var(--accent); color: var(--accent-ink); box-shadow: 0 0 0 4px var(--bg), 0 6px 18px rgba(0,0,0,.35); }
+html body:not(.night) .speedbox .speedunit { color: rgba(14,17,22,.72); font-weight: 600; }
+html body:not(.night) .speedbox.over { background: #E5484D; color: #fff; }
+html body:not(.night) .speedbox.over .speedunit { color: #fff; }
+html body.night .fab-search { background: var(--surface); color: var(--fg); box-shadow: 0 0 0 2px var(--accent), 0 6px 18px rgba(0,0,0,.55); }
