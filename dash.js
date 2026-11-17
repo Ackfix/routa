@@ -63,6 +63,44 @@
       '<text id="dkSpeed" x="150" y="' + digitsY + '" class="dk-speed" style="font-size:' + size + 'px' + (st === 'neon' ? ';fill:' + c + ';filter:url(#dkGlow)' : '') + '">0</text>' +
       '<text x="150" y="' + (digitsY + (st === 'classic' || st === 'race' ? 22 : 30)) + '" class="dk-unit">km/h</text></svg>';
   }
+
+  /* ---------- chrono : démarrer / pause, tours, remise à zéro (mémorisé, même si on ferme le cadran) ---------- */
+  const CH = Object.assign({ run: false, t0: 0, acc: 0, laps: [] }, store.get('routa.chrono', {}));
+  const chSave = () => store.set('routa.chrono', CH);
+  const chMs = () => CH.acc + (CH.run ? Date.now() - CH.t0 : 0);
+  const fmtT = (ms) => { ms = Math.max(0, Math.round(ms)); const cs = Math.floor(ms / 10) % 100, s = Math.floor(ms / 1000) % 60, m = Math.floor(ms / 60000) % 60, h = Math.floor(ms / 3600000); return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0') + '.' + String(cs).padStart(2, '0'); };
+  const fmtD = (ms) => (ms < 0 ? '−' : '+') + (Math.abs(ms) / 1000).toFixed(2).replace('.', ',');
+  const chBest = () => CH.laps.length ? Math.min.apply(null, CH.laps.map((l) => l.t)) : null;
+  function chronoHtml() {
+    return '<div class="dk-w dk-ch" data-w="chrono"><div class="dk-chhead"><span class="dk-wl">' + esc(T('Chrono')) + '</span><span class="dk-chlap" id="dkChLap"></span></div>' +
+      '<div class="dk-chtime" id="dkChTime">0:00.00</div><div class="dk-chsub" id="dkChSub"></div>' +
+      '<div class="dk-chbtns"><button class="dk-cb" id="dkChReset">' + esc(T('Zéro')) + '</button><button class="dk-cb" id="dkChLapBtn">' + esc(T('Tour')) + '</button><button class="dk-cb go" id="dkChGo">' + esc(T('Démarrer')) + '</button></div>' +
+      '<div class="dk-chlaps" id="dkChLaps"></div></div>';
+  }
+  function chLapsHtml() {
+    const best = chBest();
+    return CH.laps.map((l, i) => '<div class="dk-lap' + (l.t === best && CH.laps.length > 1 ? ' best' : '') + '"><span>' + esc(T('Tour')) + ' ' + (CH.laps.length - i) + '</span><b>' + fmtT(l.t) + '</b><em>' + (CH.laps.length > 1 && l.t !== best ? fmtD(l.t - best) : (CH.laps.length > 1 ? esc(T('Meilleur')) : '')) + '</em></div>').join('');
+  }
+  function chronoSync() {
+    const q = (id) => document.getElementById(id); if (!q('dkChGo')) return;
+    const ms = chMs();
+    q('dkChTime').textContent = fmtT(ms);
+    const lastEnd = CH.laps.length ? CH.laps[0].at : 0;
+    q('dkChLap').textContent = ms > 0 ? T('Tour') + ' ' + (CH.laps.length + 1) + ' · ' + fmtT(ms - lastEnd) : '';
+    q('dkChSub').textContent = CH.laps.length ? T('Dernier') + ' ' + fmtT(CH.laps[0].t) + ' · ' + T('Meilleur') + ' ' + fmtT(chBest()) : '';
+    q('dkChGo').textContent = CH.run ? T('Pause') : (ms > 0 ? T('Reprendre') : T('Démarrer'));
+    q('dkChGo').classList.toggle('on', CH.run);
+    q('dkChReset').disabled = CH.run || ms === 0;
+    q('dkChLapBtn').disabled = !CH.run;
+  }
+  function chronoBind(d) {
+    const q = (id) => d.querySelector('#' + id); if (!q('dkChGo')) return;
+    const vib = (n) => { try { A.vibrate && A.vibrate(n); } catch (e) { /* */ } };
+    q('dkChGo').onclick = () => { if (CH.run) { CH.acc += Date.now() - CH.t0; CH.run = false; } else { CH.t0 = Date.now(); CH.run = true; } vib(20); chSave(); chronoSync(); };
+    q('dkChLapBtn').onclick = () => { if (!CH.run) return; const ms = chMs(), lastEnd = CH.laps.length ? CH.laps[0].at : 0; CH.laps.unshift({ t: ms - lastEnd, at: ms }); if (CH.laps.length > 200) CH.laps.pop(); vib(30); chSave(); q('dkChLaps').innerHTML = chLapsHtml(); chronoSync(); };
+    q('dkChReset').onclick = () => { if (CH.run) return; CH.acc = 0; CH.t0 = 0; CH.laps = []; vib(20); chSave(); q('dkChLaps').innerHTML = ''; chronoSync(); };
+    q('dkChLaps').innerHTML = chLapsHtml(); chronoSync();
+  }
   const W = (k, label, id) => '<div class="dk-w" data-w="' + k + '"><div class="dk-wv" id="' + id + '">–</div><div class="dk-wl">' + esc(T(label)) + '</div></div>';
   function render() {
     let d = document.getElementById('dashOv');
@@ -73,10 +111,11 @@
     d.innerHTML = '<div class="dk-top"><button class="dk-btn" id="dkSet" aria-label="' + esc(T('Personnaliser le cadran')) + '">' + A.ic('gear') + '</button><button class="dk-btn" id="dkClose" aria-label="' + esc(T('Fermer')) + '"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
       '<div class="dk-main">' + gaugeSvg() + (w.limit ? '<div class="dk-limit" id="dkLimit" hidden></div>' : '') + '</div>' +
       '<div class="dk-ws">' + (w.g ? '<div class="dk-w dk-gw" data-w="g"><svg viewBox="0 0 80 80" class="dk-gsvg"><circle cx="40" cy="40" r="36" class="dk-gring"/><circle cx="40" cy="40" r="18" class="dk-gring"/><line x1="4" y1="40" x2="76" y2="40" class="dk-gring"/><line x1="40" y1="4" x2="40" y2="76" class="dk-gring"/><circle id="dkGdot" cx="40" cy="40" r="6" style="fill:' + CFG.color + '"/></svg><div class="dk-wv" id="dkG">0,00 g</div><div class="dk-wl">' + esc(T('Forces G')) + '</div></div>' : '') +
-      (w.max ? W('max', 'Vitesse max', 'dkMax') : '') + (w.avg ? W('avg', 'Vitesse moyenne', 'dkAvg') : '') + (w.trip ? W('trip', 'Distance', 'dkTrip') : '') + (w.chrono ? W('chrono', 'Chrono', 'dkChrono') : '') +
+      (w.max ? W('max', 'Vitesse max', 'dkMax') : '') + (w.avg ? W('avg', 'Vitesse moyenne', 'dkAvg') : '') + (w.trip ? W('trip', 'Distance', 'dkTrip') : '') + (w.chrono ? chronoHtml() : '') +
       (w.alt ? W('alt', 'Altitude', 'dkAlt') : '') + (w.head ? W('head', 'Cap (boussole)', 'dkHead') : '') + (w.clock ? W('clock', 'Heure', 'dkClock') : '') + '</div>' +
       '<p class="dk-note">' + esc(T('Valeurs indicatives (GPS et capteurs du téléphone). Le compteur du véhicule fait foi.')) + '</p>';
     d.querySelector('#dkClose').onclick = hide;
+    chronoBind(d);
     d.querySelector('#dkSet').onclick = openDashSettings;
     return d;
   }
@@ -101,6 +140,7 @@
     const fl = document.getElementById('dkFill'); if (fl) fl.setAttribute('d', f > 0.003 ? arc(150, 150, 128, A0, a) : '');
     const nd = document.getElementById('dkNeedle'); if (nd) nd.setAttribute('transform', 'rotate(' + ((a - Math.PI * 1.5) * 180 / Math.PI).toFixed(2) + ' 150 150)');
     const br = document.getElementById('dkBar'); if (br) br.setAttribute('width', (220 * f).toFixed(1));
+    if (tick % 2 === 0 && CH.run) chronoSync();
     if (++tick % 6 === 0) {
       const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
       const lim = A.capLimit ? A.capLimit(S.limit) : S.limit;
@@ -109,7 +149,6 @@
       set('dkMax', Math.round(M.max) + ' km/h');
       const hrs = M.mv / 3600; set('dkAvg', hrs > 0.005 ? Math.round(M.km / hrs) + ' km/h' : '–');
       set('dkTrip', M.km < 10 ? M.km.toFixed(2).replace('.', ',') + ' km' : Math.round(M.km) + ' km');
-      const s = Math.floor((Date.now() - M.t0) / 1000); set('dkChrono', Math.floor(s / 3600) + ':' + String(Math.floor(s / 60) % 60).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'));
       set('dkAlt', S.pos && S.pos.alt != null ? Math.round(S.pos.alt) + ' m' : '–');
       const h = S.heading; set('dkHead', h != null ? ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'][Math.round(h / 45) % 8] + ' · ' + Math.round(h) + '°' : '–');
       set('dkClock', new Date().toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' }));
