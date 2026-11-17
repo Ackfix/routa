@@ -371,9 +371,9 @@ html, body { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .dep .tm{flex:none;text-align:right;display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
 .dep .late{color:#FF6B70;font-weight:700}
 /* 0.9.14 compteur bien visible la nuit */
-body.night .speedbox{background:var(--surface);color:var(--fg);box-shadow:0 0 0 2px rgba(255,255,255,.18),0 6px 18px rgba(0,0,0,.55)}
+body.night .speedbox{background:var(--surface);color:var(--fg);box-shadow:0 0 0 2px var(--accent),0 6px 18px rgba(0,0,0,.55)}
 body.night .speedbox .speedunit{color:var(--muted);font-weight:600}
-body.night .speedbox.over{background:#E5484D;color:#fff}
+body.night .speedbox.over{background:#E5484D;color:#fff;box-shadow:0 0 0 2px #fff,0 6px 18px rgba(0,0,0,.55)}
 body.night .speedbox.over .speedunit{color:#fff}
 /* 0.9.15 santé */
 .mk-poi.hospital{background:#E5484D;color:#fff}
