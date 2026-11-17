@@ -123,7 +123,7 @@
     if (S.sheetView === 'mapview' && !body.querySelector('#mvWx')) {
       const after = body.querySelector('label[for="mvTransit"]') || body.querySelector('label[for="mvTraffic"]');
       if (!after) return;
-      const lab = el('<label class="switch" for="mvWx"><span><b>' + esc(T('Bouton météo')) + '</b><br><span class="muted small">' + esc(T('Une icône sur la carte montre le temps qu\'il fait. Touche-la pour voir les prévisions.')) + '</span></span><input id="mvWx" type="checkbox"' + (S.settings.wx !== false ? ' checked' : '') + '></label>');
+      const lab = el('<label class="switch" for="mvWx"><span><b>' + esc(T('Météo')) + '</b><br><span class="muted small">' + esc(T('Une icône sur la carte montre le temps qu\'il fait. Touche-la pour voir les prévisions.')) + '</span></span><input id="mvWx" type="checkbox"' + (S.settings.wx !== false ? ' checked' : '') + '></label>');
       after.parentNode.insertBefore(lab, after.nextSibling);
       lab.querySelector('input').onchange = (e) => { S.settings.wx = e.target.checked; saveSettings(); wxShow(); };
     }

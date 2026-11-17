@@ -828,11 +828,11 @@ html body .fab-report svg { stroke-width: 2.8; }
 /* Bouton météo + feuille de prévisions */
 html body .fabs-right .iconbtn.wx[hidden] { display: none; }
 .wxnow { display: flex; align-items: center; gap: 16px; margin: 4px 0 12px; }
-.wxbig svg { width: 64px; height: 64px; fill: none; stroke: var(--blue, #4DA3FF); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.wxbig svg { width: 64px; height: 64px; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .wxt { font-size: 40px; line-height: 1; }
 .wxh { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; }
 .wxh > div { flex: 0 0 auto; min-width: 58px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px; border-radius: 14px; background: var(--surface-2); }
-.wxh svg, .wxd svg { width: 26px; height: 26px; fill: none; stroke: var(--blue, #4DA3FF); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.wxh svg, .wxd svg { width: 26px; height: 26px; fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .wxh small, .wxd small { color: var(--muted); font-size: 11px; }
 .wxd > div { display: flex; align-items: center; gap: 12px; padding: 8px 4px; border-bottom: 1px solid var(--line, rgba(128,128,128,.2)); }
 .wxd > div > span { width: 84px; text-transform: capitalize; }
