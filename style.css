@@ -823,3 +823,4 @@ html body.navigating .fabs-right { top: auto; bottom: calc(var(--navH, 150px) + 
   html body .fabs-right, html body.navigating .fabs-right { top: auto; right: auto; left: var(--eL); bottom: var(--eB); flex-direction: column; }
   html body.navigating .fabs-right { left: calc(max(10px, var(--sal)) + min(46vw, 420px) + 12px); bottom: calc(var(--sab) + 8px); }
 }
+html body .fab-report svg { stroke-width: 2.8; }
