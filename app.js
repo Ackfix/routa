@@ -1066,6 +1066,16 @@ function filterSpeed(c, now) {
     // la voiture aurait dû avancer : si elle est restée sur place, c'est du bruit
     if (span >= 2 && moved < Math.max(6, (c.accuracy || 0) * 0.6) && moved < raw * span * 0.35) raw = 0;
   }
+  // basse vitesse (< 30 km/h) : le GPS qui « dérive » à l'arrêt (couché, à l'intérieur) donne de faux 5 à 15 km/h.
+  // On exige un vrai déplacement net sur 4 à 8 s, dans une direction suivie (pas des allers-retours sur place).
+  if (raw > 0 && raw < 8) {
+    let i0 = 0; while (i0 < H.length - 1 && Date.now() - H[i0].t > 8000) i0++;
+    const o = H[i0], span = (Date.now() - o.t) / 1000;
+    let path = 0; for (let i = i0 + 1; i < H.length; i++) path += dist(H[i - 1], H[i]);
+    const net = dist(o, now);
+    if (span < 4) { if (!(S.speed > 1.1)) raw = 0; }
+    else if (net < Math.max(10, acc * 0.8, raw * span * 0.5) || (path > 0 && net / path < 0.6)) raw = 0;
+  }
   // il faut 2 relevés de suite en mouvement pour quitter le 0 (un saut isolé ne fait plus monter le compteur)
   if (raw > 1.1 && !(S.speed > 1.1)) { S.mvN = (S.mvN || 0) + 1; if (S.mvN < 2) raw = 0; } else if (raw <= 1.1) S.mvN = 0;
   let v = S.speed == null ? raw : S.speed * 0.35 + raw * 0.65;

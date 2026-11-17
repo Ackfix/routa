@@ -1,5 +1,5 @@
 /* ROUTA – service worker : l'app s'ouvre même avec un réseau faible. */
-const CACHE = 'routa-v1.0.96';
+const CACHE = 'routa-v1.0.97';
 const MAPC = 'routa-map';
 const SHELL = ['./', './index.html', './style.css', './app.js', './native.js', './extra.js', './i18n-a.js', './i18n-c.js', './i18n-d.js', './i18n.js', './config.js', './countries.js', './aide.html', './confidentialite.html', './i18n-e.js', './i18n-f.js', './i18n-g.js', './i18n-h.js', './zfe.js', './dash.js', './plus.js', './pro.js', './more.js', './plan.js', './act.js', './cols.js', './low.js', './i18n-p.js', './i18n-m.js', './i18n-n.js', './veh-db.js', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'];
 
