@@ -785,3 +785,5 @@ body:has(#geoChip:not([hidden])):not(.navigating) .toasts { top: calc(var(--sat)
   html body.navigating .limitsign, html body:not(.navigating) .limitsign { left: auto; right: calc(var(--eR) + 76px); top: calc(var(--sat) + 8px); bottom: auto; }
   html body:not(.navigating) .limitnext { display: none; }
 }
+#vehLic .ico { background: var(--surface-2); border-radius: 14px; }
+#vehLic .ico svg { color: var(--info); }
