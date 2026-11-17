@@ -698,7 +698,6 @@ body.navlite.navigating #navThen, body.navlite.navigating .fabs-right, body.navl
 .dk-gsvg { width: 72px; height: 72px; display: block; margin: 0 auto 4px; }
 .dk-gring { fill: none; stroke: rgba(255,255,255,.18); stroke-width: 1.5; }
 .dk-note { margin: 0; font-size: 10.5px; color: rgba(255,255,255,.4); text-align: center; pointer-events: none; }
-body.dashon .fab-menu, body.dashon .fab-search { z-index: 41; }
 /* réglages du cadran */
 .dk-preview { background: radial-gradient(120% 90% at 50% 30%, #1B2130, #0B0E13); border-radius: 20px; padding: 14px 30px 6px; margin-bottom: 6px; }
 .dk-styles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -837,3 +836,30 @@ html body .fabs-right .iconbtn.wx[hidden] { display: none; }
 .wxd > div { display: flex; align-items: center; gap: 12px; padding: 8px 4px; border-bottom: 1px solid var(--line, rgba(128,128,128,.2)); }
 .wxd > div > span { width: 84px; text-transform: capitalize; }
 .wxd > div > b { margin-left: auto; }
+
+/* Cadran : plein écran à la place de la carte, sous le bandeau de guidage et la barre de trajet */
+html body .dashov { z-index: 22; padding: calc(var(--dkT, 0px) + 64px) max(16px, var(--sar, 0px)) calc(var(--dkB, 0px) + 12px) calc(var(--dkL, 0px) + 16px); }
+html body .dashov .dk-top { top: calc(var(--dkT, 0px) + 10px); right: max(12px, var(--sar, 0px)); }
+html body .dashov .dk-btn { width: 52px; height: 52px; border-radius: 50%; border: 4px solid var(--bg); background: var(--surface); color: var(--fg); display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 3px var(--accent); padding: 0; }
+html body .dashov .dk-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+html body .dashov .dk-main { width: min(92vw, calc((100vh - var(--dkT, 0px) - var(--dkB, 0px)) * .62), 460px); }
+@media (orientation: landscape) and (max-height: 540px) {
+  html body .dashov { flex-direction: row; justify-content: center; gap: 28px; padding-top: calc(var(--dkT, 0px) + 8px); }
+  html body .dashov .dk-main { width: min(46vw, calc(var(--dkH, 390px) - 16px)); }
+  html body .dashov .dk-ws { width: min(44vw, 360px); }
+  html body .dashov .dk-note { display: none; }
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  html body .dashov .dk-main { flex: none; }
+  html body .dashov .dk-ws { flex: none; grid-template-columns: 1fr 1fr; align-content: center; padding-top: 50px; gap: 6px; }
+  html body .dashov .dk-gw { grid-row: auto; grid-column: span 2; display: flex; align-items: center; gap: 10px; padding: 6px 10px; }
+  html body .dashov .dk-gsvg { width: 44px; height: 44px; margin: 0; }
+  html body .dashov .dk-w { padding: 6px; }
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  html body .dashov .dk-main { width: min(calc(var(--dkW, 844px) * .5), calc(var(--dkH, 390px) * .85)); }
+  html body .dashov .dk-ws { width: calc(var(--dkW, 844px) * .4); }
+  html body .dashov { gap: 16px; padding-left: calc(var(--dkL, 0px) + 8px); padding-right: 8px; }
+}
