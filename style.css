@@ -670,7 +670,7 @@ body.navlite.navigating #navThen, body.navlite.navigating .fabs-right, body.navl
 .dk-tick { stroke: rgba(255,255,255,.35); stroke-width: 2; }
 .dk-tick.big { stroke: rgba(255,255,255,.85); stroke-width: 3.5; }
 .dk-num { fill: rgba(255,255,255,.7); font: 600 13px Inter, system-ui, sans-serif; text-anchor: middle; }
-.dk-speed { fill: #fff; font-family: Inter, system-ui, sans-serif; font-weight: 800; text-anchor: middle; font-variant-numeric: tabular-nums; letter-spacing: -2px; }
+.dk-speed { fill: var(--dkn, #fff); font-family: Inter, system-ui, sans-serif; font-weight: 800; text-anchor: middle; font-variant-numeric: tabular-nums; letter-spacing: -2px; }
 .dk-unit { fill: rgba(255,255,255,.55); font: 600 14px Inter, system-ui, sans-serif; text-anchor: middle; letter-spacing: 2px; }
 .dk-needle { stroke-width: 5; stroke-linecap: round; }
 .dk-hub { stroke: #0B0E13; stroke-width: 3; }
@@ -863,3 +863,28 @@ html body .dashov .dk-main { width: min(92vw, calc((100vh - var(--dkT, 0px) - va
   html body .dashov .dk-ws { width: calc(var(--dkW, 844px) * .4); }
   html body .dashov { gap: 16px; padding-left: calc(var(--dkL, 0px) + 8px); padding-right: 8px; }
 }
+
+/* Cadran : bords sûrs de l'écran (encoche, barre d'état), boutons toujours accessibles */
+html body .dashov { padding-top: calc(max(var(--dkT, 0px), var(--sat, 0px)) + 72px); }
+html body .dashov .dk-top { top: calc(max(var(--dkT, 0px), var(--sat, 0px)) + 12px); right: max(14px, var(--sar, 0px)); }
+.dk-cust { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0; }
+.dk-cust label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.dk-cust input[type=color] { width: 44px; height: 32px; padding: 0; border: 2px solid var(--line); border-radius: 8px; background: none; }
+/* Version claire : suit le réglage jour / nuit de la carte (néon et piste restent sombres) */
+body:not(.night) .dashov.dm-full:not(.ds-neon):not(.ds-race) { background: radial-gradient(120% 80% at 50% 30%, #FFFFFF 0%, #EEF1F6 60%, #E0E5EC 100%); color: #14181F; }
+body:not(.night) .dk-preview:not(.ds-neon):not(.ds-race) { background: radial-gradient(120% 90% at 50% 30%, #FFFFFF, #E6EAF1); }
+body:not(.night) :is(.dashov, .dk-preview):not(.ds-neon):not(.ds-race) .dk-speed { fill: var(--dkn, #14181F); }
+body:not(.night) :is(.dashov, .dk-preview):not(.ds-neon):not(.ds-race) .dk-unit { fill: rgba(0,0,0,.55); }
+body:not(.night) :is(.dashov, .dk-preview):not(.ds-neon):not(.ds-race) .dk-track { stroke: rgba(0,0,0,.1); }
+body:not(.night) :is(.dashov, .dk-preview):not(.ds-neon):not(.ds-race) .dk-classic .dk-track { stroke: rgba(0,0,0,.2); }
+body:not(.night) :is(.dashov, .dk-preview):not(.ds-neon):not(.ds-race) .dk-tick { stroke: rgba(0,0,0,.3); }
+body:not(.night) :is(.dashov, .dk-preview):not(.ds-neon):not(.ds-race) .dk-tick.big { stroke: rgba(0,0,0,.8); }
+body:not(.night) :is(.dashov, .dk-preview):not(.ds-neon):not(.ds-race) .dk-num { fill: rgba(0,0,0,.7); }
+body:not(.night) :is(.dashov, .dk-preview):not(.ds-neon):not(.ds-race) .dk-trackbar { fill: rgba(0,0,0,.1); }
+body:not(.night) :is(.dashov, .dk-preview):not(.ds-neon):not(.ds-race) .dk-hub { stroke: #fff; }
+body:not(.night) .dashov:not(.ds-neon):not(.ds-race) .dk-w { background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.08); }
+body:not(.night) .dashov:not(.ds-neon):not(.ds-race) .dk-wv { color: #14181F; }
+body:not(.night) .dashov:not(.ds-neon):not(.ds-race) .dk-wl { color: rgba(0,0,0,.55); }
+body:not(.night) .dashov:not(.ds-neon):not(.ds-race) .dk-note { color: rgba(0,0,0,.45); }
+body:not(.night) .dashov:not(.ds-neon):not(.ds-race) .dk-gring { stroke: rgba(0,0,0,.2); }
+body:not(.night) .dk-sty { background: #E6EAF1; color: #14181F; }

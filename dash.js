@@ -12,6 +12,7 @@
   const COLORS = ['#FF8A3D', '#E5484D', '#F5C542', '#3DDC84', '#4DA3FF', '#7C5CFF', '#FF5FA2', '#FFFFFF'];
   const WIDGETS = [['g', 'Forces G'], ['max', 'Vitesse max'], ['avg', 'Vitesse moyenne'], ['trip', 'Distance'], ['chrono', 'Chrono'], ['alt', 'Altitude'], ['head', 'Cap (boussole)'], ['clock', 'Heure'], ['limit', 'Limitation']];
   const CFG = Object.assign({ style: 'sport', color: '#FF8A3D', mode: 'full', scale: 'auto', w: { g: 1, max: 1, trip: 1, chrono: 1, limit: 1 } }, store.get('routa.dash', {}));
+  if (!store.get('routa.dash', null) && A.veh && A.veh().heavy) CFG.w = { g: 0, max: 1, avg: 1, trip: 1, chrono: 1, clock: 1, limit: 1 }; // véhicules pros : durée de conduite, moyenne, heure
   const save = () => store.set('routa.dash', CFG);
 
   /* ---------- mesures ---------- */
@@ -37,7 +38,7 @@
   }
 
   /* ---------- dessin ---------- */
-  const scaleMax = () => { if (CFG.scale !== 'auto') return +CFG.scale; const v = A.veh ? A.veh() : {}; return v.cyclo ? 60 : v.heavy ? 140 : (v.two ? 240 : 220); };
+  const scaleMax = () => { if (CFG.scale !== 'auto') return +CFG.scale; const v = A.veh ? A.veh() : {}; return v.cyclo ? 60 : (v.hgv || v.type === 'bus' || v.type === 'minibus') ? 120 : v.heavy ? 140 : (v.two ? 240 : 220); };
   const polar = (cx, cy, r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
   const A0 = Math.PI * 0.75, A1 = Math.PI * 2.25;
   function arc(cx, cy, r, a, b) { const [x0, y0] = polar(cx, cy, r, a), [x1, y1] = polar(cx, cy, r, b); return 'M' + x0.toFixed(1) + ' ' + y0.toFixed(1) + 'A' + r + ' ' + r + ' 0 ' + (b - a > Math.PI ? 1 : 0) + ' 1 ' + x1.toFixed(1) + ' ' + y1.toFixed(1); }
@@ -68,8 +69,8 @@
     if (!d) { d = el('<div id="dashOv" class="dashov" hidden></div>'); document.body.appendChild(d); }
     const w = CFG.w || {};
     d.className = 'dashov dm-full ds-' + CFG.style;
-    d.style.setProperty('--dkc', CFG.color);
-    d.innerHTML = '<div class="dk-top"><button class="dk-btn" id="dkSet" aria-label="' + esc(T('Personnaliser le cadran')) + '"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button><button class="dk-btn" id="dkClose" aria-label="' + esc(T('Fermer')) + '"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+    d.style.setProperty('--dkc', CFG.color); if (CFG.numc) d.style.setProperty('--dkn', CFG.numc); else d.style.removeProperty('--dkn');
+    d.innerHTML = '<div class="dk-top"><button class="dk-btn" id="dkSet" aria-label="' + esc(T('Personnaliser le cadran')) + '">' + A.ic('gear') + '</button><button class="dk-btn" id="dkClose" aria-label="' + esc(T('Fermer')) + '"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
       '<div class="dk-main">' + gaugeSvg() + (w.limit ? '<div class="dk-limit" id="dkLimit" hidden></div>' : '') + '</div>' +
       '<div class="dk-ws">' + (w.g ? '<div class="dk-w dk-gw" data-w="g"><svg viewBox="0 0 80 80" class="dk-gsvg"><circle cx="40" cy="40" r="36" class="dk-gring"/><circle cx="40" cy="40" r="18" class="dk-gring"/><line x1="4" y1="40" x2="76" y2="40" class="dk-gring"/><line x1="40" y1="4" x2="40" y2="76" class="dk-gring"/><circle id="dkGdot" cx="40" cy="40" r="6" style="fill:' + CFG.color + '"/></svg><div class="dk-wv" id="dkG">0,00 g</div><div class="dk-wl">' + esc(T('Forces G')) + '</div></div>' : '') +
       (w.max ? W('max', 'Vitesse max', 'dkMax') : '') + (w.avg ? W('avg', 'Vitesse moyenne', 'dkAvg') : '') + (w.trip ? W('trip', 'Distance', 'dkTrip') : '') + (w.chrono ? W('chrono', 'Chrono', 'dkChrono') : '') +
@@ -135,6 +136,7 @@
       '<div class="dk-preview ds-' + CFG.style + '" style="--dkc:' + CFG.color + '">' + gaugeSvg() + '</div>' +
       '<h3>' + esc(T('Style')) + '</h3><div class="dk-styles">' + STYLES.map(([k, n]) => '<button class="dk-sty' + (CFG.style === k ? ' on' : '') + '" data-st="' + k + '"><span class="ds-' + k + '" style="--dkc:' + CFG.color + '">' + prev(k) + '</span><b>' + esc(T(n)) + '</b></button>').join('') + '</div>' +
       '<h3>' + esc(T('Couleur')) + '</h3><div class="dk-cols">' + COLORS.map((c) => '<button class="dk-col' + (CFG.color === c ? ' on' : '') + '" data-c="' + c + '" style="background:' + c + '" aria-label="' + c + '"></button>').join('') + '</div>' +
+      '<div class="dk-cust"><label>' + esc(T('Couleur personnalisée')) + '<input type="color" id="dkCust" value="' + CFG.color + '"></label><label>' + esc(T('Couleur des chiffres')) + '<input type="color" id="dkNum" value="' + (CFG.numc || '#ffffff') + '"></label><button class="btn soft small" id="dkNumAuto">' + esc(T('Chiffres : auto')) + '</button></div>' +
       '<h3>' + esc(T('Échelle')) + '</h3><div class="seg" id="dkScale">' + [['auto', 'Auto'], ['60', '60'], ['140', '140'], ['220', '220'], ['300', '300']].map(([k, n]) => '<button data-s="' + k + '"' + (String(CFG.scale) === k ? ' class="on"' : '') + '>' + esc(k === 'auto' ? T('Auto') : n) + '</button>').join('') + '</div>' +
       '<h3>' + esc(T('Infos affichées')) + '</h3>' + WIDGETS.map(([k, n]) => '<label class="switch" for="dkw_' + k + '"><span>' + esc(T(n)) + '</span><input id="dkw_' + k + '" type="checkbox"' + ((CFG.w || {})[k] ? ' checked' : '') + '></label>').join('') +
       '<p class="muted small">' + esc(T('Forces G : téléphone fixé sur un support, écran face à toi. Touche ↺ à l\'arrêt pour calibrer.')) + '</p>' +
@@ -146,6 +148,9 @@
     body.querySelectorAll('[data-c]').forEach((b) => { b.onclick = () => { CFG.color = b.dataset.c; body.querySelectorAll('[data-c]').forEach((x) => x.classList.toggle('on', x === b)); body.querySelectorAll('.dk-sty > span').forEach((s) => s.style.setProperty('--dkc', CFG.color)); re(); }; });
     body.querySelectorAll('#dkScale button').forEach((b) => { b.onclick = () => { CFG.scale = b.dataset.s; body.querySelectorAll('#dkScale button').forEach((x) => x.classList.toggle('on', x === b)); re(); }; });
     WIDGETS.forEach(([k]) => { const c = body.querySelector('#dkw_' + k); c.onchange = () => { CFG.w = CFG.w || {}; CFG.w[k] = c.checked ? 1 : 0; re(); }; });
+    body.querySelector('#dkCust').oninput = (e) => { CFG.color = e.target.value; body.querySelectorAll('[data-c]').forEach((x) => x.classList.remove('on')); body.querySelectorAll('.dk-sty > span').forEach((sp) => sp.style.setProperty('--dkc', CFG.color)); re(); };
+    body.querySelector('#dkNum').oninput = (e) => { CFG.numc = e.target.value; re(); };
+    body.querySelector('#dkNumAuto').onclick = () => { CFG.numc = ''; body.querySelector('#dkNum').value = '#ffffff'; re(); };
     body.querySelector('#dkRst').onclick = () => { reset(); M.base = M.motion ? { x: M.g.x + (M.base ? M.base.x : 0), y: M.g.y + (M.base ? M.base.y : 0) } : null; toast(esc(T('Compteurs remis à zéro.'))); };
     body.querySelector('#dkShow').onclick = () => { closeSheet(); show(); };
   }
