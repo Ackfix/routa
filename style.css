@@ -804,10 +804,12 @@ html body:not(.night) .speedbox, html body:not(.night) .fab-search { background:
 html body:not(.night) .speedbox .speedunit { color: rgba(14,17,22,.72); font-weight: 600; }
 html body:not(.night) .speedbox.over { background: #E5484D; color: #fff; }
 html body:not(.night) .speedbox.over .speedunit { color: #fff; }
-html body.night .speedbox, html body.night .fab-search { background: var(--surface); color: var(--fg); box-shadow: inset 0 0 0 3px var(--accent), 0 6px 18px rgba(0,0,0,.55); }
+html body.night .speedbox, html body.night .fab-search, html body.night .fab-report { background: var(--surface); color: var(--fg); box-shadow: inset 0 0 0 3px var(--accent), 0 6px 18px rgba(0,0,0,.55); }
 html body.night .speedbox .speedunit { color: var(--muted); }
 html body.night .speedbox.over { background: #E5484D; color: #fff; box-shadow: inset 0 0 0 3px #fff, 0 6px 18px rgba(0,0,0,.55); }
 html body.night .speedbox.over .speedunit { color: #fff; }
 @media (orientation: landscape) and (max-height: 540px) {
   html body.navigating .limitsign, html body:not(.navigating) .limitsign { bottom: auto; right: calc(var(--eR) + 76px); }
 }
+html body.night .fab-report { color: var(--fg); }
+html body .fab-menu.ringed { box-shadow: inset 0 0 0 3px var(--accent), 0 6px 18px rgba(0,0,0,.45); }
