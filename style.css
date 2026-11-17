@@ -797,7 +797,6 @@ html body .speedbox { display: flex; flex-direction: column; align-items: center
 html body .speedbox .speedval { font-size: 25px; line-height: 1; }
 html body .speedbox .speedunit { font-size: 10px; line-height: 1.1; margin-top: 1px; }
 html body .fab-search { right: var(--eR); bottom: calc(var(--eB) + 80px); }
-html body .fabs-right { bottom: calc(var(--eB) + 162px); }
 html body:not(.navigating) .limitsign { bottom: calc(var(--eB) + 82px); }
 html body.navigating .limitsign { bottom: calc(var(--navH, 150px) + 96px); }
 html body:not(.night) .speedbox, html body:not(.night) .fab-search { background: var(--accent); color: var(--accent-ink); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
@@ -813,3 +812,14 @@ html body.night .speedbox.over .speedunit { color: #fff; }
 }
 html body.night .fab-report { color: var(--fg); }
 html body .fab-menu.ringed { box-shadow: inset 0 0 0 3px var(--accent), 0 6px 18px rgba(0,0,0,.45); }
+
+/* Bouton de recentrage et boussole : même style et même taille que les autres boutons. Portrait : coin haut droit. Paysage : coin bas gauche. */
+html body .fabs-right .iconbtn { width: 70px; height: 70px; border-radius: 50%; border: 4px solid var(--bg); padding: 0; background: var(--accent); color: var(--accent-ink); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+html body .fabs-right .iconbtn svg { width: 30px; height: 30px; stroke-width: 2.4; }
+html body.night .fabs-right .iconbtn { background: var(--surface); color: var(--fg); box-shadow: inset 0 0 0 3px var(--accent), 0 6px 18px rgba(0,0,0,.55); }
+html body .fabs-right { top: var(--eT); bottom: auto; right: var(--eR); left: auto; flex-direction: column-reverse; gap: 10px; }
+html body.navigating .fabs-right { top: auto; bottom: calc(var(--navH, 150px) + 98px); right: var(--eR); flex-direction: column; }
+@media (orientation: landscape) and (max-height: 540px) {
+  html body .fabs-right, html body.navigating .fabs-right { top: auto; right: auto; left: var(--eL); bottom: var(--eB); flex-direction: column; }
+  html body.navigating .fabs-right { left: calc(max(10px, var(--sal)) + min(46vw, 420px) + 12px); bottom: calc(var(--sab) + 8px); }
+}
