@@ -939,7 +939,7 @@ function saveParked(p, until) { parked = { lat: p.lat, lon: p.lon, at: Date.now(
 function openParked() {
   const left = parked && parked.until ? Math.round((parked.until - Date.now()) / 60000) : null;
   const body = openSheet('Stationnement',
-    (parked ? '<div class="card"><div class="ico" style="background:#FFC24D">' + IC.car + '</div><div class="grow"><b>Garée ' + ago(new Date(parked.at).toISOString()) + '</b><div class="sub">' + (S.pos ? 'à ' + fmtDist(dist(S.pos, parked)) : '') + (left != null ? ' · ' + (left > 0 ? 'parking payé encore ' + left + ' min' : 'temps de parking dépassé') : '') + '</div></div></div>' +
+    (parked ? '<div class="card"><div class="ico" style="background:var(--accent)">' + IC.car + '</div><div class="grow"><b>Garée ' + ago(new Date(parked.at).toISOString()) + '</b><div class="sub">' + (S.pos ? 'à ' + fmtDist(dist(S.pos, parked)) : '') + (left != null ? ' · ' + (left > 0 ? 'parking payé encore ' + left + ' min' : 'temps de parking dépassé') : '') + '</div></div></div>' +
       '<div class="row"><button class="btn grow" id="pkGo">' + ic('nav') + 'Y retourner</button><button class="btn soft grow" id="pkShow">Voir</button></div>' : '<p>Aucune position enregistrée. Elle s\'enregistre toute seule à la fin d\'une navigation, ou avec le bouton ci-dessous.</p>') +
     '<button class="btn soft block" id="pkHere">' + IC.car + 'Ma voiture est garée ici</button>' +
     '<h3>Rappel de fin de parking</h3><div class="row wrap" id="pkTimer">' + [30, 60, 90, 120, 180].map((m) => '<button class="pill tap" data-m="' + m + '">' + (m < 60 ? m + ' min' : (m / 60) + ' h') + '</button>').join('') + '</div>' +
