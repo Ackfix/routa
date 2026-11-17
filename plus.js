@@ -100,7 +100,7 @@
       wxBtn.setAttribute('aria-label', T('Météo') + ' : ' + wxLabel(j.current.weather_code) + ', ' + Math.round(j.current.temperature_2m) + '°');
     } catch (e) { /* météo indisponible : l'icône reste neutre */ } finally { wxBusy = false; }
   }
-  setInterval(() => { if (document.hidden || S.settings.wx === false || !S.pos) return; if (!WX || Date.now() - wxAt > 900000 || (wxPos && dist(wxPos, S.pos) > 15000)) wxLoad(); }, 5000);
+  setInterval(() => { if (document.hidden || S.settings.wx === false || !S.pos) return; if (!WX || Date.now() - wxAt > 600000 || (wxPos && dist(wxPos, S.pos) > 10000)) wxLoad(); }, 5000);
   const wxDay = (t) => { try { return new Date(t).toLocaleDateString(A.I18N && A.I18N.speech || 'fr-FR', { weekday: 'short' }); } catch (e) { return t.slice(5, 10); } };
   wxBtn.onclick = async () => {
     const body = openSheet(T('Météo'), '<p class="muted">' + esc(T('Chargement…')) + '</p>', 'wx');
@@ -116,6 +116,7 @@
       '<p class="muted small">' + esc(T('Prévisions Open-Meteo. Indicatif : fie-toi à la réalité sur place.')) + '</p>';
   };
   wxLoad();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && S.settings.wx !== false && (!WX || Date.now() - wxAt > 600000)) wxLoad(); });
 
   /* ---------- réglages ajoutés dans « Affichage de la carte » ---------- */
   function onSheet() {
