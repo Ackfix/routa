@@ -88,6 +88,7 @@ button{height:46px;border-radius:12px;border:0;background:var(--accent);color:#1
     for (var i = 0; i < zs.length; i++) { if (!cache[zs[i].lat + ',' + zs[i].lon]) { await where(zs[i], cache); draw(zs, cache); } }
     draw(zs, cache);
   }
+  var ATL = { trou: 'Trou', objet: 'Objet', accident: 'Accident', travaux: 'Travaux', bouchon: 'Bouchon', arret: 'Véhicule arrêté', glissant: 'Route glissante', animal: 'Animal', feu: 'Feu hors service', contresens: 'Contresens', brouillard: 'Brouillard', fermee: 'Route fermée' };
   var KIND = { bug: ['Problème', '#FF8F94'], idee: ['Idée', '#3DD68C'], autre: ['Autre', '#9AA3AF'] };
   function fdate(t) { try { return new Date(t).toLocaleString('fr-CH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
   function tabs() {
@@ -100,9 +101,9 @@ button{height:46px;border-radius:12px;border:0;background:var(--accent);color:#1
     var list = [];
     try {
       var r = await fetch(CFG.supabaseUrl + '/rest/v1/rpc/routa_retours', { method: 'POST', headers: { apikey: CFG.supabaseKey, Authorization: 'Bearer ' + CFG.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ k: getKey() }) });
-      if (r.status === 404) { box.innerHTML = '<p class="err">La lecture des retours n\'est pas encore activée dans Supabase (script 07 à lancer).</p>'; return; }
+      if (r.status === 404) { box.innerHTML = '<p class="err">La lecture des avis n\'est pas encore activée dans Supabase (script 07 à lancer).</p>'; return; }
       list = await r.json(); if (!Array.isArray(list)) throw 0;
-    } catch (e) { box.innerHTML = '<p class="err">Retours inaccessibles. Réessaie.</p>'; return; }
+    } catch (e) { box.innerHTML = '<p class="err">Avis inaccessibles. Réessaie.</p>'; return; }
     var f = 'all', n = 25;
     function show() {
       var L = list.filter(function (x) { return f === 'all' || x.kind === f; });
@@ -111,7 +112,7 @@ button{height:46px;border-radius:12px;border:0;background:var(--accent);color:#1
         (L.length ? L.slice(0, n).map(function (x) {
           var k = KIND[x.kind] || KIND.autre;
           return '<div class="card fb"><div class="t"><span><span class="tag" style="color:' + k[1] + '">' + k[0] + '</span> · ' + esc(x.pseudo || 'Anonyme') + '</span><span>' + esc(fdate(x.created_at)) + '</span></div><div class="m">' + esc(x.message || '') + '</div><div class="x">' + esc([x.app_version && ('Version ' + x.app_version), x.page && ('Écran : ' + x.page), x.device].filter(Boolean).join(' · ') || 'Pas d\'infos techniques') + '</div></div>';
-        }).join('') : '<p class="muted">Aucun retour pour l\'instant.</p>') +
+        }).join('') : '<p class="muted">Aucun avis pour l\'instant.</p>') +
         (L.length > n ? '<p><button id="more">Voir plus (' + (L.length - n) + ')</button></p>' : '');
       Array.prototype.forEach.call(box.querySelectorAll('.flt button'), function (b) { b.onclick = function () { f = b.getAttribute('data-f'); n = 25; show(); }; });
       Array.prototype.forEach.call(box.querySelectorAll('.fb'), function (c) { c.onclick = function () { c.classList.toggle('open'); }; });
@@ -129,10 +130,13 @@ button{height:46px;border-radius:12px;border:0;background:var(--accent);color:#1
       if (!d || d.code || d.message) { setKey(''); ask('Code incorrect.'); return; }
       var days = d.par_jour || []; var max = Math.max.apply(null, days.map(function (x) { return x.n; }).concat([1]));
       out.innerHTML =
-        '<div class="tabs"><button id="t1" class="on">Résumé</button><button id="t2">Retours (' + esc(d.retours || 0) + ')</button></div><div id="p1">' +
+        '<div class="tabs"><button id="t1" class="on">Résumé</button><button id="t2">Avis (' + esc(d.retours || 0) + ')</button></div><div id="p1">' +
         '<h2>Conducteurs</h2><div class="grid">' + card(d.profils, 'profils créés') + card(d.actifs_24h, 'actifs ces 24 h') + card(d.actifs_7j, 'actifs sur 7 jours') + card(d.actifs_30j, 'actifs sur 30 jours') + '</div>' +
         '<h2>Dernière activité par jour (14 jours)</h2><div class="card bars">' + (days.length ? days.map(function (x) { return '<div class="bar"><span>' + esc(x.j.slice(5).split('-').reverse().join('.')) + '</span><i style="width:' + Math.max(4, Math.round(x.n / max * 100)) + '%"></i><b>' + esc(x.n) + '</b></div>'; }).join('') : '<span class="muted">Pas encore de données.</span>') + '</div>' +
         '<p class="muted">Chaque conducteur compte le jour de sa dernière ouverture de l\'app.</p>' +
+        '<h2>Signalements</h2>' + (d.alertes_total == null ? '<div class="grid">' + card(d.alertes_7j || 0, 'sur 7 jours') + '</div><p class="muted">Pour voir le total et le détail par type, lance le script 08 dans Supabase.</p>' :
+          '<div class="grid">' + card(d.alertes_total, 'au total') + card(d.alertes_24h, 'ces 24 h') + card(d.alertes_7j, 'sur 7 jours') + card(d.alertes_30j, 'sur 30 jours') + '</div>' +
+          '<div class="card" style="margin-top:8px">' + ((d.alertes_types || []).length ? d.alertes_types.map(function (x) { return '<div class="bar"><span style="width:110px">' + esc(ATL[x.t] || x.t) + '</span><b style="margin-left:auto">' + esc(x.n) + '</b></div>'; }).join('') : '<span class="muted">Aucun signalement pour l\'instant.</span>') + '</div>') +
         '<h2>Pays les plus actifs (30 jours)</h2><div class="card" id="zn"><span class="muted">Chargement…</span></div>' +
         '<p class="muted">Pays déduits de la zone d\'activité des conducteurs, jamais de position exacte.</p>' +
         '<p><button id="rf">Actualiser</button></p></div><div id="p2" hidden></div>';

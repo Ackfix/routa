@@ -868,6 +868,7 @@ function renderAlerts() {
   const seen = new Set();
   S.alerts.forEach((a) => {
     if (!alertVisible(a)) return;
+    if (a.type === 'bouchon' && S.jamSeg && S.jamSeg.get(a.id) && S.jamSeg.get(a.id).length > 1) return; // la route rouge remplace l'icône
     seen.add(a.id);
     let m = S.markers.alerts.get(a.id);
     if (!m) {
@@ -906,7 +907,7 @@ async function loadJam(a) {
     const shape = e ? decodePoly6(e.edge_info.shape) : null;
     S.jamSeg.set(a.id, shape && shape.length > 1 ? cutAround(shape, a, 60) : [[a.lon, a.lat]]);
   } catch (err) { S.jamSeg.delete(a.id); return; }
-  updateJams();
+  renderAlerts();
 }
 function updateJams() {
   const src = map.getSource && map.getSource('jam'); if (!src) return;
@@ -915,9 +916,10 @@ function updateJams() {
     if (a.type !== 'bouchon' || !alertVisible(a)) return;
     const g = S.jamSeg.get(a.id);
     if (g === undefined) loadJam(a);
-    else if (g && g.length > 1) f.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: g } });
+    else if (g && g.length > 1) f.push({ type: 'Feature', properties: { id: a.id }, geometry: { type: 'LineString', coordinates: g } });
   });
   src.setData({ type: 'FeatureCollection', features: f });
+  if (!S.jamClick && map.getLayer('jam-line')) { S.jamClick = true; map.on('click', 'jam-line', (ev) => { const id = ev.features && ev.features[0] && ev.features[0].properties.id; if (id) openAlert(id); }); }
 }
 setInterval(() => { if (!document.hidden) renderAlerts(); }, 60000);
 
