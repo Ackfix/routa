@@ -958,3 +958,11 @@ body:not(.night) .dk-sty { background: #0E1116; color: #F4F6FA; }
 .dlrow.dl-b-soon { border-left-color: #FFC24D; }
 .dlrow.dl-b-late { border-left-color: #FF5C5C; }
 #dlCats .pill.on { background: var(--accent); color: var(--accent-ink); }
+
+/* ROUTA PRO (aperçu, rien d'activé) */
+.ppfeat { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 14px; }
+.ppplans { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ppplan { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border-radius: 16px; border: 2px solid var(--line); background: var(--bg); color: var(--fg); text-align: left; }
+.ppplan.on { border-color: var(--accent); }
+.ppplan .pprice { font-size: 20px; font-weight: 800; }
+.ppbadge { position: absolute; top: -10px; right: 10px; background: var(--accent); color: var(--accent-ink); font-style: normal; font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }

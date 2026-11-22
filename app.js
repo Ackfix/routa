@@ -3354,6 +3354,7 @@ function openLicence() {
 function openProfile() {
   const f = profileForm(false);
   const body = openSheet('Mon profil', '<button class="card tap menuprof" id="pfSettings"><span class="ico">' + ic('gear') + '</span><span class="grow"><b>' + esc(I18N.t('Réglages')) + '</b><span class="sub">' + esc(I18N.t('Navigation, carte, véhicule, notifications, confidentialité et compte')) + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +
+    '<div id="pfAccount"></div>' +
     '<button class="btn soft block" id="pfVeh">' + ic(veh().icon) + esc(I18N.t('Mon véhicule')) + ' · ' + esc(vehSummary()) + '</button>' + f.html +
     '<button class="btn block" id="pfSave">Enregistrer</button>' +
     '<button class="btn block" id="pfFeedback">' + ic('msg') + 'Signaler un problème ou une idée</button>' +
