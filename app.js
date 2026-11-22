@@ -183,6 +183,7 @@ const TYPE_BRANDS = {
   bus: ['Irizar', 'Iveco Bus', 'MAN', 'Mercedes-Benz', 'Neoplan', 'Otokar', 'Scania', 'Setra', 'Solaris', 'Temsa', 'Van Hool', 'VDL', 'Volvo'],
   camion: ['DAF', 'Fuso', 'Hino', 'Isuzu', 'Iveco', 'MAN', 'Mercedes-Benz', 'Renault Trucks', 'Scania', 'Tatra', 'Volvo']
 };
+const AXLES_DEF = { camping: 2, remorque: 3, minibus: 2, bus: 2, camion: 5 }; // essieux par défaut (modifiables)
 const DIM_LABELS = [['height', 'Hauteur', 'm'], ['width', 'Largeur', 'm'], ['length', 'Longueur', 'm'], ['weight', 'Poids total', 't']];
 
 /* ======================= État ======================= */
@@ -238,7 +239,7 @@ function vehSummary() {
   const nm = [S.vehicle.brand, S.vehicle.model].filter(Boolean).join(' ');
   if (!v.heavy) return nm || v.label;
   const d = v.dims;
-  return (nm || v.label) + ' · ' + String(d.height).replace('.', ',') + ' m · ' + String(d.weight).replace('.', ',') + ' t' + (v.hazmat ? ' · ADR' : '');
+  return (nm || v.label) + ' · ' + String(d.height).replace('.', ',') + ' m · ' + String(d.weight).replace('.', ',') + ' t' + (d.axles ? ' · ' + I18N.t('{n} essieux').replace('{n}', d.axles) : '') + (v.hazmat ? ' · ADR' : '');
 }
 
 /* ======================= Données (Supabase ou local) ======================= */
@@ -673,8 +674,18 @@ function myView(ahead) {
   const so = S.snapOff && Date.now() - S.snapOff.t < 12000 ? S.snapOff : null;
   const bl = S.pos.lat + (so ? so.dLat : 0), bo = S.pos.lon + (so ? so.dLon : 0);
   if (go && S.heading != null && S.moving) {
-    const m = Math.min(go, 70), h = toRad(S.heading);
-    return { lat: bl + (m * Math.cos(h)) / 111320, lon: bo + (m * Math.sin(h)) / (111320 * Math.cos(toRad(S.pos.lat))), heading: S.heading };
+    // Hors itinéraire : on prolonge la position en suivant la courbe en cours (cap + vitesse de virage),
+    // et non plus en ligne droite : dans un virage, le curseur reste sur la route au lieu de partir tout droit.
+    const rate = Math.abs(S.hdRate || 0) > 2 ? S.hdRate : 0;
+    const m = Math.min(go, rate ? 45 : 70), t = m / Math.max(spd, 1), n = 6;
+    let la = bl, lo = bo, h = S.heading;
+    const kLon = 111320 * Math.cos(toRad(S.pos.lat));
+    for (let i = 0; i < n; i++) {
+      const hr = toRad(h + rate * (t / n) / 2);
+      la += (m / n) * Math.cos(hr) / 111320; lo += (m / n) * Math.sin(hr) / kLon;
+      h += rate * (t / n);
+    }
+    return { lat: la, lon: lo, heading: (S.heading + rate * Math.min(t, 0.8) + 360) % 360 };
   }
   return { lat: bl, lon: bo, heading: S.heading };
 }
@@ -997,7 +1008,17 @@ function startGps(force) {
     let hd = null;
     if (c.heading != null && !isNaN(c.heading) && c.heading >= 0 && (S.speed || 0) > 2.5) hd = c.heading;
     else if (S.pos && (S.speed || 0) > 2.5 && dist(S.pos, now) > Math.max(12, c.accuracy || 10)) hd = bearing(S.pos, now);
-    if (hd != null) S.heading = smoothHeading(S.heading, hd);
+    if (hd != null) {
+      const h0 = S.heading, t0 = S.hdAt || 0;
+      S.heading = smoothHeading(S.heading, hd);
+      // vitesse de virage (degrés par seconde), lissée : sert à prolonger la position le long de la courbe
+      const dt = (Date.now() - t0) / 1000;
+      if (h0 != null && dt > 0.2 && dt < 4) {
+        const r = ((((S.heading - h0) % 360) + 540) % 360 - 180) / dt;
+        S.hdRate = Math.max(-35, Math.min(35, (S.hdRate || 0) * 0.4 + r * 0.6));
+      } else S.hdRate = 0;
+      S.hdAt = Date.now();
+    } else if ((S.speed || 0) <= 2.5) S.hdRate = 0;
     S.prevPos = S.pos; S.pos = now;
     renderMe();
     updateSpeed();
@@ -1317,12 +1338,40 @@ async function nomiImportant(text, c) {
     });
   } catch (e) { return []; }
 }
+/* Entreprises et commerces : recherche TomTom (bien plus complète qu'OpenStreetMap pour les établissements).
+   Gratuit jusqu'à ~2 500 recherches par jour ; réponses gardées en mémoire pour ne pas redemander la même chose. */
+const TT_LANG = { fr: 'fr-FR', en: 'en-GB', de: 'de-DE', it: 'it-IT', pt: 'pt-PT', es: 'es-ES', tr: 'tr-TR' };
+const TT_CACHE = new Map();
+async function ttSearch(text, c) {
+  if (!CFG.tomtomKey || text.length < 3 || Date.now() < (GEO.ttOffUntil || 0)) return [];
+  const k = text.toLowerCase() + '|' + c.lat.toFixed(2) + '|' + c.lon.toFixed(2);
+  if (TT_CACHE.has(k)) return TT_CACHE.get(k);
+  try {
+    const u = 'https://api.tomtom.com/search/2/search/' + encodeURIComponent(text) + '.json?key=' + encodeURIComponent(CFG.tomtomKey) +
+      '&lat=' + c.lat.toFixed(4) + '&lon=' + c.lon.toFixed(4) + '&limit=6&typeahead=true&language=' + (TT_LANG[I18N.lang] || 'NGT');
+    const j = await fetchJson(u, 4500);
+    const out = (j.results || []).filter((r) => r.position && (r.type === 'POI' || r.type === 'Point Address' || r.type === 'Street')).map((r) => {
+      const a = r.address || {};
+      const poi = r.type === 'POI' && r.poi && r.poi.name;
+      return { name: poi || a.freeformAddress || 'Lieu', sub: poi ? (a.freeformAddress || '') : [a.municipality, a.country].filter(Boolean).join(', '), lat: r.position.lat, lon: r.position.lon, poi: !!poi };
+    });
+    if (TT_CACHE.size > 200) TT_CACHE.clear();
+    TT_CACHE.set(k, out);
+    return out;
+  } catch (e) { GEO.ttOffUntil = Date.now() + 5 * 60000; return []; }
+}
 async function geoSearch(text, c, full) {
   const imp = full ? nomiImportant(text, c) : Promise.resolve([]);
+  const tt = ttSearch(text, c);
   const base = await geoSearchBase(text, c, full).catch(() => []);
-  const top = await imp;
-  if (!top.length) return base;
-  return top.concat(base.filter((b) => !top.some((t) => dist(t, b) < 150))).slice(0, 8);
+  const top = await imp, tom = await tt;
+  // les établissements TomTom passent en premier, puis les adresses et lieux habituels, sans doublon
+  const pois = tom.filter((t) => t.poi).slice(0, 5);
+  const same = (a, b) => dist(a, b) < 80;
+  let list = top.concat(pois.filter((p) => !top.some((t) => same(t, p))));
+  list = list.concat(base.filter((b) => !list.some((t) => same(t, b))));
+  if (list.length < 4) list = list.concat(tom.filter((t) => !t.poi && !list.some((x) => same(x, t))));
+  return list.slice(0, 8);
 }
 async function geoSearchBase(text, c, full) {
   if (Date.now() > GEO.photonOffUntil) {
@@ -1475,7 +1524,7 @@ async function fetchRoute(from, to) {
   if (v.heavy && window.ROUTA_X && ROUTA_X.route) { try { const R = await ROUTA_X.route(from, to); if (R) { R.vehicle = vehSummary(); return R; } } catch (e) { console.warn('tomtom poids lourd', e); } }
   if (v.heavy) {
     const d = v.dims;
-    const o = { height: d.height, width: d.width, length: d.length, weight: d.weight };
+    const o = { height: d.height, width: d.width, length: d.length, weight: d.weight, axle_count: d.axles || AXLES_DEF[v.type] || 2 };
     if (v.costing === 'truck') { o.hazmat = v.hazmat; if (v.type === 'camping' && !v.isHgv) o.use_highways = 1; }
     try { const R = await fetchValhalla(from, to, v.costing, o); R.vehicle = vehSummary(); return R; }
     catch (e) { console.warn('valhalla', e); const R = await fetchOsrm(from, to); R.fallback = true; return R; }
@@ -1874,10 +1923,22 @@ function navUpdate() {
   N.lastP = S.pos;
   const R = N.R;
   let pr = project(R, S.pos, N.seg - 3, N.seg + 300);
-  if (pr.d > 40) pr = project(R, S.pos, 0, R.coords.length - 1);
-  if (pr.d > 55 && (S.acc || 0) < 60) {
+  if (pr.d > 40) {
+    // on ne « saute » plus vers une autre partie du trajet qui passerait juste à côté : seulement si on y est vraiment
+    const g = project(R, S.pos, 0, R.coords.length - 1);
+    if (g.d < 25 && g.d < pr.d) pr = g;
+  }
+  // Hors trajet : trop loin de la ligne, OU on roule dans une autre direction que le trajet (route parallèle, mauvaise sortie).
+  const accOk = (S.acc || 0) < 60;
+  const far = pr.d > Math.max(35, Math.min(60, (S.acc || 0) * 1.2));
+  let wrongDir = false;
+  if (!far && pr.d > 18 && (S.speed || 0) > 4 && S.heading != null) {
+    const A0 = pointAt(R, pr.along), A1 = pointAt(R, pr.along + 30);
+    if (dist(A0, A1) > 5) { const dh = Math.abs((((bearing(A0, A1) - S.heading) % 360) + 540) % 360 - 180); wrongDir = dh > 60; }
+  }
+  if ((far || wrongDir) && accOk) {
     N.offCount++;
-    if (N.offCount >= 3 && Date.now() - N.lastReroute > 12000) { reroute(); return; }
+    if (N.offCount >= 2 && Date.now() - N.lastReroute > 8000) { reroute(); return; }
   } else N.offCount = 0;
   N.along = pr.along; N.seg = pr.seg;
   if (pr.d < 30 && (S.acc || 0) < 60) {
@@ -2925,7 +2986,7 @@ function openVehicle(after, editId) {
     '<p class="muted small">Le trajet, les alertes et les lieux proposés s\'adaptent à ton véhicule.</p>' +
     '<button class="card tap" id="vehLic"><span class="ico">' + ic('info') + '</span><span class="grow"><b>' + esc(I18N.t('Mon permis de conduire')) + '</b><span class="sub">' + esc(licSummary() || I18N.t('Catégories, pays, date')) + '</span></span></button>' +
     '<h3>Type</h3><div class="vehgrid" id="vehGrid">' + KINDS.map(([k, v]) => '<button class="typebtn' + (k === kind() ? ' sel' : '') + '" data-v="' + k + '">' + ic(v.icon) + esc(v.label) + '</button>').join('') + '</div>' +
-    '<div id="vehAsst"></div><div id="vehDims"></div>' +
+    '<div id="vehAsst"></div><div id="vehDims"></div><div id="vehEnv"></div>' +
     '<button class="btn block" id="vehSave">Enregistrer</button>' +
     '<button class="btn soft block" id="vehAdd">' + ic('plus') + 'Ajouter un autre véhicule <span class="prem">PRO</span></button>' +
     (base.rental && editId !== 'new' && editId !== 'rental' ? '<button class="btn soft block" id="vehRentEnd">' + esc(I18N.t('Fin de la location : revenir à mon véhicule')) + '</button>' : editId === 'rental' ? '<p class="muted small">' + esc(I18N.t('Véhicule de location : ton véhicule principal est gardé, tu pourras y revenir en un geste.')) + '</p>' : '<button class="btn soft block" id="vehRent">' + ic('car') + esc(I18N.t('Véhicule de location (temporaire)')) + ' <span class="prem">PRO</span></button>') +
@@ -2993,9 +3054,23 @@ function openVehicle(after, editId) {
     const dims = Object.assign({}, v.dims || {}, V.dims || {});
     $('vehDims').innerHTML = '<h3>Dimensions</h3><p class="muted small">Remplis avec les valeurs de ta carte grise ou de ton véhicule chargé.</p><div class="dimgrid">' +
       DIM_LABELS.map(([k, l, u]) => '<label class="field" for="dim_' + k + '">' + l + ' (' + u + ')<input id="dim_' + k + '" type="text" inputmode="decimal" value="' + String(dims[k] != null ? dims[k] : '').replace('.', ',') + '"></label>').join('') + '</div>' +
+      '<h3>' + esc(I18N.t('Nombre d\'essieux')) + '</h3><div class="seg" id="dimAx">' + ['2', '3', '4', '5', '6'].map((n) => '<button type="button" data-a="' + n + '"' + (String(V.dims && V.dims.axles || AXLES_DEF[V.type] || 2) === n ? ' class="on"' : '') + '>' + (n === '6' ? '6+' : n) + '</button>').join('') + '</div>' +
       (V.type === 'camion' ? '<label class="switch" for="dimHaz"><span>Matières dangereuses (ADR)</span><input id="dimHaz" type="checkbox"' + (V.hazmat ? ' checked' : '') + '></label>' : '');
+    $('vehDims').querySelectorAll('#dimAx button').forEach((b) => { b.onclick = () => { V.dims = Object.assign({}, V.dims || {}, { axles: +b.dataset.a }); $('vehDims').querySelectorAll('#dimAx button').forEach((x) => x.classList.toggle('on', x === b)); }; });
   };
-  drawAsst(); drawDims();
+  // Vignette Crit'Air (France) et norme Euro : déclarées par la personne (jamais devinées), utilisées pour les zones à faibles émissions
+  const drawEnv = () => {
+    const CA = [['', I18N.t('Non renseignée')], ['0', I18N.t('Verte (électrique)')], ['1', 'Crit\'Air 1'], ['2', 'Crit\'Air 2'], ['3', 'Crit\'Air 3'], ['4', 'Crit\'Air 4'], ['5', 'Crit\'Air 5'], ['6', I18N.t('Non classé')]];
+    const heavyV = !!(VEHICLES[V.type] || {}).heavy;
+    const EU = [['', I18N.t('Non renseignée')]].concat((heavyV ? ['I', 'II', 'III', 'IV', 'V', 'VI'] : ['1', '2', '3', '4', '5', '6']).map((x) => [x, 'Euro ' + x]));
+    $('vehEnv').innerHTML = '<h3>' + esc(I18N.t('Environnement')) + '</h3><div class="row">' +
+      '<label class="field grow" for="veCrit">' + esc(I18N.t('Vignette Crit\'Air')) + '<select id="veCrit">' + CA.map(([k, l]) => opt(k, l, String(V.critair != null ? V.critair : '') === k)).join('') + '</select></label>' +
+      '<label class="field grow" for="veEuro">' + esc(I18N.t('Norme Euro')) + '<select id="veEuro">' + EU.map(([k, l]) => opt(k, l, String(V.euro || '') === k)).join('') + '</select></label></div>' +
+      '<p class="muted small">' + esc(I18N.t('Indique ta vignette Crit\'Air pour savoir si tu peux entrer dans les zones à faibles émissions en France.')) + '</p>';
+    $('veCrit').onchange = (e) => { V.critair = e.target.value === '' ? null : +e.target.value; };
+    $('veEuro').onchange = (e) => { V.euro = e.target.value || null; };
+  };
+  drawAsst(); drawDims(); drawEnv();
   body.querySelectorAll('#vehGrid .typebtn').forEach((b) => {
     b.onclick = () => {
       const k = b.dataset.v;
@@ -3003,7 +3078,7 @@ function openVehicle(after, editId) {
       V.dims = Object.assign({}, (VEHICLES[V.type] || {}).dims || {});
       body.querySelectorAll('#vehGrid .typebtn').forEach((x) => x.classList.toggle('sel', x === b));
       const tb = TYPE_BRANDS[V.type]; if (tb && V.brand && !tb.includes(V.brand) && !V.brandOther) { V.brand = ''; V.model = ''; V.year = ''; }
-      drawAsst(); drawDims();
+      drawAsst(); drawDims(); drawEnv();
     };
   });
   body.querySelectorAll('[data-vid]').forEach((b) => { b.onclick = () => { const x = loadVehicles().find((y) => y.id === b.dataset.vid); if (!x) return; useVehicle(x); toast(I18N.t('Véhicule actif') + ' : <b>' + esc(vehName(x)) + '</b>'); openVehicle(after); }; });
@@ -3030,6 +3105,7 @@ function openVehicle(after, editId) {
         if (isNaN(x) || x < lim[k][0] || x > lim[k][1]) { toast(l + ' : entre une valeur entre ' + lim[k][0] + ' et ' + lim[k][1] + '.'); return; }
         nd[k] = Math.round(x * 100) / 100;
       }
+      const axb = $('vehDims').querySelector('#dimAx button.on'); nd.axles = axb ? +axb.dataset.a : (AXLES_DEF[V.type] || 2);
       V.hazmat = V.type === 'camion' && $('dimHaz') ? $('dimHaz').checked : false;
     } else V.hazmat = false;
     V.dims = nd;
@@ -3465,13 +3541,14 @@ function openMenu() {
       X.openPro && ['pro', PROI, 'Temps de conduite'],
       XO('tour') && xt('tour'),
       XO('bans') && xt('bans'),
+      XO('docs') && xt('docs'),
       X.openProLog && ['prolog', '<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7M9 7h4"/></svg>', 'Relevé de conduite'],
       ['truckstop', ic('truckstop'), 'Aires poids lourds'],
       ['restrictions', '<svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M6 20V9l6-5 6 5v11"/><path d="M12 9v6M9 12h6"/></svg>', 'Restrictions autour']
     ]]
   ];
   // #008 : fonctions classées Premium (étiquette seulement pendant les tests, rien n'est verrouillé)
-  const PREM_TILES = ['plan', 'convoy', 'events', 'checklists', 'spots', 'cols', 'voyage', 'pro', 'tour', 'bans', 'prolog', 'truckstop', 'restrictions'];
+  const PREM_TILES = ['plan', 'convoy', 'events', 'checklists', 'spots', 'cols', 'voyage', 'pro', 'tour', 'bans', 'docs', 'prolog', 'truckstop', 'restrictions'];
   const tile = (t) => '<button class="tile" data-k="' + t[0] + '">' + (PREM_TILES.includes(t[0]) ? '<i class="prem tileprem">PRO</i>' : '') + t[1] + '<span>' + t[2] + '</span></button>';
   const body = openSheet('Menu',
     '<button class="card tap menuprof" data-k="profile"><span class="avatarmini" style="background:' + curColor() + ';color:' + (lum(curColor()) > 0.5 ? '#0E1116' : '#FFFFFF') + '">' + esc(initials(S.me.pseudo || '?')) + '</span><span class="grow"><b>' + esc(S.me.pseudo || 'Mon profil') + '</b><span class="sub">' + esc(visLabel(S.me.vis)) + (S.me.points ? ' · ' + S.me.points + ' pts' : '') + '</span></span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>' +

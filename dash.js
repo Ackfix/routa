@@ -40,7 +40,7 @@
   }
 
   /* ---------- dessin ---------- */
-  const scaleMax = () => { if (CFG.scale !== 'auto') return +CFG.scale; const v = A.veh ? A.veh() : {}; return v.cyclo ? 60 : (v.hgv || v.type === 'bus' || v.type === 'minibus') ? 120 : v.heavy ? 140 : (v.two ? 240 : 220); };
+  const scaleMax = () => { if (CFG.scale !== 'auto') return +CFG.scale; const v = A.veh ? A.veh() : {}; return v.cyclo ? 60 : CFG.style === 'race' ? 300 : (v.hgv || v.type === 'bus' || v.type === 'minibus') ? 120 : v.heavy ? 140 : (v.two ? 240 : 220); };
   const polar = (cx, cy, r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
   const A0 = Math.PI * 0.75, A1 = Math.PI * 2.25;
   function arc(cx, cy, r, a, b) { const [x0, y0] = polar(cx, cy, r, a), [x1, y1] = polar(cx, cy, r, b); return 'M' + x0.toFixed(1) + ' ' + y0.toFixed(1) + 'A' + r + ' ' + r + ' 0 ' + (b - a > Math.PI ? 1 : 0) + ' 1 ' + x1.toFixed(1) + ' ' + y1.toFixed(1); }

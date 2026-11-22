@@ -942,3 +942,19 @@ body:not(.night) .dk-sty { background: #0E1116; color: #F4F6FA; }
   html body .dashov .dk-main { width: min(calc(var(--dkW, 844px) * .46), calc(var(--dkH, 390px) * .85)); }
 }
 .dk-col.auto { width: auto; min-width: 56px; padding: 0 12px; border-radius: 20px; background: var(--surface-2); color: var(--fg); font: 700 13px var(--font); }
+
+/* Espacements réguliers dans les formulaires des panneaux (retour testeur 18/11) */
+.sheet-body form:not(.row) { display: flex; flex-direction: column; gap: 12px; }
+.sheet-body form.row { align-items: flex-end; gap: 10px; }
+
+/* Mes échéances (pro) : vert à jour, jaune bientôt (90 j), rouge expirée */
+.dlsum { display: flex; flex-wrap: wrap; gap: 8px; }
+.dlpill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+.dl-ok { background: rgba(61,220,151,.16); color: #3DDC97; }
+.dl-soon { background: rgba(255,194,77,.16); color: #FFC24D; }
+.dl-late { background: rgba(255,92,92,.16); color: #FF7070; }
+.dlrow { border-left: 4px solid transparent; }
+.dlrow.dl-b-ok { border-left-color: #3DDC97; }
+.dlrow.dl-b-soon { border-left-color: #FFC24D; }
+.dlrow.dl-b-late { border-left-color: #FF5C5C; }
+#dlCats .pill.on { background: var(--accent); color: var(--accent-ink); }

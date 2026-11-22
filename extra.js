@@ -415,6 +415,7 @@ async function ttRoutes(from, to, vias) {
       vp.travelMode = vv.costing === 'bus' ? 'bus' : vv.costing === 'auto' ? 'car' : 'truck';
       if (vd.height) vp.vehicleHeight = vd.height; if (vd.width) vp.vehicleWidth = vd.width; if (vd.length) vp.vehicleLength = vd.length;
       if (vd.weight) vp.vehicleWeight = Math.round(vd.weight * 1000);
+      if (vd.axles) vp.vehicleNumberOfAxles = vd.axles;
       vp.vehicleCommercial = (vv.type === 'camping' || vv.type === 'remorque') ? 'false' : 'true';
       if (vv.hazmat) vp.vehicleLoadType = 'otherHazmatGeneral';
     }

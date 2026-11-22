@@ -295,8 +295,20 @@
     }
     zfeCrossed(R).forEach((z) => {
       const head = '<b>' + esc(T('Zone à faibles émissions')) + ' : ' + esc(z.n) + '</b> · ';
-      const txt = v.type === 'electrique' ? T('accès autorisé avec la vignette Crit\'Air verte.') : z.nc ? T('vignette Crit\'Air recommandée, pas de restriction annoncée pour les voitures.') : T('vignette Crit\'Air obligatoire, les véhicules les plus anciens y sont interdits.');
-      const b = banner(IC.leaf, head + esc(txt) + (z.u ? ' <a href="' + esc(z.u) + '" target="_blank" rel="noopener" style="color:var(--info)">' + esc(T('Règles officielles')) + '</a>' : ''), !z.nc && v.type !== 'electrique');
+      // catégorie du véhicule dans la base officielle des ZFE ; vignette déclarée dans « Mon véhicule » (jamais devinée)
+      const cat = v.two ? 'rm' : v.isHgv ? 'pl' : (v.type === 'bus' || v.type === 'minibus') ? 'bus' : 'vp';
+      const lim = z[cat] != null ? z[cat] : (z.nc ? 0 : null);
+      const ca = A.S.vehicle && A.S.vehicle.critair != null ? +A.S.vehicle.critair : (v.type === 'electrique' ? 0 : null);
+      const hrs = z.h && z.h[cat] ? ' ' + T('(à certaines heures)') : '';
+      const caName = (c) => c === 0 ? T('verte') : c === 6 ? T('non classé') : String(c);
+      let txt, warn = false;
+      if (lim == null) { txt = T('vignette Crit\'Air obligatoire, les véhicules les plus anciens y sont interdits.'); warn = true; }
+      else if (!lim) txt = T('pas de restriction annoncée pour ton type de véhicule, vignette Crit\'Air recommandée.');
+      else if (ca === 0) txt = T('accès autorisé avec la vignette Crit\'Air verte.');
+      else if (ca == null) { txt = T('Crit\'Air {n} et plus interdits{h}. Indique ta vignette dans Mon véhicule.', { n: lim, h: hrs }); warn = true; }
+      else if (ca >= lim) { txt = T('ta vignette Crit\'Air {c} y est interdite{h}.', { c: caName(ca), h: hrs }); warn = true; }
+      else txt = T('ta vignette Crit\'Air {c} y est autorisée.', { c: caName(ca) });
+      const b = banner(IC.leaf, head + esc(txt) + ' <span class="muted small">' + esc(T('Selon la base officielle des ZFE, à vérifier.')) + '</span>' + (z.u ? ' <a href="' + esc(z.u) + '" target="_blank" rel="noopener" style="color:var(--info)">' + esc(T('Règles officielles')) + '</a>' : ''), warn);
       box.appendChild(b);
       // #037 : contourner la zone si on le souhaite (rectangle autour du périmètre officiel)
       if (X.avoidAdd) {
