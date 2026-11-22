@@ -657,6 +657,122 @@ function smoothHeading(old, nw) {
   S.hdJump = 0;
   return (old + d * 0.55 + 360) % 360;
 }
+/* ======================= Collage sur la route + lissage GPS (hors itinéraire) =======================
+   1) Lissage : un saut impossible pour la vitesse est ignoré, les petites variations sont adoucies selon la précision.
+   2) Collage : la route la plus proche dans le sens où l'on roule, lue directement dans la carte affichée
+      (tuiles OpenMapTiles déjà chargées : instantané, gratuit, sans serveur).
+   3) Le curseur et la caméra utilisent cette position (et la prolongent le long de la route, pas en ligne droite). */
+const ROAD_CLASSES = /^(motorway|trunk|primary|secondary|tertiary|minor|service|raceway|busway)$/;
+const RD = { segs: [], at: 0, c: null, lastKey: null };
+const angDiff = (a, b) => Math.abs((((a - b) % 360) + 540) % 360 - 180);
+function roadIndex(p) {
+  if (RD.c && Date.now() - RD.at < 4000 && dist(RD.c, p) < 350) return RD;
+  let feats = [];
+  try { feats = map.querySourceFeatures('openmaptiles', { sourceLayer: 'transportation' }); } catch (e) { feats = []; }
+  const kx = 111320 * Math.cos(toRad(p.lat)), ky = 110540, R = 800, segs = [];
+  feats.forEach((f) => {
+    const pr = f.properties || {}; if (!ROAD_CLASSES.test(pr.class || '')) return;
+    const g = f.geometry || {}; const lines = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : [];
+    const ow = +pr.oneway === 1 ? 1 : +pr.oneway === -1 ? -1 : 0;
+    lines.forEach((ln) => {
+      if (!ln || ln.length < 2) return;
+      const pts = ln.map(([lo, la]) => [(lo - p.lon) * kx, (la - p.lat) * ky]);
+      if (!pts.some(([x, y]) => Math.abs(x) < R && Math.abs(y) < R)) return;
+      const line = { pts, ow, key: (pr.name || '') + '|' + pr.class + '|' + (pr.brunnel || '') };
+      for (let i = 0; i < pts.length - 1; i++) segs.push({ line, i });
+    });
+  });
+  Object.assign(RD, { segs, at: Date.now(), c: { lat: p.lat, lon: p.lon }, kx, ky });
+  return RD;
+}
+function roadMatch(p, hd, spd, acc) {
+  const I = roadIndex(p); if (!I.segs.length) return null;
+  const x = (p.lon - I.c.lon) * I.kx, y = (p.lat - I.c.lat) * I.ky;
+  const Rmax = Math.max(12, Math.min(35, (acc || 10) * 1.5)), sig = Math.max(6, acc || 10);
+  let best = null, same = null;
+  for (const s of I.segs) {
+    const A = s.line.pts[s.i], B = s.line.pts[s.i + 1];
+    const Rb = Rmax + 30;
+    if (Math.min(A[0], B[0]) - Rb > x || Math.max(A[0], B[0]) + Rb < x || Math.min(A[1], B[1]) - Rb > y || Math.max(A[1], B[1]) + Rb < y) continue;
+    const dx = B[0] - A[0], dy = B[1] - A[1], L2 = dx * dx + dy * dy; if (L2 < 0.01) continue;
+    let t = ((x - A[0]) * dx + (y - A[1]) * dy) / L2; t = Math.max(0, Math.min(1, t));
+    const px = A[0] + t * dx, py = A[1] + t * dy, d = Math.hypot(x - px, y - py);
+    const isLast = RD.lastKey === s.line.key;
+    if (d > (isLast ? Rmax + 30 : Rmax)) continue; // la route actuelle reste candidate un peu plus loin (saut GPS)
+    const segB = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+    let dir = 1, dh = 0;
+    if (hd != null && spd > 3) {
+      const d1 = angDiff(segB, hd), d2 = angDiff((segB + 180) % 360, hd);
+      if (s.line.ow === 1) { dir = 1; dh = d1; } else if (s.line.ow === -1) { dir = -1; dh = d2; } else { dir = d1 <= d2 ? 1 : -1; dh = Math.min(d1, d2); }
+      if (dh > 50) continue; // route qui part dans une autre direction (croisement, bretelle, route parallèle à contresens)
+    }
+    const score = (d * d) / (sig * sig) + (dh / 30) * (dh / 30);
+    const cand = { score, s, px, py, dir, segB, d };
+    if (d <= Rmax && (!best || score < best.score)) best = cand;
+    if (isLast && (!same || score < same.score)) same = cand;
+  }
+  if (!best) best = same;
+  if (!best) { RD.lastKey = null; RD.switchN = 0; return null; }
+  // Changer de route seulement si l'autre route gagne 2 relevés de suite : un saut GPS isolé ne fait plus « sauter » le curseur sur une route voisine
+  if (same && best.s.line.key !== RD.lastKey) {
+    RD.switchN = (RD.switchKey === best.s.line.key ? RD.switchN : 0) + 1; RD.switchKey = best.s.line.key;
+    if (RD.switchN < 2) best = same; else RD.switchN = 0;
+  } else RD.switchN = 0;
+  RD.lastKey = best.s.line.key;
+  return { lat: I.c.lat + best.py / I.ky, lon: I.c.lon + best.px / I.kx, heading: best.dir === 1 ? best.segB : (best.segB + 180) % 360,
+    m: { pts: best.s.line.pts, i: best.s.i, dir: best.dir, px: best.px, py: best.py, c: I.c, kx: I.kx, ky: I.ky } };
+}
+/* Position « m » mètres plus loin en suivant la route (virages compris) */
+function roadAhead(M, meters) {
+  const m = M.m; let pts = m.pts, dir = m.dir, j = dir === 1 ? m.i + 1 : m.i, cx = m.px, cy = m.py, left = meters, h = M.heading, hops = 0;
+  for (;;) {
+    while (left > 0 && j >= 0 && j < pts.length) {
+      const nx = pts[j][0], ny = pts[j][1], seg = Math.hypot(nx - cx, ny - cy);
+      if (seg > 0.5) h = (Math.atan2(nx - cx, ny - cy) * 180 / Math.PI + 360) % 360;
+      if (seg >= left) { cx += (nx - cx) * left / seg; cy += (ny - cy) * left / seg; left = 0; break; }
+      left -= seg; cx = nx; cy = ny; j += dir;
+    }
+    if (left <= 0 || hops >= 3 || RD.c !== m.c) break;
+    // fin de ce tronçon : on continue sur le tronçon suivant qui part dans la même direction (la route continue après un carrefour)
+    let nxt = null, bd = 60;
+    const seen = new Set();
+    for (const sg of RD.segs) {
+      const L = sg.line; if (L.pts === pts || seen.has(L)) continue; seen.add(L);
+      const n = L.pts.length, a = L.pts[0], z = L.pts[n - 1];
+      [[a, 1, 1], [z, -1, n - 2]].forEach(([e, d2, k2]) => {
+        if (Math.hypot(e[0] - cx, e[1] - cy) > 4) return;
+        if (d2 === 1 && L.ow === -1) return; if (d2 === -1 && L.ow === 1) return;
+        const q = L.pts[k2]; const hb = (Math.atan2(q[0] - e[0], q[1] - e[1]) * 180 / Math.PI + 360) % 360, dd = angDiff(hb, h);
+        if (dd < bd) { bd = dd; nxt = { pts: L.pts, dir: d2, j: k2 }; }
+      });
+    }
+    if (!nxt) break;
+    pts = nxt.pts; dir = nxt.dir; j = nxt.j; hops++;
+  }
+  if (left > 0) { const r = toRad(h); cx += Math.sin(r) * left; cy += Math.cos(r) * left; } // fin de ce tronçon : on continue tout droit (rare, corrigé au relevé suivant)
+  return { lat: m.c.lat + cy / m.ky, lon: m.c.lon + cx / m.kx, heading: h };
+}
+function smoothPos(now, acc) {
+  const t = Date.now(), F = S.filt;
+  if (!F || t - F.t > 10000) { S.filt = { lat: now.lat, lon: now.lon, t, rej: 0 }; return S.filt; }
+  const dt = Math.max(0.2, Math.min(5, (t - F.t) / 1000)), spd = S.speed || 0;
+  let pla = F.lat, plo = F.lon;
+  if (spd > 1 && S.heading != null) { const r = toRad(S.heading), mm = spd * dt; pla += mm * Math.cos(r) / 111320; plo += mm * Math.sin(r) / (111320 * Math.cos(toRad(F.lat))); }
+  const lim = 2 * Math.max(acc || 10, 6) + 0.6 * spd * dt + 10; // écart à la position prévue : au-delà, c'est un saut du GPS
+  if (dist({ lat: pla, lon: plo }, now) > lim && F.rej < 3) { F.rej++; F.lat = pla; F.lon = plo; F.t = t; return F; } // saut impossible : ignoré (3 fois max)
+  const k = acc <= 8 ? 0.85 : acc <= 15 ? 0.7 : acc <= 30 ? 0.5 : 0.35;
+  F.lat = pla + k * (now.lat - pla); F.lon = plo + k * (now.lon - plo); F.t = t; F.rej = 0;
+  return F;
+}
+function updateMatched(now, acc) {
+  const fp = smoothPos(now, acc);
+  const prev = S.posM;
+  if (softMode() || (S.nav && S.nav.mode && S.nav.mode !== 'car')) { S.posM = { lat: fp.lat, lon: fp.lon, t: Date.now() }; return; }
+  if ((S.speed || 0) < 1.2 && prev && dist(prev, fp) < 20) { prev.t = Date.now(); return; } // à l'arrêt : le curseur ne « danse » plus
+  let M = null;
+  try { M = roadMatch(fp, S.heading, S.speed || 0, acc); } catch (e) { M = null; }
+  S.posM = M ? { lat: M.lat, lon: M.lon, heading: M.heading, M, t: Date.now() } : { lat: fp.lat, lon: fp.lon, t: Date.now() };
+}
 /* En navigation : position et direction calées sur la route (comme Waze ou Google Maps) */
 /* Anticipation : le GPS arrive avec ~1 s de retard et la caméra glisse pendant ~1 s.
    On place donc le curseur là où la voiture EST (et sera à la fin du glissement), le long de la route. */
@@ -671,8 +787,13 @@ function myView(ahead) {
     const H0 = pointAt(N.R, N.along + Math.min(go, spd * 0.8)), H1 = pointAt(N.R, N.along + Math.min(go, spd * 0.8) + 30);
     return { lat: P0.lat, lon: P0.lon, heading: dist(H0, H1) > 5 ? bearing(H0, H1) : N.snap.heading };
   }
-  const so = S.snapOff && Date.now() - S.snapOff.t < 12000 ? S.snapOff : null;
-  const bl = S.pos.lat + (so ? so.dLat : 0), bo = S.pos.lon + (so ? so.dLon : 0);
+  const P = S.posM && Date.now() - S.posM.t < 4000 ? S.posM : null;
+  if (P && P.M) {
+    // collé sur la route : on avance le long de la route elle-même
+    if (go && S.moving) return roadAhead(P.M, Math.min(go, 60));
+    return { lat: P.lat, lon: P.lon, heading: (S.speed || 0) > 2 ? P.heading : S.heading };
+  }
+  const bl = P ? P.lat : S.pos.lat, bo = P ? P.lon : S.pos.lon;
   if (go && S.heading != null && S.moving) {
     // Hors itinéraire : on prolonge la position en suivant la courbe en cours (cap + vitesse de virage),
     // et non plus en ligne droite : dans un virage, le curseur reste sur la route au lieu de partir tout droit.
@@ -808,8 +929,18 @@ function renderMe() {
   if (!S.markers.me) {
     const e = el(meHtml());
     S.markers.me = new maplibregl.Marker({ element: e, rotationAlignment: 'map', pitchAlignment: 'map' }).setLngLat([v.lon, v.lat]).addTo(map);
+    S.meShown = { lat: v.lat, lon: v.lon };
   }
-  S.markers.me.setLngLat([v.lon, v.lat]).setRotation(v.heading || 0);
+  // glissement doux d'une position à l'autre (au lieu d'un saut chaque seconde)
+  const from = S.meShown && S.markers.me ? S.meShown : null;
+  cancelAnimationFrame(S.meAnim);
+  if (!from || dist(from, v) > 300 || document.hidden) { S.markers.me.setLngLat([v.lon, v.lat]); S.meShown = { lat: v.lat, lon: v.lon }; }
+  else {
+    const t0 = performance.now();
+    const step = (ts) => { const k = Math.min(1, (ts - t0) / 900); const la = from.lat + (v.lat - from.lat) * k, lo = from.lon + (v.lon - from.lon) * k; if (S.markers.me) S.markers.me.setLngLat([lo, la]); S.meShown = { lat: la, lon: lo }; if (k < 1) S.meAnim = requestAnimationFrame(step); };
+    S.meAnim = requestAnimationFrame(step);
+  }
+  S.markers.me.setRotation(v.heading || 0);
   const u2 = S.markers.me.getElement().querySelector('svg.upr'); if (u2) u2.style.transform = 'rotate(' + Math.round(-((v.heading || 0) - map.getBearing())) + 'deg)';
 }
 
@@ -1020,6 +1151,7 @@ function startGps(force) {
       S.hdAt = Date.now();
     } else if ((S.speed || 0) <= 2.5) S.hdRate = 0;
     S.prevPos = S.pos; S.pos = now;
+    updateMatched(now, c.accuracy);
     renderMe();
     updateSpeed();
     speedLimitTick();
@@ -3625,7 +3757,7 @@ if (!store.get('routa.mig096', false)) { S.settings.voice = false; S.settings.re
 if (!store.get('routa.mig0913', false)) { S.settings.traffic = true; S.settings.showPlaces = true; S.settings.showTransit = false; saveSettings(); store.set('routa.mig0913', true); }
 S.settings.mapType = 'plan';
 S.settings.relief3d = false;
-window.ROUTA = { CUR_COLORS, alertVisible, renderAlerts, reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, chooseDestination, initials, veh, openDriver, startNav, openSpot, openPoi, capLimit, openCursor, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
+window.ROUTA = { myView, roadMatch, CUR_COLORS, alertVisible, renderAlerts, reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, chooseDestination, initials, veh, openDriver, startNav, openSpot, openPoi, capLimit, openCursor, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
 if (!S.me || !S.me.pseudo) onboarding(); else boot();
 
 })();
