@@ -700,9 +700,14 @@ function roadMatch(p, hd, spd, acc) {
     const isLast = RD.lastKey === s.line.key;
     if (d > (isLast ? Rmax + 30 : Rmax)) continue; // la route actuelle reste candidate un peu plus loin (saut GPS)
     const segB = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
-    let dir = 1, dh = 0;
+    // sans cap fiable (lent, à l'arrêt) : on garde le sens du dernier affichage, jamais un demi-tour au hasard
+    const refH = S.posM && S.posM.heading != null ? S.posM.heading : (S.heading != null ? S.heading : null);
+    let dir = refH != null && angDiff(segB, refH) > 90 ? -1 : 1, dh = 0;
+    if (s.line.ow === 1) dir = 1; else if (s.line.ow === -1) dir = -1;
     if (hd != null && spd > 3) {
-      const d1 = angDiff(segB, hd), d2 = angDiff((segB + 180) % 360, hd);
+      // cap lissé ET cap brut du dernier relevé : dans un virage, la nouvelle route est reconnue tout de suite (le cap lissé a du retard)
+      const hr = S.hdRaw != null && Date.now() - (S.hdRawAt || 0) < 2500 ? S.hdRaw : hd;
+      const d1 = Math.min(angDiff(segB, hd), angDiff(segB, hr)), d2 = Math.min(angDiff((segB + 180) % 360, hd), angDiff((segB + 180) % 360, hr));
       if (s.line.ow === 1) { dir = 1; dh = d1; } else if (s.line.ow === -1) { dir = -1; dh = d2; } else { dir = d1 <= d2 ? 1 : -1; dh = Math.min(d1, d2); }
       if (dh > 50) continue; // route qui part dans une autre direction (croisement, bretelle, route parallèle à contresens)
     }
@@ -916,9 +921,23 @@ function puckEl() {
 }
 var meRaf = 0;
 function meOnRotate() { if (meRaf || !S.follow || !S.camOff) return; meRaf = requestAnimationFrame(() => { meRaf = 0; try { renderMe(); } catch (e) { /* */ } }); }
+/* Cap affiché lissé (la flèche tourne en douceur, sans « spin ») : vitesse de rotation limitée, petits écarts ignorés */
+function dispHeading(h) {
+  const t = performance.now();
+  if (h == null) return S.dispH;
+  if (S.dispH == null) { S.dispH = h; S.dispHAt = t; return h; }
+  const dt = Math.min(0.5, (t - (S.dispHAt || t)) / 1000); S.dispHAt = t;
+  let d = ((((h - S.dispH) % 360) + 540) % 360) - 180;
+  if (Math.abs(d) > 150 && (S.speed || 0) > 2) d = 0; // demi-tour soudain en roulant : bruit, ignoré
+  const maxStep = 220 * dt; // 220 °/s au maximum
+  const step = Math.max(-maxStep, Math.min(maxStep, d * (1 - Math.exp(-dt / 0.18))));
+  S.dispH = (S.dispH + step + 360) % 360;
+  return S.dispH;
+}
 function renderMe() {
   if (!S.pos) return;
-  const v = myView();
+  const v0 = myView();
+  const v = Object.assign({}, v0, { heading: dispHeading(v0.heading) });
   const fixed = S.follow && S.camOff && Date.now() >= (S.puckAt || 0);
   const pk = puckEl();
   if (fixed) {
@@ -926,7 +945,8 @@ function renderMe() {
     const r = map.getContainer().getBoundingClientRect();
     pk.style.left = Math.round(r.left + r.width / 2 + S.camOff[0]) + 'px';
     pk.style.top = Math.round(r.top + r.height / 2 + S.camOff[1]) + 'px';
-    const rot = S.settings.navNorth ? (v.heading || 0) : ((v.heading || 0) - map.getBearing() + 360) % 360; // cap du véhicule moins rotation actuelle de la carte : le curseur reste aligné sur la route, même pendant que la carte tourne dans un virage
+    // carte qui tourne avec la route : la flèche pointe vers le haut et suit la caméra (pas de rotation parasite)
+    const rot = S.settings.navNorth ? (v.heading || 0) : (camCur ? (camCur.b - map.getBearing() + 360) % 360 : ((v.heading || 0) - map.getBearing() + 360) % 360); // cap du véhicule moins rotation actuelle de la carte : le curseur reste aligné sur la route, même pendant que la carte tourne dans un virage
     pk.firstChild.style.transform = 'rotate(' + Math.round(rot) + 'deg)';
     const u1 = pk.querySelector('svg.upr'); if (u1) u1.style.transform = 'rotate(' + (-Math.round(rot)) + 'deg)';
     pk.hidden = false;
@@ -1147,6 +1167,7 @@ function startGps(force) {
     if (c.heading != null && !isNaN(c.heading) && c.heading >= 0 && (S.speed || 0) > 2.5) hd = c.heading;
     else if (S.pos && (S.speed || 0) > 2.5 && dist(S.pos, now) > Math.max(12, c.accuracy || 10)) hd = bearing(S.pos, now);
     if (hd != null) {
+      S.hdRaw = hd; S.hdRawAt = Date.now();
       const h0 = S.heading, t0 = S.hdAt || 0;
       S.heading = smoothHeading(S.heading, hd);
       // vitesse de virage (degrés par seconde), lissée : sert à prolonger la position le long de la courbe
@@ -1337,8 +1358,30 @@ function followCam() {
   if (S.puckAt == null) S.puckAt = 0;
   if (lc && lc.moving !== moving) S.puckAt = nowT + 1000;
   S.lastCam = { moving };
+  if (moving) { S.camZoomT = zoom; if (!camRaf) { camLast = 0; camRaf = requestAnimationFrame(camLoop); } return; } // en roulant : caméra image par image (fluide)
+  if (camRaf) { cancelAnimationFrame(camRaf); camRaf = 0; }
+  camCur = null;
   map.easeTo({ center: [v.lon, v.lat], bearing, pitch: 0, zoom, duration: DUR, easing: (t) => t, offset: off, essential: true });
   renderMe();
+}
+/* Caméra de conduite fluide : recalculée à chaque image (~60 fois par seconde) au lieu d'un glissement par seconde.
+   Entre deux relevés GPS, la position avance le long de la route selon la vitesse ; à chaque nouveau relevé, l'écart est rattrapé en douceur. */
+let camRaf = 0, camLast = 0, camCur = null;
+function camLoop(ts) {
+  camRaf = 0;
+  if (!S.follow || !S.pos || document.hidden || !(S.moving || S.nav)) { camCur = null; return; }
+  const dt = camLast ? Math.min(0.1, Math.max(0.001, (ts - camLast) / 1000)) : 0.016; camLast = ts;
+  const tgt = myView(0.15);
+  if (!camCur || dist(camCur, tgt) > 150) camCur = { lat: tgt.lat, lon: tgt.lon, b: map.getBearing(), z: map.getZoom() };
+  const a = 1 - Math.exp(-dt / 0.3);
+  camCur.lat += (tgt.lat - camCur.lat) * a; camCur.lon += (tgt.lon - camCur.lon) * a;
+  const want = S.settings.navNorth ? 0 : (tgt.heading != null && ((S.speed || 0) > 1.5 || S.nav) ? tgt.heading : camCur.b);
+  const db = ((((want - camCur.b) % 360) + 540) % 360) - 180;
+  camCur.b = (camCur.b + db * (1 - Math.exp(-dt / 0.45)) + 360) % 360;
+  camCur.z += ((S.camZoomT || camCur.z) - camCur.z) * (1 - Math.exp(-dt / 1.2));
+  try { map.jumpTo({ center: [camCur.lon, camCur.lat], bearing: camCur.b, zoom: camCur.z, pitch: 0 }); if (S.camOff && (S.camOff[0] || S.camOff[1])) map.panBy([-S.camOff[0], -S.camOff[1]], { duration: 0 }); } catch (e) { /* */ }
+  renderMe();
+  camRaf = requestAnimationFrame(camLoop);
 }
 setInterval(() => { if (S.follow && S.pos && !document.hidden) followCam(); }, 1000);
 
