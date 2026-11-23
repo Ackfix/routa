@@ -733,8 +733,11 @@ function roadAhead(M, meters) {
       left -= seg; cx = nx; cy = ny; j += dir;
     }
     if (left <= 0 || hops >= 3 || RD.c !== m.c) break;
-    // fin de ce tronçon : on continue sur le tronçon suivant qui part dans la même direction (la route continue après un carrefour)
-    let nxt = null, bd = 60;
+    // Fin de ce tronçon (carrefour) : on continue sur la route qui prolonge dans la même direction ;
+    // si on est en train de tourner, sur la route du côté du virage ; sinon on s'arrête AU carrefour (jamais tout droit dans le vide).
+    const rate = S.hdRate || 0;
+    const curKey = (RD.segs.find((x) => x.line.pts === pts) || { line: {} }).line.key;
+    let nxt = null, bd = 60, bt = null, btd = 999;
     const seen = new Set();
     for (const sg of RD.segs) {
       const L = sg.line; if (L.pts === pts || seen.has(L)) continue; seen.add(L);
@@ -743,13 +746,17 @@ function roadAhead(M, meters) {
         if (Math.hypot(e[0] - cx, e[1] - cy) > 4) return;
         if (d2 === 1 && L.ow === -1) return; if (d2 === -1 && L.ow === 1) return;
         const q = L.pts[k2]; const hb = (Math.atan2(q[0] - e[0], q[1] - e[1]) * 180 / Math.PI + 360) % 360, dd = angDiff(hb, h);
-        if (dd < bd) { bd = dd; nxt = { pts: L.pts, dir: d2, j: k2 }; }
+        const signed = ((((hb - h) % 360) + 540) % 360) - 180;
+        // tout droit : seulement la même route (même nom) ou un prolongement presque parfait ; sinon on attend de savoir où l'on va
+        if (dd < bd && ((L.key === curKey && !/^\|/.test(curKey || '|')) || dd < 20)) { bd = dd; nxt = { pts: L.pts, dir: d2, j: k2 }; }
+        if (Math.abs(rate) > 6 && Math.sign(signed) === Math.sign(rate) && dd <= 130 && dd < btd) { btd = dd; bt = { pts: L.pts, dir: d2, j: k2 }; }
       });
     }
-    if (!nxt) break;
+    if (!nxt) nxt = bt;
+    if (!nxt) { left = 0; break; } // on reste sur le carrefour
     pts = nxt.pts; dir = nxt.dir; j = nxt.j; hops++;
   }
-  if (left > 0) { const r = toRad(h); cx += Math.sin(r) * left; cy += Math.cos(r) * left; } // fin de ce tronçon : on continue tout droit (rare, corrigé au relevé suivant)
+  if (left > 0) left = 0; // jamais de prolongation hors de la route
   return { lat: m.c.lat + cy / m.ky, lon: m.c.lon + cx / m.kx, heading: h };
 }
 function smoothPos(now, acc) {
@@ -3757,7 +3764,7 @@ if (!store.get('routa.mig096', false)) { S.settings.voice = false; S.settings.re
 if (!store.get('routa.mig0913', false)) { S.settings.traffic = true; S.settings.showPlaces = true; S.settings.showTransit = false; saveSettings(); store.set('routa.mig0913', true); }
 S.settings.mapType = 'plan';
 S.settings.relief3d = false;
-window.ROUTA = { myView, roadMatch, CUR_COLORS, alertVisible, renderAlerts, reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, chooseDestination, initials, veh, openDriver, startNav, openSpot, openPoi, capLimit, openCursor, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
+window.ROUTA = { myView, roadMatch, roadKey: () => RD.lastKey, CUR_COLORS, alertVisible, renderAlerts, reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, chooseDestination, initials, veh, openDriver, startNav, openSpot, openPoi, capLimit, openCursor, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
 if (!S.me || !S.me.pseudo) onboarding(); else boot();
 
 })();
