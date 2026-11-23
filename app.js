@@ -812,7 +812,9 @@ function myView(ahead) {
   if (P && P.M) {
     // collé sur la route : on avance le long de la route elle-même
     if (go && S.moving) return roadAhead(P.M, Math.min(go, 60));
-    return { lat: P.lat, lon: P.lon, heading: (S.speed || 0) > 2 ? P.heading : S.heading };
+    // à l'arrêt : direction de la route où l'on est (dans le sens où l'on roulait) => la route reste bien droite à l'écran
+    const hs = (S.speed || 0) > 2 || (P.heading != null && S.heading != null && angDiff(P.heading, S.heading) < 45) ? P.heading : S.heading;
+    return { lat: P.lat, lon: P.lon, heading: hs };
   }
   const bl = P ? P.lat : S.pos.lat, bo = P ? P.lon : S.pos.lon;
   if (go && S.heading != null && S.moving) {
@@ -1356,7 +1358,8 @@ function followCam() {
   const DUR = 1100;
   const v = myView(moving ? DUR / 1000 : 0); // la caméra arrive sur la vraie position à la fin du glissement
   const live = S.moving || (S.nav && S.nav.snap);
-  let bearing = north ? 0 : (live && v.heading != null ? v.heading : map.getBearing());
+  // à l'arrêt aussi, la carte reste orientée dans le sens de la route (avant : elle gardait l'angle du moment => route de travers)
+  let bearing = north ? 0 : (v.heading != null && (live || S.heading != null) ? v.heading : map.getBearing());
   const turn = Math.abs(((bearing - map.getBearing()) % 360 + 540) % 360 - 180);
   if (!north && turn < 4) bearing = map.getBearing(); // petits écarts de cap : on ne fait pas tourner la carte
   const A = freeArea();

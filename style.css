@@ -966,6 +966,3 @@ body:not(.night) .dk-sty { background: #0E1116; color: #F4F6FA; }
 .ppplan.on { border-color: var(--accent); }
 .ppplan .pprice { font-size: 20px; font-weight: 800; }
 .ppbadge { position: absolute; top: -10px; right: 10px; background: var(--accent); color: var(--accent-ink); font-style: normal; font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
-
-/* paysage : les boutons ne passent plus sous la Dynamic Island / l'encoche */
-@media (orientation: landscape) { :root { --eL: max(10px, var(--sal)); --eR: max(10px, var(--sar)); } }
