@@ -495,7 +495,7 @@ body:not(.navigating) .lowchip { top: calc(var(--sat) + 88px); }
 
 /* 1.0 : curseur fixe pendant le suivi, barre de navigation compacte, mode paysage */
 .mepuck { position: fixed; z-index: 6; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; transition: left 1s linear, top 1s linear; }
-.mepuck .mk-me { transition: transform .35s ease-out; }
+.mepuck .mk-me { transition: none; }
 .navbar { padding-bottom: calc(var(--sab) + 14px); }
 .navinstr { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 @media (orientation: landscape) and (max-height: 540px) {
@@ -966,3 +966,6 @@ body:not(.night) .dk-sty { background: #0E1116; color: #F4F6FA; }
 .ppplan.on { border-color: var(--accent); }
 .ppplan .pprice { font-size: 20px; font-weight: 800; }
 .ppbadge { position: absolute; top: -10px; right: 10px; background: var(--accent); color: var(--accent-ink); font-style: normal; font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
+
+/* paysage : les boutons ne passent plus sous la Dynamic Island / l'encoche */
+@media (orientation: landscape) { :root { --eL: max(10px, var(--sal)); --eR: max(10px, var(--sar)); } }

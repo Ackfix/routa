@@ -721,7 +721,7 @@ function roadMatch(p, hd, spd, acc) {
       const hr = S.hdRaw != null && Date.now() - (S.hdRawAt || 0) < 2500 ? S.hdRaw : hd;
       const d1 = Math.min(angDiff(segB, hd), angDiff(segB, hr)), d2 = Math.min(angDiff((segB + 180) % 360, hd), angDiff((segB + 180) % 360, hr));
       if (s.line.ow === 1) { dir = 1; dh = d1; } else if (s.line.ow === -1) { dir = -1; dh = d2; } else { dir = d1 <= d2 ? 1 : -1; dh = Math.min(d1, d2); }
-      if (dh > 50) continue; // route qui part dans une autre direction (croisement, bretelle, route parallèle à contresens)
+      if (dh > 50 && !(isLast && dh < 120)) continue; // route qui part dans une autre direction (croisement, bretelle, route parallèle à contresens)
     }
     const score = (d * d) / (sig * sig) + (dh / 30) * (dh / 30);
     const cand = { score, s, px, py, dir, segB, d };
@@ -789,7 +789,7 @@ function updateMatched(now, acc) {
   const fp = smoothPos(now, acc);
   const prev = S.posM;
   if (softMode() || (S.nav && S.nav.mode && S.nav.mode !== 'car')) { S.posM = { lat: fp.lat, lon: fp.lon, t: Date.now() }; return; }
-  if ((S.speed || 0) < 1.2 && prev && dist(prev, fp) < 20) { prev.t = Date.now(); return; } // à l'arrêt : le curseur ne « danse » plus
+  if ((S.speed || 0) < 1.2 && prev && prev.M && dist(prev, fp) < 20) { prev.t = Date.now(); return; } // à l'arrêt : le curseur ne « danse » plus
   let M = null;
   try { M = roadMatch(fp, S.heading, S.speed || 0, acc); } catch (e) { M = null; }
   S.posM = M ? { lat: M.lat, lon: M.lon, heading: M.heading, M, t: Date.now() } : { lat: fp.lat, lon: fp.lon, t: Date.now() };
@@ -956,7 +956,7 @@ function renderMe() {
     pk.style.left = Math.round(r.left + r.width / 2 + S.camOff[0]) + 'px';
     pk.style.top = Math.round(r.top + r.height / 2 + S.camOff[1]) + 'px';
     // carte qui tourne avec la route : la flèche pointe vers le haut et suit la caméra (pas de rotation parasite)
-    const rot = S.settings.navNorth ? (v.heading || 0) : ((v.heading || 0) - map.getBearing() + 360) % 360; // cap du véhicule moins rotation actuelle de la carte : le curseur reste aligné sur la route, même pendant que la carte tourne dans un virage
+    const rot = sAng(S.settings.navNorth ? (v.heading || 0) : (v.heading || 0) - map.getBearing()); // cap du véhicule moins rotation actuelle de la carte : le curseur reste aligné sur la route, même pendant que la carte tourne dans un virage
     pk.firstChild.style.transform = 'rotate(' + Math.round(rot) + 'deg)';
     const u1 = pk.querySelector('svg.upr'); if (u1) u1.style.transform = 'rotate(' + (-Math.round(rot)) + 'deg)';
     pk.hidden = false;
@@ -1420,7 +1420,14 @@ function drvFrame(ts) {
   const kf = 1 - Math.exp(-dt / 0.3);
   if (Math.hypot(dX, dY) <= stepMax) { X.fx += (dX / dt - X.fx) * kf; X.fy += (dY / dt - X.fy) * kf; }
   else if (spdN < 1) { X.fx *= 1 - kf; X.fy *= 1 - kf; }
-  let cx = (tx - X.x) / DRV_TAU, cy = (ty - X.y) / DRV_TAU;
+  let ex = tx - X.x, ey = ty - X.y;
+  if (T.heading != null && spdN > 1) {
+    const ux = Math.sin(toRad(T.heading)), uy = Math.cos(toRad(T.heading)), ea = ex * ux + ey * uy;
+    const px = ex - ea * ux, py = ey - ea * uy, kp = 1 - Math.exp(-dt / 0.22);
+    const pm = Math.hypot(px, py) * kp, pc = pm > 9 * dt ? 9 * dt / pm : 1; // retour sur la route : rapide mais sans saut (9 m/s max)
+    X.x += px * kp * pc; X.y += py * kp * pc; ex = ea * ux; ey = ea * uy;
+  }
+  let cx = ex / DRV_TAU, cy = ey / DRV_TAU;
   const cm = Math.hypot(cx, cy), cMax = Math.max(2.5, spdN * 0.45);
   if (cm > cMax) { cx *= cMax / cm; cy *= cMax / cm; }
   const kv = 1 - Math.exp(-dt / DRV_TV);
@@ -1431,7 +1438,8 @@ function drvFrame(ts) {
   let hT = X.h;
   if (T.heading != null && ((S.speed || 0) > 1.5 || S.nav)) {
     const d = sAng(T.heading - X.h);
-    hT = Math.abs(d) > 150 && (S.speed || 0) > 3 ? X.h : X.h + d;
+    if (Math.abs(d) > 150 && (S.speed || 0) > 3) { X.flip = X.flip || ts; hT = ts - X.flip > 1500 ? X.h + d : X.h; }
+    else { X.flip = 0; hT = X.h + d; }
   }
   [X.h, X.vh] = springStep(X.h, X.vh, hT, DRV_BEAR, dt);
   if (X.vh > DRV_MAXROT) X.vh = DRV_MAXROT; else if (X.vh < -DRV_MAXROT) X.vh = -DRV_MAXROT;
@@ -1466,7 +1474,7 @@ function drawMe(lat, lon, hd) {
     const r = map.getContainer().getBoundingClientRect();
     pk.style.left = Math.round(r.left + r.width / 2 + S.camOff[0]) + 'px';
     pk.style.top = Math.round(r.top + r.height / 2 + S.camOff[1]) + 'px';
-    const rot = S.settings.navNorth ? hd : sAng(hd - map.getBearing()); // carte qui tourne avec la route : 0 = flèche vers le haut
+    const rot = sAng(S.settings.navNorth ? hd : hd - map.getBearing()); // carte qui tourne avec la route : 0 = flèche vers le haut
     const rr = Math.abs(rot) < 0.5 ? 0 : Math.round(rot * 10) / 10;
     if (pk.dataset.rot !== String(rr)) { pk.dataset.rot = String(rr); pk.firstChild.style.transform = 'rotate(' + rr + 'deg)'; const u1 = pk.querySelector('svg.upr'); if (u1) u1.style.transform = 'rotate(' + (-rr) + 'deg)'; }
     pk.hidden = false;
@@ -1479,7 +1487,7 @@ function drawMe(lat, lon, hd) {
   cancelAnimationFrame(S.meAnim);
   S.markers.me.setLngLat([lon, lat]).setRotation(hd);
   S.meShown = { lat, lon };
-  const u2 = S.markers.me.getElement().querySelector('svg.upr'); if (u2) u2.style.transform = 'rotate(' + Math.round(-(hd - map.getBearing())) + 'deg)';
+  const u2 = S.markers.me.getElement().querySelector('svg.upr'); if (u2) u2.style.transform = 'rotate(' + Math.round(-sAng(hd - map.getBearing())) + 'deg)';
 }
 setInterval(() => { if (S.follow && S.pos && !document.hidden) followCam(); }, 1000);
 
