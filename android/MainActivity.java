@@ -7,6 +7,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(RoutaMapPlugin.class);
+        registerPlugin(RoutaUpdatePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

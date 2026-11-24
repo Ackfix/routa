@@ -27,7 +27,9 @@ jobs:
         run: |
           set -e
           mkdir -p /tmp/app/www
-          cp index.html /tmp/app/www/index.html
+          # app avec fichiers embarqués (liste dans bundle.json) + mise à jour automatique
+          python3 -c "import json,shutil,os;d=json.load(open('bundle.json'));[ (os.makedirs(os.path.dirname('/tmp/app/www/'+f) or '.',exist_ok=True), shutil.copy(f,'/tmp/app/www/'+f)) for f in d['files']]"
+          cp bundle.json /tmp/app/www/bundle.json
           cd /tmp/app
           npm init -y > /dev/null
           npm install --no-audit --no-fund @capacitor/core@8.6.0 @capacitor/android@8.6.0 @capacitor/cli@8.6.0
@@ -36,7 +38,7 @@ jobs:
             "appId": "com.ackfix.routa",
             "appName": "ROUTA",
             "webDir": "www",
-            "server": { "url": "https://routa.ackfix.com", "cleartext": false },
+            "server": { "hostname": "routa.ackfix.com", "androidScheme": "https" },
             "android": { "backgroundColor": "#0E1116" },
             "loggingBehavior": "none"
           }
@@ -51,6 +53,7 @@ jobs:
           mkdir -p $D
           cp $GITHUB_WORKSPACE/android/RoutaMapPlugin.java $D/RoutaMapPlugin.java
           cp $GITHUB_WORKSPACE/android/MainActivity.java $D/MainActivity.java
+          cp $GITHUB_WORKSPACE/android/RoutaUpdatePlugin.java $D/RoutaUpdatePlugin.java
           python3 - <<'PY'
           p='app/build.gradle'
           s=open(p).read()
