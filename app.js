@@ -662,7 +662,8 @@ function smoothHeading(old, nw) {
    2) Collage : la route la plus proche dans le sens où l'on roule, lue directement dans la carte affichée
       (tuiles OpenMapTiles déjà chargées : instantané, gratuit, sans serveur).
    3) Le curseur et la caméra utilisent cette position (et la prolongent le long de la route, pas en ligne droite). */
-const ROAD_CLASSES = /^(motorway|trunk|primary|secondary|tertiary|minor|service|raceway|busway)$/;
+const ROAD_CLASSES = /^(motorway|trunk|primary|secondary|tertiary|minor|service|raceway)$/;
+const ROAD_RANK = { motorway: 0, trunk: 0, primary: 1, secondary: 1, tertiary: 2, minor: 3, service: 4, raceway: 3 };
 const RD = { segs: [], at: 0, c: null, lastKey: null };
 const angDiff = (a, b) => Math.abs((((a - b) % 360) + 540) % 360 - 180);
 function roadIndex(p) {
@@ -677,8 +678,9 @@ function roadIndex(p) {
     lines.forEach((ln) => {
       if (!ln || ln.length < 2) return;
       const pts = ln.map(([lo, la]) => [(lo - p.lon) * kx, (la - p.lat) * ky]);
-      if (!pts.some(([x, y]) => Math.abs(x) < R && Math.abs(y) < R)) return;
-      const line = { pts, ow, key: (pr.name || '') + '|' + pr.class + '|' + (pr.brunnel || '') };
+      let nx0 = 1e9, ny0 = 1e9, nx1 = -1e9, ny1 = -1e9; pts.forEach(([x, y]) => { if (x < nx0) nx0 = x; if (x > nx1) nx1 = x; if (y < ny0) ny0 = y; if (y > ny1) ny1 = y; });
+      if (nx0 > R || nx1 < -R || ny0 > R || ny1 < -R) return; // boîte du tronçon (une autoroute droite n'a parfois aucun point proche)
+      const line = { pts, ow, rank: ROAD_RANK[pr.class] || 0, key: (pr.name || '') + '|' + pr.class + '|' + (pr.brunnel || '') + (+pr.ramp === 1 ? '|ramp' : '') };
       for (let i = 0; i < pts.length - 1; i++) segs.push({ line, i });
       ends.push(line);
     });
@@ -721,17 +723,23 @@ function roadMatch(p, hd, spd, acc) {
       const hr = S.hdRaw != null && Date.now() - (S.hdRawAt || 0) < 2500 ? S.hdRaw : hd;
       const d1 = Math.min(angDiff(segB, hd), angDiff(segB, hr)), d2 = Math.min(angDiff((segB + 180) % 360, hd), angDiff((segB + 180) % 360, hr));
       if (s.line.ow === 1) { dir = 1; dh = d1; } else if (s.line.ow === -1) { dir = -1; dh = d2; } else { dir = d1 <= d2 ? 1 : -1; dh = Math.min(d1, d2); }
-      if (dh > 50 && !(isLast && dh < 120)) continue; // route qui part dans une autre direction (croisement, bretelle, route parallèle à contresens)
+      const gate = spd > 14 ? 35 : 50;
+      if (dh > gate && !(isLast && dh < (spd > 14 ? 60 : 120))) continue; // route qui part dans une autre direction (croisement, bretelle, route parallèle à contresens)
     }
-    const score = (d * d) / (sig * sig) + (dh / 30) * (dh / 30);
-    const cand = { score, s, px, py, dir, segB, d };
+    const hw = spd > 14 ? 15 : spd > 7 ? 22 : 30, rk = s.line.rank || 0;
+    const score = (d * d) / (sig * sig) + (dh / hw) * (dh / hw) + (spd > 22 ? rk * 1.5 : spd > 12 ? Math.max(0, rk - 2) * 1.5 : 0);
+    const cand = { score, s, px, py, dir, segB, d, dh };
     if (d <= Rmax && (!best || score < best.score)) best = cand;
     if (isLast && (!same || score < same.score)) same = cand;
   }
   if (!best) best = same;
   if (!best) { RD.lastKey = null; RD.switchN = 0; return null; }
   // Changer de route seulement si l'autre route gagne 2 relevés de suite : un saut GPS isolé ne fait plus « sauter » le curseur sur une route voisine
-  if (same && best.s.line.key !== RD.lastKey) {
+  // la nouvelle route est nettement meilleure (cap ou distance) : on change tout de suite, sans attendre 2 relevés
+  const clear = same && best.s.line.key !== RD.lastKey && spd > 6 &&
+    same.dh > 22 && best.dh < same.dh - 15; // (distance seule : non, un saut GPS isolé ferait sauter le curseur)
+  if (clear) RD.switchN = 0;
+  else if (same && best.s.line.key !== RD.lastKey) {
     RD.switchN = (RD.switchKey === best.s.line.key ? RD.switchN : 0) + 1; RD.switchKey = best.s.line.key;
     if (RD.switchN < 2) best = same; else RD.switchN = 0;
   } else RD.switchN = 0;
@@ -761,7 +769,8 @@ function roadAhead(M, meters) {
       if (d2 === 1 && L.ow === -1) continue; if (d2 === -1 && L.ow === 1) continue;
       const q = L.pts[k2]; const hb = (Math.atan2(q[0] - e[0], q[1] - e[1]) * 180 / Math.PI + 360) % 360, dd = angDiff(hb, h);
       const signed = ((((hb - h) % 360) + 540) % 360) - 180;
-      if (dd < bd && ((L.key === curKey && !/^\|/.test(curKey || '|')) || dd < 20)) { bd = dd; nxt = { line: L, dir: d2, j: k2 }; }
+      const ddp = dd - (L.key === curKey ? 12 : 0) + (L.rank || 0) * 3;
+      if (ddp < bd && ((L.key === curKey && !/^\|/.test(curKey || '|')) || dd < 20)) { bd = ddp; nxt = { line: L, dir: d2, j: k2 }; }
       if (dd < bad) { bad = dd; ba = { line: L, dir: d2, j: k2 }; }
       if (Math.abs(rate) > 6 && Math.sign(signed) === Math.sign(rate) && dd <= 130 && dd < btd) { btd = dd; bt = { line: L, dir: d2, j: k2 }; }
     }
@@ -1159,6 +1168,16 @@ function openGeoHelp() {
   body.querySelector('#geoRetry').onclick = () => { closeSheet(); startGps(true); };
 }
 let gpsRetryT = 0, gpsRetryN = 0, gpsWeakT = 0;
+/* Journal du trajet (20 min, gardé sur le téléphone) : envoyé SEULEMENT si on coche la case dans « Mon avis ». Sert à rejouer
+   exactement un trajet réel pour corriger le placement sur la carte. */
+const TRACE = { a: (() => { try { const v = JSON.parse(localStorage.getItem('routa.trace') || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } })(), n: 0 };
+function traceFix(c, ts) {
+  const r6 = (x) => Math.round(x * 1e6) / 1e6, D = S.drv, M = S.posM;
+  TRACE.a.push([Math.round(ts / 100) / 10, r6(c.latitude), r6(c.longitude), Math.round(c.accuracy || 0), c.speed == null ? null : Math.round(c.speed * 10) / 10, c.heading == null || isNaN(c.heading) ? null : Math.round(c.heading),
+    D ? r6(D.lat) : null, D ? r6(D.lon) : null, D ? Math.round(D.heading) : null, M && M.M ? RD.lastKey : null, Math.round(map.getBearing()), Math.round(map.getZoom() * 10) / 10]);
+  const lim = ts / 1000 - 1200; while (TRACE.a.length && TRACE.a[0][0] < lim) TRACE.a.shift();
+  if (++TRACE.n % 10 === 0) { try { localStorage.setItem('routa.trace', JSON.stringify(TRACE.a)); } catch (e) { /* */ } }
+}
 function startGps(force) {
   if (!('geolocation' in navigator)) { setGeoState('denied'); return; }
   if (S.watchId != null && !force) return;
@@ -1191,6 +1210,7 @@ function startGps(force) {
       S.hdAt = Date.now();
     } else if ((S.speed || 0) <= 2.5) S.hdRate = 0;
     S.prevPos = S.pos; S.pos = now;
+    try { traceFix(c, Date.now()); } catch (e) { /* */ }
     updateMatched(now, c.accuracy);
     renderMe();
     drvStart();
@@ -3570,6 +3590,7 @@ async function openFeedback(preset) {
     '<div class="seg" id="fbKind">' + FB_KINDS.map(([k, v]) => '<button data-k="' + k + '" class="' + (k === kind ? 'on' : '') + '">' + v + '</button>').join('') + '</div>' +
     '<label class="field" for="fbMsg"><span id="fbLabel"></span><textarea id="fbMsg" maxlength="2000" style="height:140px"></textarea></label>' +
     '<label class="switch" for="fbTech"><span>Joindre les infos techniques (modèle de téléphone, navigateur, version). Jamais ta position.</span><input id="fbTech" type="checkbox" checked></label>' +
+    (TRACE.a.length > 20 ? '<label class="switch" for="fbTrace"><span>' + esc(I18N.t('Joindre mon trajet des 20 dernières minutes (pour corriger le placement sur la carte).')) + '</span><input id="fbTrace" type="checkbox"></label>' : '') +
     '<button class="btn block" id="fbSend">Envoyer mon retour</button>' +
     '<p class="muted small">Chaque retour est lu. Merci de prendre le temps, ça aide vraiment à construire l\'app.</p>', 'feedback');
   const labels = { bug: ['Qu\'est-ce qui ne marche pas ?', 'Ex. : la voix ne parle pas après le rond-point, la carte reste grise sur mon iPhone…'], idee: ['Ton idée ou amélioration', 'Ex. : pouvoir enregistrer mes trajets favoris, voir la météo sur la route…'], autre: ['Ton message', 'Tout ce que tu veux nous dire sur ROUTA'] };
@@ -3582,7 +3603,7 @@ async function openFeedback(preset) {
     const msg = $('fbMsg').value.trim();
     if (msg.length < 5) { toast('Écris quelques mots pour qu\'on comprenne ton retour.'); return; }
     const btn = $('fbSend'); btn.disabled = true; btn.textContent = 'Envoi…';
-    const ok = await DB.sendFeedback({ id: uuid(), kind, message: msg, pseudo: S.me.pseudo, created_by: S.me.id, app_version: VERSION, device: $('fbTech').checked ? deviceInfo() : null, page: preset && preset.page || null, created_at: new Date().toISOString() });
+    const ok = await DB.sendFeedback({ id: uuid(), kind, message: msg, pseudo: S.me.pseudo, created_by: S.me.id, app_version: VERSION, device: ($('fbTrace') && $('fbTrace').checked) ? JSON.stringify({ info: $('fbTech').checked ? deviceInfo() : null, v: 1, cols: 't,lat,lon,acc,spd,hd,dlat,dlon,dhd,key,bear,zoom', trace: TRACE.a }) : ($('fbTech').checked ? deviceInfo() : null), page: preset && preset.page || null, created_at: new Date().toISOString() });
     if (ok) {
       closeSheet();
       store.set('routa.fbCount', (store.get('routa.fbCount', 0) || 0) + 1);
@@ -3916,7 +3937,7 @@ if (!store.get('routa.mig096', false)) { S.settings.voice = false; S.settings.re
 if (!store.get('routa.mig0913', false)) { S.settings.traffic = true; S.settings.showPlaces = true; S.settings.showTransit = false; saveSettings(); store.set('routa.mig0913', true); }
 S.settings.mapType = 'plan';
 S.settings.relief3d = false;
-window.ROUTA = { myView, roadMatch, roadKey: () => RD.lastKey, CUR_COLORS, alertVisible, renderAlerts, reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, chooseDestination, initials, veh, openDriver, startNav, openSpot, openPoi, capLimit, openCursor, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
+window.ROUTA = { myView, roadMatch, openFeedback, TRACE, roadKey: () => RD.lastKey, __near: (q) => { const I = roadIndex(q); const x = (q.lon - I.c.lon) * I.kx, y = (q.lat - I.c.lat) * I.ky, o = {}; for (const sg of I.segs) { const A = sg.line.pts[sg.i], B = sg.line.pts[sg.i + 1], dx = B[0] - A[0], dy = B[1] - A[1], L2 = dx * dx + dy * dy || 1; let t = ((x - A[0]) * dx + (y - A[1]) * dy) / L2; t = Math.max(0, Math.min(1, t)); const d = Math.hypot(x - A[0] - t * dx, y - A[1] - t * dy); if (d < 40) { const k = sg.line.key + ' ow' + sg.line.ow + ' h' + Math.round((Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360); o[k] = Math.min(o[k] || 1e9, Math.round(d)); } } return o; }, CUR_COLORS, alertVisible, renderAlerts, reroute, saveActiveNav, alongRoute, clearPois, pickVia, updateSpeed, enterSearch, exitSearch, S, DB, map, CFG, I18N, esc, ic, el, toast, openSheet, closeSheet, userClose, say, vibrate, uuid, dist, fmtDist, fmtDur, fmtClock, ago, store, saveMe, pushPresence, chooseDestination, initials, veh, openDriver, startNav, openSpot, openPoi, capLimit, openCursor, openK, overpass, inCH, geoReverse, openCountry, renderSpots, geoSearch, parseOsm, renderPoiList, showPois, ohParse, ohStatus, OVERPASS_FILTER };
 if (!S.me || !S.me.pseudo) onboarding(); else boot();
 
 })();
