@@ -13,13 +13,10 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link href="vendor/fonts.css" rel="stylesheet">
-<link href="vendor/maplibre-gl.css?v=4.7.1" rel="stylesheet">
-<script>/* ROUTA – app iPhone avec fichiers embarqués : au premier lancement, on reprend le profil de l'ancienne version (en ligne). */
-(function(){try{var L=localStorage,h=location.hash;if(h.indexOf('#mig=')===0){var d=JSON.parse(decodeURIComponent(h.slice(5))||'{}');for(var k in d){if(/^routa\./.test(k)&&typeof d[k]==='string')L.setItem(k,d[k]);}L.setItem('routa.migDone','1');history.replaceState(null,'',location.pathname);return;}
-if(location.protocol!=='capacitor:'||L.getItem('routa.migDone'))return;if(sessionStorage.getItem('routa.migTry'))return;sessionStorage.setItem('routa.migTry','1');
-if(!navigator.onLine){return;}window.stop();var u='https://routa.ackfix.com/migrer.html';var t=setTimeout(function(){location.reload();},6000);
-fetch(u+'?t='+Date.now(),{cache:'no-store'}).then(function(r){clearTimeout(t);if(r.ok)location.replace(u+'?from=app');else location.reload();}).catch(function(){clearTimeout(t);location.reload();});}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
 <script>(function(){var C=window.Capacitor;if(!(C&&C.isNativePlatform&&C.isNativePlatform())){var d=document.documentElement;d.classList.add('web');if((window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone)d.classList.add('pwa');var m=document.querySelector('meta[name="theme-color"]');if(m)m.content='#F8F4F0';}})();</script>
 <link href="style.css?v=1.0.62" rel="stylesheet">
 </head>
@@ -144,9 +141,9 @@ fetch(u+'?t='+Date.now(),{cache:'no-store'}).then(function(r){clearTimeout(t);if
 
 <div id="toasts" class="toasts" aria-live="polite"></div>
 
-<script src="vendor/maplibre-gl.js?v=4.7.1"></script>
-<script src="native.js?v=6"></script>
-<script src="vendor/supabase.min.js?v=2.45.4"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="native.js?v=5"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="i18n-a.js"></script>
 <script src="i18n-c.js"></script>
 <script src="i18n-d.js?v=12"></script>

@@ -583,23 +583,3 @@
     setInterval(sched, 1500);
   }
 })();
-
-/* ROUTA – app avec fichiers embarqués : signale un démarrage réussi, puis cherche une nouvelle version
-   (téléchargée en arrière-plan, appliquée au prochain lancement). Sur le web, rien ne change. */
-(function () {
-  'use strict';
-  const C = window.Capacitor;
-  const U = C && C.Plugins && C.Plugins.RoutaUpdate;
-  if (!U || !C.isNativePlatform || !C.isNativePlatform()) return;
-  let last = 0;
-  const check = () => {
-    if (!navigator.onLine || Date.now() - last < 20 * 60 * 1000) return;
-    last = Date.now();
-    Promise.resolve().then(() => U.check()).then((r) => { if (r && r.updated) window.ROUTA_UPDATE_READY = r.v; }).catch(() => { /* réessai plus tard */ });
-  };
-  window.addEventListener('load', () => {
-    setTimeout(() => { if (window.ROUTA && window.ROUTA.map) Promise.resolve().then(() => U.ok()).catch(() => {}); }, 4000);
-    setTimeout(check, 8000);
-  });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
-})();
